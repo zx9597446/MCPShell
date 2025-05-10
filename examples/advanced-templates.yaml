@@ -1,0 +1,111 @@
+mcp:
+  description: |
+    Advanced Templating Examples demonstrating sophisticated Go
+    template usage within command execution, including conditional logic,
+    optional parameter handling, complex command construction, and multi-stage
+    processing pipelines for powerful and flexible tool definitions.
+  tools:
+    # -----------------------------------------------
+    # Tool: greeter
+    # 
+    # Template Features Demonstrated:
+    # - Conditional logic (if/else/end)
+    # - Optional parameter handling
+    # - String concatenation in templates
+    # 
+    # This tool shows how to use if/else conditionals
+    # to format output differently based on whether
+    # an optional parameter (title) is provided.
+    # -----------------------------------------------
+    - name: "greeter"
+      description: "Greets a person with conditional formatting"
+      params:
+        name:
+          type: string
+          description: "Name of the person to greet"
+          required: true
+        title:
+          type: string
+          description: "Optional title (Mr, Mrs, Dr, etc.)"
+      constraints:
+        - "name.size() >= 2 && name.size() <= 50"  # Name length between 2 and 50 chars
+        - "title == '' || ['Mr', 'Mrs', 'Ms', 'Dr', 'Prof'].exists(t, t == title)"  # Only allowed titles
+      run:
+        command: "echo '{{ if .title }}Hello, {{ .title }} {{ .name }}!{{ else }}Hello, {{ .name }}!{{ end }}'"
+    
+    # -----------------------------------------------
+    # Tool: file_finder
+    # 
+    # Template Features Demonstrated:
+    # - Multiple conditionals in a single command
+    # - Boolean parameter handling
+    # - Conditional command flag inclusion
+    # - String interpolation with quotes
+    # 
+    # This tool demonstrates how to build a complex
+    # command with multiple conditional parts based
+    # on provided parameters. It showcases how to
+    # conditionally include command-line flags and
+    # properly handle quoted string parameters.
+    # -----------------------------------------------
+    - name: "file_finder"
+      description: "Find files with a given extension"
+      params:
+        directory:
+          type: string
+          description: "Directory to search in"
+          required: true
+        extension:
+          type: string
+          description: "File extension to search for (without the dot)"
+        recursive:
+          type: boolean
+          description: "Whether to search recursively"
+      constraints:
+        - "directory.startsWith('/') || directory.startsWith('./')"  # Must be absolute or relative path
+        - "!directory.contains('../')"  # Prevent directory traversal
+        - "!directory.contains('~')"    # Prevent home directory expansion
+        - "extension == '' || extension.matches('^[a-zA-Z0-9]+$')"  # Extension must be alphanumeric if provided
+      run:
+        command: "find {{ .directory }} {{ if .recursive }}-type f{{ else }}-maxdepth 1 -type f{{ end }} {{ if .extension }}-name \"*.{{ .extension }}\"{{ end }}"
+      output:
+        prefix: "Found files:"
+    
+    # -----------------------------------------------
+    # Tool: conditional_formatter
+    # 
+    # Template Features Demonstrated:
+    # - Multi-line command with templating
+    # - Pipeline processing with conditionals
+    # - Boolean flags controlling command behavior
+    # - Command substitution based on parameters
+    # 
+    # This tool shows how to create a processing pipeline
+    # where each step in the pipeline is conditionally
+    # included or replaced based on boolean parameters.
+    # It demonstrates using templates in a multi-line
+    # command with proper shell escaping.
+    # -----------------------------------------------
+    - name: "conditional_formatter"
+      description: "Format text based on user preferences"
+      params:
+        text:
+          type: string
+          description: "Text to format"
+          required: true
+        uppercase:
+          type: boolean
+          description: "Convert to uppercase"
+        reverse:
+          type: boolean
+          description: "Reverse the text"
+      constraints:
+        - "text.startsWith('text:')"  # Ensure text starts with the 'text:' prefix
+        - "text.size() > 6"           # Text must be longer than just the prefix
+        - "text.size() <= 200"        # Limit text size
+        - "!text.matches('.*[;&|`].*')"  # Prevent shell injection
+      run:
+        command: |
+          echo '{{ .text }}' | \
+          {{ if .uppercase }}tr '[:lower:]' '[:upper:]'{{ else }}cat{{ end }} | \
+          {{ if .reverse }}rev{{ else }}cat{{ end }}" 

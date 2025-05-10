@@ -1,0 +1,50 @@
+mcp:
+  description: |
+    Configuration Defaults Example showing how the MCP CLI Adapter handles
+    default type values for parameters, allowing for simpler configuration
+    files with reasonable defaults while supporting explicit type declarations
+    when needed.
+  tools:
+    - name: "hello_world"
+      description: "Say hello to someone"
+      params:
+        name:
+          # type is omitted, defaults to "string"
+          description: "Name of the person to greet"
+          required: true
+      run:
+        command: "echo 'Hello, {{ .name }}!'"
+    
+    - name: "weather"
+      description: "Get the weather for a location"
+      params:
+        location:
+          # type is omitted, defaults to "string"
+          description: "The location to get weather for"
+          required: true
+        format:
+          # type is omitted, defaults to "string"
+          description: "Output format (simple or detailed)"
+      run:
+        command: "echo 'Sunny, 72°F'"
+      output:
+        prefix: "The weather in {{ .location }} is"
+    
+    - name: "mixed_types"
+      description: "Example with different parameter types"
+      params:
+        text_input:
+          # type is omitted, defaults to "string"
+          description: "A text input"
+          required: true
+        number_input:
+          type: number
+          description: "A numeric input"
+          required: true
+        flag:
+          type: boolean
+          description: "A boolean flag"
+      run:
+        command: "echo '{{ .text_input }}, {{ .number_input }}, {{ .flag }}'"
+      output:
+        prefix: "Parameters received:" 

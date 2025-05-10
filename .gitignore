@@ -1,0 +1,57 @@
+# Binaries and build directories
+/build/
+/bin/
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+*.out
+
+# Test binary, built with `go test -c`
+*.test
+
+# Output of the go coverage tool
+*.out
+*.cov
+coverage.txt
+
+# Go specific
+.DS_Store
+/vendor/
+/Godeps/
+
+# IDE files
+.idea/
+.vscode/*
+.cursor/*
+*.iml
+*.swp
+*.swo
+*~
+
+# Binary distribution files
+mcp-cli-adapter-*
+dist/
+
+# Debug files
+debug
+__debug_bin
+
+# Local configuration files that should not be committed
+config.local.yaml
+*.local.yaml
+.env
+
+# OS specific files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Log files
+*.log
+logs/

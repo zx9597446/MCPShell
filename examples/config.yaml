@@ -1,0 +1,152 @@
+mcp:
+  description: |
+    MCP CLI Adapter for basic utility tools that provides various command-line
+    utilities including greetings, weather information, calculation, file
+    operations, and environment inspection in a secure, controlled environment.
+  run:
+    shell: zsh
+  tools:
+    - name: "hello_world"
+      description: "Say hello to someone"
+      params:
+        name:
+          type: string
+          description: "Name of the person to greet"
+          required: true
+      constraints:
+        - "name.size() <= 100"  # Limit name length
+        - "!name.contains('/')" # Prevent path traversal
+      run:
+        command: "echo 'Hello, {{ .name }}!'"          
+    
+    - name: "weather"
+      description: "Get the weather for a location"
+      params:
+        location:
+          type: string
+          description: "The location to get weather for"
+          required: true
+        format:
+          type: string
+          description: "Output format (simple or detailed)"
+      constraints:
+        - "location.size() > 0"                                 # Location must not be empty
+        - "location.size() <= 50"                               # Limit location length
+        - "format == '' || format == 'simple' || format == 'detailed'"  # Restrict format values
+      run:
+        command: |
+          if [ "{{ .format }}" = "detailed" ]; then
+            curl -s --max-time 5 'https://wttr.in/{{ .location }}?format=v2'
+          else
+            curl -s --max-time 5 'https://wttr.in/{{ .location }}?format=3'
+          fi
+      output:
+        prefix: |
+          Weather information for {{ .location }}:
+    
+    - name: "calculator"
+      description: "Perform a calculation"
+      params:
+        expression:
+          type: string
+          description: "The mathematical expression to evaluate"
+          required: true
+      constraints:
+        - "expression.size() <= 200"                # Limit expression length
+        - "!expression.matches('.*[;&|`].*')"       # Prevent shell injection
+        - "!expression.matches('.*\\b(rm|sudo|mv|cp|chmod)\\b.*')"  # Block dangerous commands
+      run:
+        command: "echo '{{ .expression }}' | bc -l" 
+      output:
+        prefix: |
+          The result of the calculation is
+
+    - name: "file_reader"
+      description: "Read contents of a file with safety constraints"
+      params:
+        filepath:
+          type: string
+          description: "Path to the file to read"
+          required: true
+      constraints:
+        # Using CEL string operations for safety validations
+        - "filepath.size() > 0"                      # Ensure filepath is not empty
+        - "filepath.size() <= 255"                   # Reasonable maximum path length
+        - "!filepath.contains('../')"                # Prevent directory traversal
+        - "!filepath.startsWith('/')"                # Prevent absolute paths
+        # Using list.exists() to check if filepath ends with any allowed extension
+        - "['.txt', '.log', '.md', '.json', '.yaml', '.yml'].exists(ext, filepath.endsWith(ext))"
+      run:
+        command: "cat {{ .filepath }}"
+        
+    - name: "secure_shell"
+      description: "Run limited shell commands with strict constraints"
+      params:
+        command:
+          type: string
+          description: "Command to run"
+          required: true
+        args:
+          type: string
+          description: "Command arguments"
+          required: false
+      constraints:
+        # Using list.exists() to whitelist only safe commands
+        - "['ls', 'cat', 'echo', 'grep', 'pwd', 'find'].exists(cmd, cmd == command)"
+        # Defensive constraints against shell injection
+        - "args.size() <= 100"                       # Limit args length
+        - "!args.contains(';')"                      # No command chaining
+        - "!args.contains('&&')"                     # No command chaining
+        - "!args.contains('||')"                     # No command chaining
+        - "!args.contains('>')"                      # No redirection
+        - "!args.contains('<')"                      # No redirection
+        - "!args.contains('|')"                      # No piping
+        - "!args.contains('`')"                      # No command substitution
+        - "!args.contains('$(')"                     # No command substitution
+      run:
+        command: "{{ .command }} {{ .args }}"
+
+    - name: "number_validator"
+      description: "Validate a number against various constraints"
+      params:
+        value:
+          type: number
+          description: "Numeric value to validate"
+          required: true
+        operation:
+          type: string
+          description: "Operation to perform (square, double, half)"
+          required: false
+      constraints:
+        # Numeric comparison operations
+        - "value >= 0.0 && value <= 1000.0"          # Range constraint
+        # Conditional constraint based on operation parameter
+        - "operation == '' || ['square', 'double', 'half'].exists(op, op == operation)"
+      run:
+        command: |
+          if [ "{{ .operation }}" = "square" ]; then
+            echo "{{ .value }} * {{ .value }}" | bc -l
+          elif [ "{{ .operation }}" = "double" ]; then
+            echo "{{ .value }} * 2" | bc -l
+          elif [ "{{ .operation }}" = "half" ]; then
+            echo "{{ .value }} / 2" | bc -l
+          else
+            echo "{{ .value }}"
+          fi
+
+    - name: "env_vars"
+      description: "Show environment variables available in the shell"
+      params:
+        random_string:
+          type: string
+          description: "Dummy parameter for no-parameter tools"
+          required: true
+      run:
+        env:
+          - HOME
+          - USER
+          - PATH
+        command: env
+      output:
+        prefix: |
+          Environment variables:

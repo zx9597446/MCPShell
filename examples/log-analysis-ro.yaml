@@ -1,0 +1,601 @@
+mcp:
+  description: |
+    Log Analysis Toolkit providing read-only access to system and application logs.
+    This toolkit helps users and administrators troubleshoot issues by examining
+    log files, filtering relevant events, monitoring system messages, and
+    analyzing log patterns through safe commands that don't modify the logs or
+    system configuration.
+  run:
+    shell: bash
+  tools:
+    - name: "system_logs"
+      description: "Show recent system logs from journald/syslog/system.log"
+      params:
+        lines:
+          type: number
+          description: "Number of log lines to show (default: 50)"
+        priority:
+          type: string
+          description: "Filter by priority (error, warning, info, debug, etc.)"
+        service:
+          type: string
+          description: "Filter by service name"
+      constraints:
+        - "int(lines) == 0 || (int(lines) >= 1 && int(lines) <= 1000)"            # Reasonable line count
+        - "priority == '' || ['error', 'warning', 'notice', 'info', 'debug'].exists(p, p == priority)"  # Valid priorities
+        - "service == '' || service.matches('^[a-zA-Z0-9_.-]+$')"  # Safe service name chars
+      run:
+        command: |
+          # Set defaults
+          LINES=50
+          PRIORITY_FILTER=""
+          SERVICE_FILTER=""
+          
+          if [ {{ .lines }} -gt 0 ]; then
+            LINES={{ .lines }}
+          fi
+          
+          if [ -n "{{ .priority }}" ]; then
+            PRIORITY_FILTER="{{ .priority }}"
+          fi
+          
+          if [ -n "{{ .service }}" ]; then
+            SERVICE_FILTER="{{ .service }}"
+          fi
+          
+          echo "Retrieving system logs (last $LINES lines)"
+          if [ -n "$PRIORITY_FILTER" ]; then
+            echo "Priority filter: $PRIORITY_FILTER"
+          fi
+          
+          if [ -n "$SERVICE_FILTER" ]; then
+            echo "Service filter: $SERVICE_FILTER"
+          fi
+          
+          echo ""
+          
+          if [[ "$(uname)" == "Darwin" ]]; then
+            # MacOS uses system.log
+            LOG_CMD="log show --predicate 'messageType == error OR messageType == fault'"
+            
+            if [ -n "$SERVICE_FILTER" ]; then
+              LOG_CMD="$LOG_CMD --predicate 'process == \"$SERVICE_FILTER\"'"
+            fi
+            
+            if [ -n "$PRIORITY_FILTER" ]; then
+              case "$PRIORITY_FILTER" in
+                "error")
+                  LOG_CMD="$LOG_CMD --predicate 'messageType == error OR messageType == fault'"
+                  ;;
+                "warning")
+                  LOG_CMD="$LOG_CMD --predicate 'eventMessage CONTAINS \"warning\"'"
+                  ;;
+                "info"|"notice"|"debug")
+                  LOG_CMD="$LOG_CMD --info"
+                  ;;
+              esac
+            fi
+            
+            # Get recent log entries
+            $LOG_CMD --last 1h | tail -n $LINES
+            
+          else
+            # Linux - try journalctl first, fall back to syslog
+            if command -v journalctl >/dev/null 2>&1; then
+              # Using journalctl
+              JOURNAL_CMD="journalctl -n $LINES"
+              
+              if [ -n "$PRIORITY_FILTER" ]; then
+                case "$PRIORITY_FILTER" in
+                  "error")
+                    JOURNAL_CMD="$JOURNAL_CMD -p 0..3"  # emerg, alert, crit, err
+                    ;;
+                  "warning")
+                    JOURNAL_CMD="$JOURNAL_CMD -p 4"  # warning
+                    ;;
+                  "notice")
+                    JOURNAL_CMD="$JOURNAL_CMD -p 5"  # notice
+                    ;;
+                  "info")
+                    JOURNAL_CMD="$JOURNAL_CMD -p 6"  # info
+                    ;;
+                  "debug")
+                    JOURNAL_CMD="$JOURNAL_CMD -p 7"  # debug
+                    ;;
+                esac
+              fi
+              
+              if [ -n "$SERVICE_FILTER" ]; then
+                JOURNAL_CMD="$JOURNAL_CMD -u $SERVICE_FILTER"
+              fi
+              
+              # Execute the command
+              $JOURNAL_CMD
+              
+            elif [ -f /var/log/syslog ]; then
+              # Using syslog
+              if [ -n "$PRIORITY_FILTER" ] || [ -n "$SERVICE_FILTER" ]; then
+                GREP_CMD="grep"
+                
+                if [ -n "$PRIORITY_FILTER" ]; then
+                  GREP_CMD="$GREP_CMD -i $PRIORITY_FILTER"
+                fi
+                
+                if [ -n "$SERVICE_FILTER" ]; then
+                  GREP_CMD="$GREP_CMD $SERVICE_FILTER"
+                fi
+                
+                tail -n $LINES /var/log/syslog | $GREP_CMD
+              else
+                tail -n $LINES /var/log/syslog
+              fi
+              
+            else
+              echo "No suitable system log found. Try checking specific log files with log_file_analysis."
+            fi
+          fi
+      output:
+        prefix: "System Log Analysis:"
+
+    - name: "log_file_analysis"
+      description: "Analyze a specific log file with filters and pattern matching"
+      params:
+        log_path:
+          type: string
+          description: "Path to the log file to analyze"
+          required: true
+        lines:
+          type: number
+          description: "Number of log lines to show (default: 50)"
+        pattern:
+          type: string
+          description: "Pattern to search for (grep-style)"
+        time_window:
+          type: string
+          description: "Time window to analyze (e.g., '10m', '1h', '1d')"
+      constraints:
+        - "log_path.startsWith('/var/log/') || log_path.startsWith('/Library/Logs/')"  # Common log directories
+        - "!log_path.contains('../')"                               # Prevent directory traversal
+        - "log_path.matches(\"^[a-zA-Z0-9/._\\\\-]+$\")"           # Safe path characters
+        - "log_path.size() <= 100"                                  # Reasonable path length
+        - "int(lines) == 0 || (int(lines) >= 1 && int(lines) <= 2000)"             # Reasonable line count
+        - "pattern == '' || pattern.size() <= 100"                  # Reasonable pattern length
+        - "time_window == '' || time_window.matches(\"^[0-9]+[mhd]$\")"  # Valid time format
+      run:
+        command: |
+          LOG_PATH="{{ .log_path }}"
+          
+          # Verify log file exists and is readable
+          if [ ! -f "$LOG_PATH" ]; then
+            echo "Error: Log file not found: $LOG_PATH"
+            echo "Available log files in /var/log:"
+            ls -la /var/log | grep -v "^d" | head -20
+            exit 1
+          fi
+          
+          if [ ! -r "$LOG_PATH" ]; then
+            echo "Error: Cannot read log file (permission denied): $LOG_PATH"
+            exit 1
+          fi
+          
+          # Set defaults
+          LINES=50
+          PATTERN=""
+          TIME_WINDOW=""
+          
+          if [ {{ .lines }} -gt 0 ]; then
+            LINES={{ .lines }}
+          fi
+          
+          if [ -n "{{ .pattern }}" ]; then
+            PATTERN="{{ .pattern }}"
+          fi
+          
+          if [ -n "{{ .time_window }}" ]; then
+            TIME_WINDOW="{{ .time_window }}"
+          fi
+          
+          echo "Analyzing log file: $LOG_PATH"
+          echo "File size: $(du -h "$LOG_PATH" | awk '{print $1}')"
+          echo "Last modified: $(stat -c %y "$LOG_PATH" 2>/dev/null || stat -f "%Sm" "$LOG_PATH")"
+          
+          if [ -n "$PATTERN" ]; then
+            echo "Pattern filter: $PATTERN"
+          fi
+          
+          if [ -n "$TIME_WINDOW" ]; then
+            echo "Time window: $TIME_WINDOW"
+          fi
+          
+          echo ""
+          
+          # Process based on time window
+          if [ -n "$TIME_WINDOW" ]; then
+            # Extract time unit and value
+            TIME_VALUE=$(echo "$TIME_WINDOW" | sed 's/[mhd]$//')
+            TIME_UNIT=$(echo "$TIME_WINDOW" | sed 's/^[0-9]*//')
+            
+            SECONDS_AGO=0
+            case "$TIME_UNIT" in
+              "m")
+                SECONDS_AGO=$((TIME_VALUE * 60))
+                ;;
+              "h")
+                SECONDS_AGO=$((TIME_VALUE * 3600))
+                ;;
+              "d")
+                SECONDS_AGO=$((TIME_VALUE * 86400))
+                ;;
+            esac
+            
+            # Get current timestamp
+            CURRENT_TIME=$(date +%s)
+            SINCE_TIME=$((CURRENT_TIME - SECONDS_AGO))
+            
+            # For simplicity, we're using the last modified time as a proxy
+            # A more accurate approach would parse the log timestamps, but that requires
+            # knowledge of the log format which varies widely
+            
+            if [[ "$(uname)" == "Darwin" ]]; then
+              # MacOS
+              if [ -n "$PATTERN" ]; then
+                grep "$PATTERN" "$LOG_PATH" | tail -n $LINES
+              else
+                tail -n $LINES "$LOG_PATH"
+              fi
+            else
+              # Linux - try to use the time window with grep
+              if [ -n "$PATTERN" ]; then
+                grep "$PATTERN" "$LOG_PATH" | tail -n $LINES
+              else
+                tail -n $LINES "$LOG_PATH"
+              fi
+            fi
+          else
+            # Simple log analysis without time window
+            if [ -n "$PATTERN" ]; then
+              grep "$PATTERN" "$LOG_PATH" | tail -n $LINES
+            else
+              tail -n $LINES "$LOG_PATH"
+            fi
+          fi
+          
+          # Basic log statistics
+          echo -e "\nLog Statistics:"
+          echo "Total lines: $(wc -l < "$LOG_PATH")"
+          
+          if [ -n "$PATTERN" ]; then
+            MATCHING_LINES=$(grep -c "$PATTERN" "$LOG_PATH")
+            echo "Lines matching pattern: $MATCHING_LINES"
+            echo "Pattern frequency: $(echo "scale=2; $MATCHING_LINES * 100 / $(wc -l < "$LOG_PATH")" | bc 2>/dev/null || echo "N/A")%"
+          fi
+          
+          # Show top patterns if no specific pattern requested
+          if [ -z "$PATTERN" ]; then
+            echo -e "\nCommon patterns in log:"
+            if [[ "$(uname)" == "Darwin" ]]; then
+              # MacOS - simple word count
+              grep -o -E "[a-zA-Z0-9_]+" "$LOG_PATH" | sort | uniq -c | sort -nr | head -10
+            else
+              # Linux - try to identify error patterns
+              grep -i "error\\|warning\\|failed\\|exception" "$LOG_PATH" | grep -o -E "[a-zA-Z0-9_]+ [a-zA-Z0-9_]+ [a-zA-Z0-9_]+" | sort | uniq -c | sort -nr | head -10
+            fi
+          fi
+      output:
+        prefix: "Log File Analysis for {{ .log_path }}:"
+
+    - name: "error_log_summary"
+      description: "Show a summary of errors across multiple system and application logs"
+      params:
+        hours:
+          type: number
+          description: "How many hours back to search for errors (default: 24)"
+      constraints:
+        - "int(hours) == 0 || (int(hours) >= 1 && int(hours) <= 168)"  # 1 hour to 7 days
+      run:
+        command: |
+          # Set defaults
+          HOURS=24
+          
+          if [ {{ .hours }} -gt 0 ]; then
+            HOURS={{ .hours }}
+          fi
+          
+          echo "Error Log Summary (last $HOURS hours):"
+          echo "------------------------------------"
+          
+          if [[ "$(uname)" == "Darwin" ]]; then
+            # MacOS
+            echo -e "\nSystem Log Errors:"
+            log show --last ${HOURS}h --predicate 'messageType == error OR messageType == fault' | head -50
+            
+            echo -e "\nCrash Reports (if available):"
+            ls -la /Library/Logs/DiagnosticReports/ 2>/dev/null | grep -v "^d" | tail -10
+            
+          else
+            # Linux
+            echo -e "\nSystem Errors (syslog/journald):"
+            if command -v journalctl >/dev/null 2>&1; then
+              # Using journalctl
+              journalctl -p 0..3 --since "$HOURS hours ago" | head -50
+            elif [ -f /var/log/syslog ]; then
+              # Using syslog
+              grep -i "error\\|crit\\|alert\\|emerg" /var/log/syslog | tail -50
+            else
+              echo "No suitable system log found."
+            fi
+            
+            echo -e "\nKernel Errors:"
+            dmesg --level=err,crit,alert,emerg | tail -20
+            
+            echo -e "\nApplication Errors:"
+            for log in /var/log/apache2/error.log /var/log/nginx/error.log /var/log/mysql/error.log; do
+              if [ -f "$log" ] && [ -r "$log" ]; then
+                echo -e "\n$log:"
+                tail -20 "$log"
+              fi
+            done
+            
+            # Boot errors
+            if [ -d /var/log/boot ]; then
+              echo -e "\nBoot Errors:"
+              grep -i "error\\|failed" /var/log/boot.log 2>/dev/null | tail -10
+            fi
+          fi
+          
+          echo -e "\nError Summary by Frequency:"
+          if [[ "$(uname)" == "Darwin" ]]; then
+            # MacOS
+            log show --last ${HOURS}h --predicate 'messageType == error OR messageType == fault' | grep -o -E "[A-Za-z0-9_]+ (error|failed)" | sort | uniq -c | sort -nr | head -10
+          else
+            # Linux
+            if command -v journalctl >/dev/null 2>&1; then
+              journalctl -p 0..3 --since "$HOURS hours ago" | grep -o -E "[A-Za-z0-9_]+ (error|failed)" | sort | uniq -c | sort -nr | head -10
+            else
+              grep -i "error\\|failed\\|crit\\|alert\\|emerg" /var/log/syslog 2>/dev/null | grep -o -E "[A-Za-z0-9_]+ (error|failed)" | sort | uniq -c | sort -nr | head -10
+            fi
+          fi
+      output:
+        prefix: "System Error Summary:"
+        
+    - name: "application_log_monitor"
+      description: "Monitor application-specific logs (Apache, Nginx, MySQL, etc.)"
+      params:
+        application:
+          type: string
+          description: "Application to monitor (apache, nginx, mysql, postgres, custom)"
+          required: true
+        custom_log_path:
+          type: string
+          description: "Path to custom log file (when application='custom')"
+        lines:
+          type: number
+          description: "Number of log lines to show (default: 50)"
+      constraints:
+        - "application.matches(\"^[a-zA-Z0-9_-]+$\")"                               # Safe application name
+        - "['apache', 'nginx', 'mysql', 'postgres', 'custom'].exists(a, a == application)"  # Valid applications
+        - "application != 'custom' || custom_log_path != ''"                      # Require custom path for custom app
+        - "custom_log_path == '' || !custom_log_path.contains('../')"             # Prevent directory traversal
+        - "custom_log_path == '' || custom_log_path.matches(\"^[a-zA-Z0-9/._\\\\-]+$\")"  # Safe path characters
+        - "int(lines) == 0 || (int(lines) >= 1 && int(lines) <= 1000)"           # Reasonable line count
+      run:
+        command: |
+          APP="{{ .application }}"
+          
+          # Set defaults
+          LINES=50
+          LOG_PATH=""
+          
+          if [ {{ .lines }} -gt 0 ]; then
+            LINES={{ .lines }}
+          fi
+          
+          # Set log paths based on application
+          case "$APP" in
+            "apache")
+              if [[ "$(uname)" == "Darwin" ]]; then
+                # MacOS Apache logs
+                LOG_PATH="/var/log/apache2/error_log"
+                ACCESS_LOG="/var/log/apache2/access_log"
+              else
+                # Linux Apache logs
+                LOG_PATH="/var/log/apache2/error.log"
+                ACCESS_LOG="/var/log/apache2/access.log"
+                
+                # Check for alternative locations
+                if [ ! -f "$LOG_PATH" ]; then
+                  LOG_PATH="/var/log/httpd/error_log"
+                  ACCESS_LOG="/var/log/httpd/access_log"
+                fi
+              fi
+              ;;
+              
+            "nginx")
+              LOG_PATH="/var/log/nginx/error.log"
+              ACCESS_LOG="/var/log/nginx/access.log"
+              ;;
+              
+            "mysql")
+              if [[ "$(uname)" == "Darwin" ]]; then
+                # MacOS MySQL logs
+                LOG_PATH="/usr/local/var/mysql/$(hostname).err"
+              else
+                # Linux MySQL logs
+                LOG_PATH="/var/log/mysql/error.log"
+              fi
+              ;;
+              
+            "postgres")
+              if [[ "$(uname)" == "Darwin" ]]; then
+                # MacOS Postgres logs (might vary based on installation)
+                LOG_PATH="/usr/local/var/postgres/server.log"
+              else
+                # Linux Postgres logs
+                LOG_PATH="/var/log/postgresql/postgresql-10-main.log"
+              fi
+              ;;
+              
+            "custom")
+              LOG_PATH="{{ .custom_log_path }}"
+              ;;
+          esac
+          
+          echo "Application: $APP"
+          
+          # Check if log file exists
+          if [ ! -f "$LOG_PATH" ] || [ ! -r "$LOG_PATH" ]; then
+            echo "Error: Log file not found or not readable: $LOG_PATH"
+            
+            if [ "$APP" != "custom" ]; then
+              echo "Looking for alternative log files:"
+              case "$APP" in
+                "apache")
+                  find /var/log -name "*apache*" -o -name "*httpd*" 2>/dev/null | head -10
+                  ;;
+                "nginx")
+                  find /var/log -name "*nginx*" 2>/dev/null | head -10
+                  ;;
+                "mysql")
+                  find /var/log -name "*mysql*" -o -name "*.err" 2>/dev/null | head -10
+                  ;;
+                "postgres")
+                  find /var/log -name "*postgres*" 2>/dev/null | head -10
+                  ;;
+              esac
+            fi
+            
+            exit 1
+          fi
+          
+          echo "Log file: $LOG_PATH"
+          echo "File size: $(du -h "$LOG_PATH" | awk '{print $1}')"
+          echo "Last modified: $(stat -c %y "$LOG_PATH" 2>/dev/null || stat -f "%Sm" "$LOG_PATH")"
+          
+          echo -e "\nLast $LINES lines of log:"
+          tail -n $LINES "$LOG_PATH"
+          
+          # Show additional information based on application
+          case "$APP" in
+            "apache"|"nginx")
+              if [ -f "$ACCESS_LOG" ] && [ -r "$ACCESS_LOG" ]; then
+                echo -e "\nRecent access patterns:"
+                echo "Top client IPs:"
+                awk '{print $1}' "$ACCESS_LOG" | sort | uniq -c | sort -nr | head -5
+                
+                echo -e "\nTop requested paths:"
+                awk '{print $7}' "$ACCESS_LOG" | sort | uniq -c | sort -nr | head -5
+                
+                echo -e "\nRecent 4xx/5xx errors:"
+                grep -E ' (4|5)[0-9][0-9] ' "$ACCESS_LOG" | tail -10
+              fi
+              ;;
+              
+            "mysql")
+              echo -e "\nCommon errors:"
+              grep -i "error" "$LOG_PATH" | grep -v "Warning" | sort | uniq -c | sort -nr | head -10
+              ;;
+              
+            "postgres")
+              echo -e "\nError patterns:"
+              grep -i "error\\|fatal\\|panic" "$LOG_PATH" | sort | uniq -c | sort -nr | head -10
+              ;;
+          esac
+          
+          echo -e "\nError frequency over time:"
+          if grep -i "error\\|warn\\|fatal" "$LOG_PATH" >/dev/null; then
+            grep -i "error\\|warn\\|fatal" "$LOG_PATH" | 
+            grep -o -E "[0-9]{4}-[0-9]{2}-[0-9]{2}" | 
+            sort | 
+            uniq -c
+          else
+            echo "No clear error pattern found."
+          fi
+      output:
+        prefix: "{{ .application }} Log Analysis:"
+
+    - name: "log_pattern_search"
+      description: "Search for specific patterns across multiple log files"
+      params:
+        pattern:
+          type: string
+          description: "Pattern to search for (grep-style)"
+          required: true
+        log_dir:
+          type: string
+          description: "Directory containing logs to search (default: /var/log)"
+      constraints:
+        - "pattern.size() <= 100"                                  # Reasonable pattern length
+        - "log_dir == '' || log_dir.startsWith('/var/log') || log_dir.startsWith('/Library/Logs')"  # Common log directories
+        - "log_dir == '' || !log_dir.contains('../')"              # Prevent directory traversal
+        - "log_dir == '' || log_dir.matches(\"^[a-zA-Z0-9/._\\\\-]+$\")"  # Safe path characters
+      run:
+        command: |
+          PATTERN="{{ .pattern }}"
+          
+          # Set default log directory
+          if [ -n "{{ .log_dir }}" ]; then
+            LOG_DIR="{{ .log_dir }}"
+          else
+            if [[ "$(uname)" == "Darwin" ]]; then
+              # MacOS default logs
+              LOG_DIR="/var/log"
+            else
+              # Linux default logs
+              LOG_DIR="/var/log"
+            fi
+          fi
+          
+          echo "Searching for pattern: $PATTERN"
+          echo "In log directory: $LOG_DIR"
+          
+          # Verify log directory exists
+          if [ ! -d "$LOG_DIR" ]; then
+            echo "Error: Log directory not found: $LOG_DIR"
+            exit 1
+          fi
+          
+          # Search for the pattern across log files
+          echo -e "\nMatches by log file:"
+          
+          if command -v find >/dev/null 2>&1 && command -v xargs >/dev/null 2>&1 && command -v grep >/dev/null 2>&1; then
+            RESULTS=$(find "$LOG_DIR" -type f -name "*.log" -o -name "*.out" 2>/dev/null | xargs grep -l "$PATTERN" 2>/dev/null)
+            
+            if [ -z "$RESULTS" ]; then
+              echo "No matches found. Trying with all files in the log directory..."
+              RESULTS=$(find "$LOG_DIR" -type f 2>/dev/null | xargs grep -l "$PATTERN" 2>/dev/null)
+            fi
+            
+            if [ -z "$RESULTS" ]; then
+              echo "No matches found."
+            else
+              # For each matching file, show context
+              for logfile in $RESULTS; do
+                COUNT=$(grep -c "$PATTERN" "$logfile" 2>/dev/null)
+                echo -e "\n$logfile ($COUNT matches):"
+                grep -n "$PATTERN" "$logfile" 2>/dev/null | head -5
+                
+                if [ "$COUNT" -gt 5 ]; then
+                  echo "... and $((COUNT - 5)) more matches"
+                fi
+              done
+              
+              echo -e "\nSummary:"
+              echo "$RESULTS" | wc -l | tr -d ' ' | xargs echo "Total files with matches:"
+            fi
+          else
+            echo "Required commands (find, xargs, grep) not available."
+          fi
+          
+          # If searching system logs on macOS
+          if [[ "$(uname)" == "Darwin" ]] && [ "$LOG_DIR" = "/var/log" ]; then
+            echo -e "\nSearching in system.log:"
+            log show --last 24h --predicate "eventMessage CONTAINS '$PATTERN'" | head -20
+          fi
+          
+          # If searching system logs on Linux with journalctl
+          if [[ "$(uname)" != "Darwin" ]] && [ "$LOG_DIR" = "/var/log" ] && command -v journalctl >/dev/null 2>&1; then
+            echo -e "\nSearching in journald:"
+            journalctl --grep="$PATTERN" --since="24 hours ago" | head -20
+          fi
+      output:
+        prefix: "Log Pattern Search for '{{ .pattern }}':" 

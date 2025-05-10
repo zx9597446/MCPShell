@@ -1,0 +1,87 @@
+---
+# Configuration for MCP CLI Adapter with sandbox runner examples
+#
+# This configuration demonstrates how to use different runners for command execution,
+# including the macOS sandbox-exec runner for enhanced security.
+
+mcp:
+  tools:
+    # Example 1: Simple hello world using default exec runner
+    - name: hello_world
+      description: Say hello to someone
+      params:
+        name:
+          description: Name of the person to greet
+          type: string
+          required: true
+      run:
+        command: echo "Hello, {{.name}}!"
+
+    # Example 2: Command using sandbox-exec runner with full permissions
+    - name: secure_echo
+      description: Echo text in a sandboxed environment
+      params:
+        text:
+          description: Text to echo
+          type: string
+          required: true
+      run:
+        runner: sandbox-exec
+        command: 'echo "Sandboxed echo: {{.text}}"'
+
+    # Example 3: Command execution in sandbox with restricted networking
+    - name: network_check
+      description: Try to access the network in a sandboxed environment
+      params:
+        url:
+          description: URL to check (will fail)
+          type: string
+          required: true
+      run:
+        runner: sandbox-exec
+        command: 'curl --max-time 5 {{.url}}'
+        options:
+          allow_networking: false
+      constraints:
+        - 'true'
+
+    # Example 4: File system access with restrictions
+    - name: file_browser
+      description: List files in a directory (with restrictions)
+      params:
+        directory:
+          description: Directory to list
+          type: string
+          required: true
+      constraints:
+        - 'directory.matches("^/tmp|^/var/tmp")'
+      run:
+        runner: sandbox-exec
+        command: 'ls -la {{.directory}}'
+        options:
+          allow_user_folders: false
+          allow_folders:
+            - "/tmp"
+            - "/var/tmp"
+
+    # Example 5: Custom sandbox profile with specific permissions
+    - name: custom_sandbox
+      description: Run with a custom sandbox profile
+      params:
+        command:
+          description: Command to run
+          type: string
+          required: true
+      run:
+        runner: sandbox-exec
+        command: '{{.command}}'
+        options:
+          allow_networking: false
+          allow_user_folders: false
+          custom_profile: |
+            (version 1)
+            (allow default)
+            (deny network*)
+            (allow file-read* (regex "^/tmp"))
+      constraints:
+        - 'command.matches("^ls|^pwd|^echo")'

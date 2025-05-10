@@ -1,0 +1,281 @@
+mcp:
+  description: |
+    Disk and Filesystem Diagnostics Toolkit providing read-only access to storage
+    information and filesystem status. This toolkit helps users and administrators
+    identify disk space issues, check filesystem health, monitor disk usage patterns,
+    and find large files or directories consuming storage space through safe,
+    non-destructive commands.
+  run:
+    shell: bash
+  tools:
+    - name: "storage_overview"
+      description: "Show comprehensive storage overview (filesystems, usage, mounts)"
+      run:
+        command: |
+          echo "Filesystem Usage:"
+          df -h
+          
+          echo -e "\nMount Points:"
+          mount | grep -v "tmpfs\\|proc\\|sysfs\\|devfs\\|security"
+          
+          if [[ "$(uname)" == "Darwin" ]]; then
+            # MacOS
+            echo -e "\nDisk Information:"
+            diskutil list
+            
+            echo -e "\nSMART Status Summary:"
+            diskutil info disk0 | grep "SMART"
+          else
+            # Linux
+            echo -e "\nDisk Information:"
+            lsblk -o NAME,SIZE,TYPE,MOUNTPOINT,FSTYPE
+            
+            echo -e "\nBlock Devices:"
+            ls -la /dev/sd* /dev/nvme* 2>/dev/null || echo "No standard block devices found"
+            
+            echo -e "\nSMART Status (if available and installed):"
+            command -v smartctl > /dev/null && smartctl -a /dev/sda | grep -E "SMART overall-health|SMART Health Status" || echo "smartctl not available or no SMART capable devices"
+          fi
+      output:
+        prefix: "Storage Overview:"
+
+    - name: "filesystem_usage"
+      description: "Show detailed filesystem usage by directories"
+      params:
+        path:
+          type: string
+          description: "Path to analyze (default: current directory)"
+        depth:
+          type: number
+          description: "Depth for directory analysis (1-3)"
+      constraints:
+        - "path == '' || !path.contains('../')"                  # Prevent directory traversal
+        - "path == '' || !path.contains('~')"                    # Prevent home directory references
+        - "path == '' || path.startsWith('/')"                   # Only absolute paths
+        - "path == '' || path.matches('^[a-zA-Z0-9/._\\\\-]+$')"   # Safe path characters
+        - "depth == 0.0 || (depth >= 1.0 && depth <= 3.0)"      # Reasonable depth values
+      run:
+        command: |
+          # Set default values
+          DEPTH=2
+          DIR_PATH="."
+          
+          if [[ "{{ .path }}" != "" ]]; then
+            DIR_PATH="{{ .path }}"
+          fi
+          
+          if [ {{ .depth }} -gt 0 ]; then
+            DEPTH={{ .depth }}
+          fi
+          
+          echo "Analyzing: $DIR_PATH (depth: $DEPTH)"
+          echo ""
+          
+          # Check if path exists and is accessible
+          if [ ! -d "$DIR_PATH" ]; then
+            echo "Error: '$DIR_PATH' is not a valid directory or is not accessible."
+            exit 1
+          fi
+          
+          echo "Directory sizes:"
+          if [[ "$(uname)" == "Darwin" ]]; then
+            # MacOS
+            find "$DIR_PATH" -type d -maxdepth $DEPTH -not -path "*/\.*" -exec du -sh {} \; 2>/dev/null | sort -hr | head -20
+          else
+            # Linux
+            du -h --max-depth=$DEPTH "$DIR_PATH" 2>/dev/null | sort -hr | head -20
+          fi
+          
+          echo ""
+          echo "Largest files:"
+          if [[ "$(uname)" == "Darwin" ]]; then
+            # MacOS
+            find "$DIR_PATH" -type f -not -path "*/\.*" -exec du -h {} \; 2>/dev/null | sort -hr | head -15
+          else
+            # Linux
+            find "$DIR_PATH" -type f -not -path "*/\.*" -printf "%s %p\n" 2>/dev/null | sort -nr | head -15 | awk '{ printf "%.2f MB %s\n", $1/1024/1024, $2 }'
+          fi
+          
+          echo ""
+          echo "File types summary:"
+          find "$DIR_PATH" -type f -not -path "*/\.*" | grep -o "\\.[^./]*$" | sort | uniq -c | sort -nr | head -10
+      output:
+        prefix: "Filesystem Usage Analysis:"
+
+    - name: "inodes_check"
+      description: "Check inode usage on filesystems"
+      run:
+        command: |
+          echo "Inode Usage by Filesystem:"
+          
+          if [[ "$(uname)" == "Darwin" ]]; then
+            # MacOS doesn't have direct command for inodes, use df
+            df -i | grep -v "none\\|devfs\\|map"
+          else
+            # Linux
+            df -i | grep -v "tmpfs\\|none"
+            
+            echo -e "\nTotal Inodes by Filesystem:"
+            for fs in $(df | grep -v "tmpfs\\|none" | awk '{print $6}' | grep -v "Mounted"); do
+              echo "$fs: $(find "$fs" -xdev 2>/dev/null | wc -l) inodes used"
+            done
+          fi
+      output:
+        prefix: "Inode Usage Analysis:"
+
+    - name: "disk_space_hogs"
+      description: "Find largest files and directories consuming disk space"
+      params:
+        path:
+          type: string
+          description: "Path to analyze (default: current directory)"
+        min_size_mb:
+          type: number
+          description: "Minimum file size in MB to report (default: 100)"
+      constraints:
+        - "path == '' || !path.contains('../')"                  # Prevent directory traversal
+        - "path == '' || !path.contains('~')"                    # Prevent home directory references
+        - "path == '' || path.startsWith('/')"                   # Only absolute paths
+        - "path == '' || path.matches('^[a-zA-Z0-9/._\\\\-]+$')"   # Safe path characters
+        - "min_size_mb == 0.0 || (min_size_mb >= 10.0 && min_size_mb <= 1000.0)"  # Reasonable size
+      run:
+        command: |
+          # Set default values
+          MIN_SIZE=100
+          DIR_PATH="."
+          
+          if [[ "{{ .path }}" != "" ]]; then
+            DIR_PATH="{{ .path }}"
+          fi
+          
+          if [ {{ .min_size_mb }} -gt 0 ]; then
+            MIN_SIZE={{ .min_size_mb }}
+          fi
+          
+          SIZE_BYTES=$((MIN_SIZE * 1024 * 1024))
+          
+          echo "Searching for files larger than ${MIN_SIZE}MB in: $DIR_PATH"
+          echo ""
+          
+          # Check if path exists and is accessible
+          if [ ! -d "$DIR_PATH" ]; then
+            echo "Error: '$DIR_PATH' is not a valid directory or is not accessible."
+            exit 1
+          fi
+          
+          echo "Top disk space consumers (files larger than ${MIN_SIZE}MB):"
+          if [[ "$(uname)" == "Darwin" ]]; then
+            # MacOS
+            find "$DIR_PATH" -type f -size +${MIN_SIZE}m -not -path "*/\.*" -exec ls -lh {} \; 2>/dev/null | awk '{print $5, $9}' | sort -hr | head -20
+          else
+            # Linux
+            find "$DIR_PATH" -type f -size +${SIZE_BYTES}c -not -path "*/\.*" -printf "%s %p\n" 2>/dev/null | sort -nr | head -20 | awk '{ printf "%.2f MB %s\n", $1/1024/1024, $2 }'
+          fi
+          
+          echo ""
+          echo "Top directories by size:"
+          if [[ "$(uname)" == "Darwin" ]]; then
+            # MacOS
+            find "$DIR_PATH" -type d -not -path "*/\.*" -exec du -sh {} \; 2>/dev/null | sort -hr | head -15
+          else
+            # Linux
+            du -h --max-depth=3 "$DIR_PATH" 2>/dev/null | sort -hr | head -15
+          fi
+      output:
+        prefix: "Disk Space Usage Report:"
+
+    - name: "fs_type_summary"
+      description: "Show summary of filesystem types and mount options"
+      run:
+        command: |
+          if [[ "$(uname)" == "Darwin" ]]; then
+            # MacOS
+            echo "Filesystem types and mount options:"
+            mount | awk '{printf "%-20s %-12s %s\n", $1, $3, $0}' | sed 's/.*(\(.*\))/\1/'
+            
+            echo ""
+            echo "Disk information:"
+            diskutil list
+            
+            echo ""
+            echo "APFS volumes:"
+            diskutil apfs list 2>/dev/null || echo "No APFS volumes found"
+            
+          else
+            # Linux
+            echo "Filesystem types and mount options:"
+            findmnt -t nodevfs,notmpfs,noproc
+            
+            echo ""
+            echo "Filesystem summary by type:"
+            df -T | grep -v "tmpfs\\|devfs"
+            
+            echo ""
+            echo "Mount options details:"
+            mount | grep -v "tmpfs\\|proc\\|sysfs\\|devfs\\|security"
+            
+            echo ""
+            echo "Disk information:"
+            lsblk -f
+          fi
+      output:
+        prefix: "Filesystem Types and Mount Options:"
+
+    - name: "disk_health_check"
+      description: "Check disk health status (read-only, non-destructive)"
+      params:
+        disk:
+          type: string
+          description: "Disk to check (e.g., 'sda', 'nvme0n1', 'disk0')"
+      constraints:
+        - "disk == '' || disk.matches('^[a-zA-Z0-9]+$')"          # Only alphanumeric disk names
+        - "disk == '' || disk.size() <= 20"                       # Reasonable disk name length
+      run:
+        command: |
+          DISK="{{ .disk }}"
+          
+          if [[ "$(uname)" == "Darwin" ]]; then
+            # MacOS
+            if [ -z "$DISK" ]; then
+              DISK="disk0"
+            fi
+            
+            echo "Disk Information for $DISK:"
+            diskutil info "/dev/$DISK" || exit 1
+            
+            echo ""
+            echo "SMART Status (if available):"
+            diskutil info "/dev/$DISK" | grep "SMART"
+            
+            echo ""
+            echo "I/O Statistics:"
+            iostat -d "/dev/$DISK" 1 3
+            
+          else
+            # Linux
+            if [ -z "$DISK" ]; then
+              # Try to find main system disk
+              DISK=$(lsblk | grep disk | head -1 | awk '{print $1}')
+            fi
+            
+            echo "Disk Information for $DISK:"
+            lsblk -o NAME,SIZE,TYPE,MOUNTPOINT,FSTYPE "/dev/$DISK" 2>/dev/null || echo "Disk not found: $DISK"
+            
+            echo ""
+            if command -v smartctl > /dev/null; then
+              echo "SMART Status (if available):"
+              smartctl -H "/dev/$DISK" 2>/dev/null || echo "SMART status unavailable for this device"
+              
+              echo ""
+              echo "SMART Attributes:"
+              smartctl -A "/dev/$DISK" 2>/dev/null || echo "SMART attributes unavailable for this device"
+            else
+              echo "SMART tools not installed (smartmontools package)."
+            fi
+            
+            echo ""
+            echo "Recent Disk Errors from kernel log:"
+            dmesg | grep -i "$DISK\\|error\\|ata\\|failed" | tail -10
+          fi
+      output:
+        prefix: "Disk Health Check:" 

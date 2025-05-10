@@ -1,0 +1,427 @@
+mcp:
+  description: |
+    Security and Networking Diagnostics Toolkit providing read-only access to system
+    security information and network configuration. This toolkit helps users and
+    administrators identify security concerns, audit system settings, troubleshoot
+    network connectivity issues, and examine firewall rules through non-intrusive
+    commands that don't alter the system's security posture.
+  run:
+    shell: bash
+  tools:
+    - name: "security_overview"
+      description: "Show system security overview (users, groups, permissions)"
+      run:
+        command: |
+          echo "System Users and Groups:"
+          echo "------------------------"
+          
+          echo -e "\nCurrent User:"
+          id
+          
+          echo -e "\nUsers with Login Shells:"
+          if [[ "$(uname)" == "Darwin" ]]; then
+            # MacOS
+            dscl . -list /Users UserShell | grep -v /usr/bin/false | grep -v /sbin/nologin
+          else
+            # Linux
+            getent passwd | grep -v nologin | grep -v false | grep -v sync
+          fi
+          
+          echo -e "\nSudo Access:"
+          if [[ "$(uname)" == "Darwin" ]]; then
+            # MacOS
+            echo "Users in admin group:"
+            dscl . -read /Groups/admin GroupMembership | sed 's/GroupMembership: //'
+          else
+            # Linux
+            echo "Sudo configuration:"
+            if [ -f /etc/sudoers ] && [ -r /etc/sudoers ]; then
+              grep -v "^#" /etc/sudoers | grep -v "^$"
+            else
+              echo "Cannot read sudoers file (requires elevated privileges)"
+            fi
+            
+            echo -e "\nUsers in sudo group:"
+            getent group sudo | cut -d: -f4
+          fi
+          
+          echo -e "\nLogin Activity:"
+          last | head -10
+          
+          echo -e "\nCurrent Logins:"
+          who
+      output:
+        prefix: "System Security Overview:"
+
+    - name: "network_security_check"
+      description: "Check network security settings (firewall, open ports)"
+      run:
+        command: |
+          echo "Network Security Information:"
+          echo "----------------------------"
+          
+          echo -e "\nListening Ports (TCP):"
+          if [[ "$(uname)" == "Darwin" ]]; then
+            # MacOS
+            netstat -anp tcp | grep LISTEN
+          else
+            # Linux
+            ss -tlnp
+          fi
+          
+          echo -e "\nListening Ports (UDP):"
+          if [[ "$(uname)" == "Darwin" ]]; then
+            # MacOS
+            netstat -anp udp
+          else
+            # Linux
+            ss -ulnp
+          fi
+          
+          echo -e "\nActive Connections:"
+          if [[ "$(uname)" == "Darwin" ]]; then
+            # MacOS
+            netstat -an | grep ESTABLISHED | head -10
+          else
+            # Linux
+            ss -tn | grep ESTAB | head -10
+          fi
+          
+          echo -e "\nFirewall Status:"
+          if [[ "$(uname)" == "Darwin" ]]; then
+            # MacOS
+            echo "macOS Firewall:"
+            defaults read /Library/Preferences/com.apple.alf globalstate
+            echo "0=disabled, 1=enabled for specific services, 2=enabled"
+          else
+            # Linux
+            echo "UFW Status (if available):"
+            if command -v ufw >/dev/null 2>&1; then
+              ufw status
+            else
+              echo "UFW not installed"
+            fi
+            
+            echo -e "\nIPTables Rules (if available):"
+            if command -v iptables >/dev/null 2>&1; then
+              iptables -L -n 2>/dev/null || echo "Cannot list iptables rules (requires elevated privileges)"
+            else
+              echo "iptables not available or not in PATH"
+            fi
+          fi
+      output:
+        prefix: "Network Security Check:"
+
+    - name: "file_permissions_check"
+      description: "Check file permissions for sensitive files and directories"
+      params:
+        path:
+          type: string
+          description: "Path to check (optional, checks common sensitive files by default)"
+      constraints:
+        - "path == '' || !path.contains('../')"                  # Prevent directory traversal
+        - "path == '' || !path.contains('~')"                    # Prevent home directory references
+        - "path == '' || path.startsWith('/')"                   # Only absolute paths
+        - "path == '' || path.matches(\"^[a-zA-Z0-9/._\\\\-]+$\")"   # Safe path characters
+      run:
+        command: |
+          # Check common sensitive files or user-specified path
+          if [ -n "{{ .path }}" ]; then
+            PATHS_TO_CHECK=("{{ .path }}")
+          else
+            if [[ "$(uname)" == "Darwin" ]]; then
+              # MacOS sensitive paths
+              PATHS_TO_CHECK=(
+                "/etc/pam.d"
+                "/etc/ssh"
+                "/etc/sudoers"
+                "/Library/Preferences/com.apple.alf.plist"
+                "/Library/Preferences/com.apple.loginwindow.plist"
+              )
+            else
+              # Linux sensitive paths
+              PATHS_TO_CHECK=(
+                "/etc/passwd"
+                "/etc/shadow"
+                "/etc/group"
+                "/etc/ssh"
+                "/etc/sudoers"
+                "/etc/pam.d"
+              )
+            fi
+          fi
+          
+          echo "Checking file permissions for sensitive files/directories:"
+          echo "----------------------------------------------------------"
+          
+          for path in "${PATHS_TO_CHECK[@]}"; do
+            if [ -e "$path" ]; then
+              echo -e "\nPermissions for $path:"
+              if [ -d "$path" ]; then
+                # If it's a directory, show its contents
+                ls -la "$path" | head -20
+                
+                if [ "$(ls -1 "$path" | wc -l)" -gt 18 ]; then
+                  echo "(Showing only first 18 entries...)"
+                fi
+              else
+                # If it's a file, show its permissions
+                ls -la "$path"
+                
+                # Show ACLs if available
+                if [[ "$(uname)" == "Darwin" ]]; then
+                  echo "ACLs:"
+                  ls -le "$path" | tail -n +2
+                elif command -v getfacl >/dev/null 2>&1; then
+                  echo "ACLs:"
+                  getfacl "$path" 2>/dev/null
+                fi
+              fi
+            else
+              echo -e "\nPath not found: $path"
+            fi
+          done
+      output:
+        prefix: "File Permissions Analysis:"
+
+    - name: "process_security_check"
+      description: "Check running processes for security concerns"
+      run:
+        command: |
+          echo "Process Security Analysis:"
+          echo "--------------------------"
+          
+          echo -e "\nProcesses running as root:"
+          if [[ "$(uname)" == "Darwin" ]]; then
+            # MacOS
+            ps -eo user,pid,ppid,command | grep "^root " | head -15
+          else
+            # Linux
+            ps -eo user,pid,ppid,cmd | grep "^root " | head -15
+          fi
+          
+          echo -e "\nProcesses with open network connections:"
+          if [[ "$(uname)" == "Darwin" ]]; then
+            # MacOS
+            lsof -i -n -P | grep -v "localhost" | head -15
+          else
+            # Linux
+            if command -v lsof >/dev/null 2>&1; then
+              lsof -i -n -P | grep -v "localhost" | head -15
+            else
+              # Alternative using netstat and ps
+              netstat -tupn 2>/dev/null | grep -v "127.0.0.1" | head -15
+            fi
+          fi
+          
+          echo -e "\nRecently started processes:"
+          if [[ "$(uname)" == "Darwin" ]]; then
+            # MacOS - sort by start time (not perfect)
+            ps -eo user,pid,start,command | tail -15
+          else
+            # Linux - using etimes for elapsed time
+            ps -eo user,pid,etimes,cmd --sort=etimes | head -15
+          fi
+      output:
+        prefix: "Process Security Check:"
+
+    - name: "network_connectivity_test"
+      description: "Test network connectivity to common services and hosts"
+      params:
+        host:
+          type: string
+          description: "Host to test (optional, tests common hosts by default)"
+        port:
+          type: number
+          description: "Port to test (required if host is specified)"
+      constraints:
+        - "host == '' || host.matches('^[a-zA-Z0-9.-]+$')"       # Safe hostname characters
+        - "host == '' || host.size() <= 100"                     # Reasonable hostname length
+        - "int(port) == 0 || (int(port) >= 1 && int(port) <= 65535)"  # Valid port range
+        - "host == '' || int(port) > 0"                          # Port required if host specified
+      run:
+        command: |
+          echo "Network Connectivity Tests:"
+          echo "---------------------------"
+          
+          # Function to test a connection
+          test_connection() {
+            local host=$1
+            local port=$2
+            local service=$3
+            
+            echo -n "Testing connection to $host:$port ($service)... "
+            
+            timeout_cmd="timeout 3"
+            if [[ "$(uname)" == "Darwin" ]]; then
+              # macOS uses gtimeout from coreutils
+              if command -v gtimeout &> /dev/null; then
+                timeout_cmd="gtimeout 3"
+              else
+                # If gtimeout is not available on macOS, use built-in timeout
+                timeout_cmd="timeout 3"
+              fi
+            fi
+            
+            if command -v nc &> /dev/null; then
+              if $timeout_cmd nc -z -w 3 "$host" "$port" >/dev/null 2>&1; then
+                echo "SUCCESS"
+              else
+                echo "FAILED"
+              fi
+            else
+              # Alternative test using /dev/tcp (bash feature)
+              if $timeout_cmd bash -c "echo > /dev/tcp/$host/$port" >/dev/null 2>&1; then
+                echo "SUCCESS"
+              else
+                echo "FAILED"
+              fi
+            fi
+          }
+          
+          # Basic network information
+          echo "Network interfaces:"
+          if [[ "$(uname)" == "Darwin" ]]; then
+            # MacOS
+            ifconfig | grep -E "^[a-z0-9]+" | cut -d: -f1
+          else
+            # Linux
+            ip -br addr show
+          fi
+          
+          echo -e "\nDNS servers:"
+          if [[ "$(uname)" == "Darwin" ]]; then
+            # MacOS
+            cat /etc/resolv.conf | grep nameserver
+          else
+            # Linux
+            cat /etc/resolv.conf | grep nameserver
+          fi
+          
+          echo -e "\nDefault gateway:"
+          if [[ "$(uname)" == "Darwin" ]]; then
+            # MacOS
+            route -n get default | grep gateway
+          else
+            # Linux
+            ip route | grep default
+          fi
+          
+          # Test specific host and port if provided
+          if [ -n "{{ .host }}" ] && [ {{ .port }} -gt 0 ]; then
+            echo -e "\nTesting user-specified connection:"
+            test_connection "{{ .host }}" {{ .port }} "user-specified"
+          else
+            # Test common connections
+            echo -e "\nTesting common connections:"
+            test_connection "8.8.8.8" 53 "Google DNS"
+            test_connection "1.1.1.1" 53 "Cloudflare DNS"
+            test_connection "google.com" 443 "Google HTTPS"
+            test_connection "github.com" 443 "GitHub HTTPS"
+            test_connection "api.github.com" 443 "GitHub API"
+          fi
+          
+          # Ping test to Google DNS
+          echo -e "\nPing test to 8.8.8.8:"
+          ping -c 3 8.8.8.8
+          
+          # DNS resolution test
+          echo -e "\nDNS resolution test:"
+          host google.com || nslookup google.com || dig google.com
+      output:
+        prefix: "Network Connectivity Test:"
+
+    - name: "ssl_certificate_check"
+      description: "Check SSL certificate information for a domain"
+      params:
+        domain:
+          type: string
+          description: "Domain to check (e.g., example.com)"
+          required: true
+        port:
+          type: number
+          description: "Port to check (default: 443)"
+      constraints:
+        - "domain.matches('^[a-zA-Z0-9.-]+$')"                  # Safe domain characters
+        - "domain.size() <= 100"                                # Reasonable domain length
+        - "int(port) == 0 || (int(port) >= 1 && int(port) <= 65535)"  # Valid port range
+      run:
+        command: |
+          DOMAIN="{{ .domain }}"
+          PORT=443
+          
+          if [ {{ .port }} -gt 0 ]; then
+            PORT={{ .port }}
+          fi
+          
+          echo "SSL Certificate Check for $DOMAIN:$PORT"
+          echo "---------------------------------------"
+          
+          # Check if openssl is available
+          if ! command -v openssl &> /dev/null; then
+            echo "Error: OpenSSL is not installed or not in PATH"
+            exit 1
+          fi
+          
+          # Get certificate details
+          echo "Certificate Details:"
+          echo "------------------"
+          
+          # Connect to server and get certificate (with timeout)
+          timeout_cmd="timeout 5"
+          if [[ "$(uname)" == "Darwin" ]]; then
+            # macOS uses gtimeout from coreutils
+            if command -v gtimeout &> /dev/null; then
+              timeout_cmd="gtimeout 5"
+            else
+              timeout_cmd=""
+            fi
+          fi
+          
+          # Get certificate details
+          if [ -n "$timeout_cmd" ]; then
+            CERT_INFO=$($timeout_cmd openssl s_client -connect "$DOMAIN:$PORT" -servername "$DOMAIN" 2>/dev/null </dev/null | openssl x509 -noout -text)
+          else
+            CERT_INFO=$(openssl s_client -connect "$DOMAIN:$PORT" -servername "$DOMAIN" 2>/dev/null </dev/null | openssl x509 -noout -text)
+          fi
+          
+          if [ -z "$CERT_INFO" ]; then
+            echo "Error: Could not connect to $DOMAIN:$PORT or no SSL certificate found"
+            exit 1
+          fi
+          
+          # Extract key information
+          echo "Subject: $(echo "$CERT_INFO" | grep "Subject:" | sed 's/Subject: //')"
+          echo "Issuer: $(echo "$CERT_INFO" | grep "Issuer:" | sed 's/Issuer: //')"
+          
+          # Extract validity dates
+          echo "Validity:"
+          echo "$CERT_INFO" | grep -A 2 "Validity" | grep -v "Validity"
+          
+          # Check certificate expiration
+          echo -e "\nCertificate Expiration Check:"
+          openssl s_client -connect "$DOMAIN:$PORT" -servername "$DOMAIN" 2>/dev/null </dev/null | openssl x509 -noout -checkend 0
+          if [ $? -eq 0 ]; then
+            echo "Certificate is still valid"
+          else
+            echo "Certificate has expired"
+          fi
+          
+          # Check for upcoming expiration (30 days)
+          echo -e "\nExpiration in next 30 days:"
+          openssl s_client -connect "$DOMAIN:$PORT" -servername "$DOMAIN" 2>/dev/null </dev/null | openssl x509 -noout -checkend 2592000
+          if [ $? -eq 0 ]; then
+            echo "Certificate will not expire in the next 30 days"
+          else
+            echo "WARNING: Certificate will expire within 30 days"
+          fi
+          
+          # Show Sans
+          echo -e "\nSubject Alternative Names:"
+          echo "$CERT_INFO" | grep -A 1 "Subject Alternative Name" | grep "DNS:"
+          
+          # Show cipher information
+          echo -e "\nCipher Information:"
+          openssl s_client -connect "$DOMAIN:$PORT" -servername "$DOMAIN" 2>/dev/null </dev/null | grep -A 3 "SSL handshake"
+      output:
+        prefix: "SSL Certificate Analysis for {{ .domain }}:" 

@@ -1,0 +1,514 @@
+mcp:
+  description: |
+    AWS Networking Diagnostics Toolkit providing read-only access to AWS network configuration
+    and status information. This toolkit helps troubleshoot connectivity issues, security group
+    configurations, VPC setups, routing problems, and other AWS network-related concerns
+    through a secure, constrained interface to the AWS CLI.
+
+    NOTE FOR LLM: Authentication with AWS CLI is required to use these tools. If commands fail
+    with authentication errors, guide the user through AWS CLI authentication options:
+    1. AWS CLI configured with 'aws configure' (access key, secret key, region)
+    2. AWS SSO login via 'aws sso login'
+    3. Using AWS_PROFILE environment variable
+    4. Temporary credentials from AWS STS
+    5. Using the aws_auth_check tool to diagnose authentication issues
+  run:
+    shell: bash
+  tools:
+    - name: "aws_auth_check"
+      description: "Check AWS CLI authentication status and provide login guidance"
+      params:
+        region:
+          type: string
+          description: "AWS region to check (e.g., us-east-1)"
+          required: true
+      constraints:
+        - "region.matches('^[a-z]{2}-[a-z]+-[0-9]{1}$')"  # Valid AWS region format
+      run:
+        command: |
+          echo "Checking AWS authentication status..."
+          
+          # Check if AWS CLI is installed
+          if ! command -v aws &> /dev/null; then
+            echo "AWS CLI is not installed. Please install it first:"
+            echo "https://docs.aws.amazon.com/cli/latest/userguide/getting-started-install.html"
+            exit 1
+          fi
+          
+          # Try a simple AWS command that requires authentication
+          if aws sts get-caller-identity --region {{ .region }} &> /dev/null; then
+            echo "✅ Authentication successful!"
+            echo ""
+            echo "Current AWS identity:"
+            aws sts get-caller-identity --region {{ .region }}
+            
+            echo ""
+            echo "Current AWS configuration:"
+            aws configure list
+          else
+            echo "❌ Authentication failed. You need to authenticate with AWS CLI."
+            echo ""
+            echo "Authentication options:"
+            echo "1. Configure AWS CLI with access keys:"
+            echo "   $ aws configure"
+            echo ""
+            echo "2. Use AWS SSO (Single Sign-On):"
+            echo "   $ aws sso login"
+            echo ""
+            echo "3. Use environment variables:"
+            echo "   $ export AWS_ACCESS_KEY_ID=your_access_key"
+            echo "   $ export AWS_SECRET_ACCESS_KEY=your_secret_key"
+            echo "   $ export AWS_DEFAULT_REGION={{ .region }}"
+            echo ""
+            echo "4. Use a specific AWS profile:"
+            echo "   $ export AWS_PROFILE=your-profile-name"
+            echo ""
+            echo "For more information, see AWS CLI authentication documentation:"
+            echo "https://docs.aws.amazon.com/cli/latest/userguide/cli-chap-authentication.html"
+          fi
+      output:
+        prefix: "AWS Authentication Status:"
+
+    - name: "aws_vpc_list"
+      description: "List all VPCs in the AWS account"
+      params:
+        region:
+          type: string
+          description: "AWS region (e.g., us-east-1, eu-west-1)"
+          required: true
+        output_format:
+          type: string
+          description: "Output format (json, text, table)"
+      constraints:
+        - "region.matches('^[a-z]{2}-[a-z]+-[0-9]{1}$')"                # Valid AWS region format
+        - "output_format == '' || ['json', 'text', 'table'].exists(f, f == output_format)"  # Valid output formats
+      run:
+        command: |
+          FORMAT_PARAM=""
+          if [ -n "{{ .output_format }}" ]; then
+            FORMAT_PARAM="--output {{ .output_format }}"
+          else
+            FORMAT_PARAM="--output table"
+          fi
+          
+          # Attempt to run the command and capture the output and exit status
+          OUTPUT=$(aws ec2 describe-vpcs --region {{ .region }} $FORMAT_PARAM 2>&1)
+          EXIT_CODE=$?
+          
+          # Check if authentication failed
+          if [[ $EXIT_CODE -ne 0 && ($OUTPUT == *"Unable to locate credentials"* || $OUTPUT == *"AuthFailure"* || $OUTPUT == *"ExpiredToken"* || $OUTPUT == *"AccessDenied"*) ]]; then
+            echo "AWS authentication error detected. You need valid AWS credentials to use this tool."
+            echo ""
+            echo "Try using the aws_auth_check tool first to diagnose authentication issues:"
+            echo "aws_auth_check region={{ .region }}"
+            echo ""
+            echo "Error details: $OUTPUT"
+            exit 1
+          else
+            # If no authentication error, just output the result
+            echo "$OUTPUT"
+          fi
+      output:
+        prefix: "VPCs in region {{ .region }}:"
+
+    - name: "aws_subnet_list"
+      description: "List all subnets in a VPC"
+      params:
+        region:
+          type: string
+          description: "AWS region (e.g., us-east-1, eu-west-1)"
+          required: true
+        vpc_id:
+          type: string
+          description: "VPC ID (e.g., vpc-12345678)"
+        output_format:
+          type: string
+          description: "Output format (json, text, table)"
+      constraints:
+        - "region.matches('^[a-z]{2}-[a-z]+-[0-9]{1}$')"                # Valid AWS region format
+        - "vpc_id == '' || vpc_id.matches('^vpc-[a-f0-9]{8,}$')"        # Valid VPC ID format
+        - "output_format == '' || ['json', 'text', 'table'].exists(f, f == output_format)"  # Valid output formats
+      run:
+        command: |
+          FORMAT_PARAM=""
+          if [ -n "{{ .output_format }}" ]; then
+            FORMAT_PARAM="--output {{ .output_format }}"
+          else
+            FORMAT_PARAM="--output table"
+          fi
+          
+          FILTER=""
+          if [ -n "{{ .vpc_id }}" ]; then
+            FILTER="--filters Name=vpc-id,Values={{ .vpc_id }}"
+          fi
+          
+          aws ec2 describe-subnets --region {{ .region }} $FILTER $FORMAT_PARAM
+      output:
+        prefix: "Subnets{{ if .vpc_id }} in VPC {{ .vpc_id }}{{ end }} (region {{ .region }}):"
+
+    - name: "aws_security_group_list"
+      description: "List all security groups, optionally filtered by VPC"
+      params:
+        region:
+          type: string
+          description: "AWS region (e.g., us-east-1, eu-west-1)"
+          required: true
+        vpc_id:
+          type: string
+          description: "VPC ID (e.g., vpc-12345678)"
+        output_format:
+          type: string
+          description: "Output format (json, text, table)"
+      constraints:
+        - "region.matches('^[a-z]{2}-[a-z]+-[0-9]{1}$')"                # Valid AWS region format
+        - "vpc_id == '' || vpc_id.matches('^vpc-[a-f0-9]{8,}$')"        # Valid VPC ID format
+        - "output_format == '' || ['json', 'text', 'table'].exists(f, f == output_format)"  # Valid output formats
+      run:
+        command: |
+          FORMAT_PARAM=""
+          if [ -n "{{ .output_format }}" ]; then
+            FORMAT_PARAM="--output {{ .output_format }}"
+          else
+            FORMAT_PARAM="--output table"
+          fi
+          
+          FILTER=""
+          if [ -n "{{ .vpc_id }}" ]; then
+            FILTER="--filters Name=vpc-id,Values={{ .vpc_id }}"
+          fi
+          
+          aws ec2 describe-security-groups --region {{ .region }} $FILTER $FORMAT_PARAM
+      output:
+        prefix: "Security groups{{ if .vpc_id }} in VPC {{ .vpc_id }}{{ end }} (region {{ .region }}):"
+
+    - name: "aws_security_group_detail"
+      description: "Get detailed information about a specific security group"
+      params:
+        region:
+          type: string
+          description: "AWS region (e.g., us-east-1, eu-west-1)"
+          required: true
+        group_id:
+          type: string
+          description: "Security group ID (e.g., sg-12345678)"
+          required: true
+        output_format:
+          type: string
+          description: "Output format (json, text, table)"
+      constraints:
+        - "region.matches('^[a-z]{2}-[a-z]+-[0-9]{1}$')"                # Valid AWS region format
+        - "group_id.matches('^sg-[a-f0-9]{8,}$')"                       # Valid security group ID format
+        - "output_format == '' || ['json', 'text', 'table'].exists(f, f == output_format)"  # Valid output formats
+      run:
+        command: |
+          FORMAT_PARAM=""
+          if [ -n "{{ .output_format }}" ]; then
+            FORMAT_PARAM="--output {{ .output_format }}"
+          else
+            FORMAT_PARAM="--output table"
+          fi
+          
+          aws ec2 describe-security-groups --region {{ .region }} --group-ids {{ .group_id }} $FORMAT_PARAM
+      output:
+        prefix: "Security group {{ .group_id }} details (region {{ .region }}):"
+
+    - name: "aws_nacl_list"
+      description: "List network ACLs, optionally filtered by VPC"
+      params:
+        region:
+          type: string
+          description: "AWS region (e.g., us-east-1, eu-west-1)"
+          required: true
+        vpc_id:
+          type: string
+          description: "VPC ID (e.g., vpc-12345678)"
+        output_format:
+          type: string
+          description: "Output format (json, text, table)"
+      constraints:
+        - "region.matches('^[a-z]{2}-[a-z]+-[0-9]{1}$')"                # Valid AWS region format
+        - "vpc_id == '' || vpc_id.matches('^vpc-[a-f0-9]{8,}$')"        # Valid VPC ID format
+        - "output_format == '' || ['json', 'text', 'table'].exists(f, f == output_format)"  # Valid output formats
+      run:
+        command: |
+          FORMAT_PARAM=""
+          if [ -n "{{ .output_format }}" ]; then
+            FORMAT_PARAM="--output {{ .output_format }}"
+          else
+            FORMAT_PARAM="--output table"
+          fi
+          
+          FILTER=""
+          if [ -n "{{ .vpc_id }}" ]; then
+            FILTER="--filters Name=vpc-id,Values={{ .vpc_id }}"
+          fi
+          
+          aws ec2 describe-network-acls --region {{ .region }} $FILTER $FORMAT_PARAM
+      output:
+        prefix: "Network ACLs{{ if .vpc_id }} in VPC {{ .vpc_id }}{{ end }} (region {{ .region }}):"
+
+    - name: "aws_route_table_list"
+      description: "List route tables, optionally filtered by VPC"
+      params:
+        region:
+          type: string
+          description: "AWS region (e.g., us-east-1, eu-west-1)"
+          required: true
+        vpc_id:
+          type: string
+          description: "VPC ID (e.g., vpc-12345678)"
+        output_format:
+          type: string
+          description: "Output format (json, text, table)"
+      constraints:
+        - "region.matches('^[a-z]{2}-[a-z]+-[0-9]{1}$')"                # Valid AWS region format
+        - "vpc_id == '' || vpc_id.matches('^vpc-[a-f0-9]{8,}$')"        # Valid VPC ID format
+        - "output_format == '' || ['json', 'text', 'table'].exists(f, f == output_format)"  # Valid output formats
+      run:
+        command: |
+          FORMAT_PARAM=""
+          if [ -n "{{ .output_format }}" ]; then
+            FORMAT_PARAM="--output {{ .output_format }}"
+          else
+            FORMAT_PARAM="--output table"
+          fi
+          
+          FILTER=""
+          if [ -n "{{ .vpc_id }}" ]; then
+            FILTER="--filters Name=vpc-id,Values={{ .vpc_id }}"
+          fi
+          
+          aws ec2 describe-route-tables --region {{ .region }} $FILTER $FORMAT_PARAM
+      output:
+        prefix: "Route tables{{ if .vpc_id }} in VPC {{ .vpc_id }}{{ end }} (region {{ .region }}):"
+
+    - name: "aws_eni_list"
+      description: "List network interfaces, optionally filtered by VPC or subnet"
+      params:
+        region:
+          type: string
+          description: "AWS region (e.g., us-east-1, eu-west-1)"
+          required: true
+        vpc_id:
+          type: string
+          description: "VPC ID (e.g., vpc-12345678)"
+        subnet_id:
+          type: string
+          description: "Subnet ID (e.g., subnet-12345678)"
+        output_format:
+          type: string
+          description: "Output format (json, text, table)"
+      constraints:
+        - "region.matches('^[a-z]{2}-[a-z]+-[0-9]{1}$')"                # Valid AWS region format
+        - "vpc_id == '' || vpc_id.matches('^vpc-[a-f0-9]{8,}$')"        # Valid VPC ID format
+        - "subnet_id == '' || subnet_id.matches('^subnet-[a-f0-9]{8,}$')"  # Valid subnet ID format
+        - "output_format == '' || ['json', 'text', 'table'].exists(f, f == output_format)"  # Valid output formats
+      run:
+        command: |
+          FORMAT_PARAM=""
+          if [ -n "{{ .output_format }}" ]; then
+            FORMAT_PARAM="--output {{ .output_format }}"
+          else
+            FORMAT_PARAM="--output table"
+          fi
+          
+          FILTERS=""
+          if [ -n "{{ .vpc_id }}" ]; then
+            FILTERS="$FILTERS Name=vpc-id,Values={{ .vpc_id }}"
+          fi
+          
+          if [ -n "{{ .subnet_id }}" ]; then
+            FILTERS="$FILTERS Name=subnet-id,Values={{ .subnet_id }}"
+          fi
+          
+          FILTER_PARAM=""
+          if [ -n "$FILTERS" ]; then
+            FILTER_PARAM="--filters $FILTERS"
+          fi
+          
+          aws ec2 describe-network-interfaces --region {{ .region }} $FILTER_PARAM $FORMAT_PARAM
+      output:
+        prefix: "Network interfaces{{ if .vpc_id }} in VPC {{ .vpc_id }}{{ end }}{{ if .subnet_id }} in subnet {{ .subnet_id }}{{ end }} (region {{ .region }}):"
+
+    - name: "aws_lb_list"
+      description: "List load balancers (ELB, ALB, NLB) in the specified region"
+      params:
+        region:
+          type: string
+          description: "AWS region (e.g., us-east-1, eu-west-1)"
+          required: true
+        output_format:
+          type: string
+          description: "Output format (json, text, table)"
+      constraints:
+        - "region.matches('^[a-z]{2}-[a-z]+-[0-9]{1}$')"                # Valid AWS region format
+        - "output_format == '' || ['json', 'text', 'table'].exists(f, f == output_format)"  # Valid output formats
+      run:
+        command: |
+          FORMAT_PARAM=""
+          if [ -n "{{ .output_format }}" ]; then
+            FORMAT_PARAM="--output {{ .output_format }}"
+          else
+            FORMAT_PARAM="--output table"
+          fi
+          
+          echo "Application and Network Load Balancers:"
+          aws elbv2 describe-load-balancers --region {{ .region }} $FORMAT_PARAM
+          
+          echo -e "\nClassic Load Balancers:"
+          aws elb describe-load-balancers --region {{ .region }} $FORMAT_PARAM
+      output:
+        prefix: "Load balancers in region {{ .region }}:"
+
+    - name: "aws_vpn_list"
+      description: "List VPN connections in the specified region"
+      params:
+        region:
+          type: string
+          description: "AWS region (e.g., us-east-1, eu-west-1)"
+          required: true
+        output_format:
+          type: string
+          description: "Output format (json, text, table)"
+      constraints:
+        - "region.matches('^[a-z]{2}-[a-z]+-[0-9]{1}$')"                # Valid AWS region format
+        - "output_format == '' || ['json', 'text', 'table'].exists(f, f == output_format)"  # Valid output formats
+      run:
+        command: |
+          FORMAT_PARAM=""
+          if [ -n "{{ .output_format }}" ]; then
+            FORMAT_PARAM="--output {{ .output_format }}"
+          else
+            FORMAT_PARAM="--output table"
+          fi
+          
+          aws ec2 describe-vpn-connections --region {{ .region }} $FORMAT_PARAM
+      output:
+        prefix: "VPN connections in region {{ .region }}:"
+
+    - name: "aws_tgw_list"
+      description: "List transit gateways in the specified region"
+      params:
+        region:
+          type: string
+          description: "AWS region (e.g., us-east-1, eu-west-1)"
+          required: true
+        output_format:
+          type: string
+          description: "Output format (json, text, table)"
+      constraints:
+        - "region.matches('^[a-z]{2}-[a-z]+-[0-9]{1}$')"                # Valid AWS region format
+        - "output_format == '' || ['json', 'text', 'table'].exists(f, f == output_format)"  # Valid output formats
+      run:
+        command: |
+          FORMAT_PARAM=""
+          if [ -n "{{ .output_format }}" ]; then
+            FORMAT_PARAM="--output {{ .output_format }}"
+          else
+            FORMAT_PARAM="--output table"
+          fi
+          
+          aws ec2 describe-transit-gateways --region {{ .region }} $FORMAT_PARAM
+      output:
+        prefix: "Transit gateways in region {{ .region }}:"
+
+    - name: "aws_flow_logs"
+      description: "List VPC flow logs in the specified region"
+      params:
+        region:
+          type: string
+          description: "AWS region (e.g., us-east-1, eu-west-1)"
+          required: true
+        vpc_id:
+          type: string
+          description: "VPC ID (e.g., vpc-12345678)"
+        output_format:
+          type: string
+          description: "Output format (json, text, table)"
+      constraints:
+        - "region.matches('^[a-z]{2}-[a-z]+-[0-9]{1}$')"                # Valid AWS region format
+        - "vpc_id == '' || vpc_id.matches('^vpc-[a-f0-9]{8,}$')"        # Valid VPC ID format
+        - "output_format == '' || ['json', 'text', 'table'].exists(f, f == output_format)"  # Valid output formats
+      run:
+        command: |
+          FORMAT_PARAM=""
+          if [ -n "{{ .output_format }}" ]; then
+            FORMAT_PARAM="--output {{ .output_format }}"
+          else
+            FORMAT_PARAM="--output table"
+          fi
+          
+          FILTER=""
+          if [ -n "{{ .vpc_id }}" ]; then
+            FILTER="--filter Name=resource-id,Values={{ .vpc_id }}"
+          fi
+          
+          aws ec2 describe-flow-logs --region {{ .region }} $FILTER $FORMAT_PARAM
+      output:
+        prefix: "VPC flow logs{{ if .vpc_id }} for VPC {{ .vpc_id }}{{ end }} in region {{ .region }}:"
+
+    - name: "aws_vpc_peering"
+      description: "List VPC peering connections in the specified region"
+      params:
+        region:
+          type: string
+          description: "AWS region (e.g., us-east-1, eu-west-1)"
+          required: true
+        vpc_id:
+          type: string
+          description: "VPC ID to filter by (e.g., vpc-12345678)"
+        output_format:
+          type: string
+          description: "Output format (json, text, table)"
+      constraints:
+        - "region.matches('^[a-z]{2}-[a-z]+-[0-9]{1}$')"                # Valid AWS region format
+        - "vpc_id == '' || vpc_id.matches('^vpc-[a-f0-9]{8,}$')"        # Valid VPC ID format
+        - "output_format == '' || ['json', 'text', 'table'].exists(f, f == output_format)"  # Valid output formats
+      run:
+        command: |
+          FORMAT_PARAM=""
+          if [ -n "{{ .output_format }}" ]; then
+            FORMAT_PARAM="--output {{ .output_format }}"
+          else
+            FORMAT_PARAM="--output table"
+          fi
+          
+          FILTERS=""
+          if [ -n "{{ .vpc_id }}" ]; then
+            FILTERS="$FILTERS Name=requester-vpc-info.vpc-id,Values={{ .vpc_id }} Name=accepter-vpc-info.vpc-id,Values={{ .vpc_id }}"
+          fi
+          
+          FILTER_PARAM=""
+          if [ -n "$FILTERS" ]; then
+            FILTER_PARAM="--filters $FILTERS"
+          fi
+          
+          aws ec2 describe-vpc-peering-connections --region {{ .region }} $FILTER_PARAM $FORMAT_PARAM
+      output:
+        prefix: "VPC peering connections{{ if .vpc_id }} involving VPC {{ .vpc_id }}{{ end }} in region {{ .region }}:"
+
+    - name: "aws_availability_zones"
+      description: "List availability zones in the specified region"
+      params:
+        region:
+          type: string
+          description: "AWS region (e.g., us-east-1, eu-west-1)"
+          required: true
+        output_format:
+          type: string
+          description: "Output format (json, text, table)"
+      constraints:
+        - "region.matches('^[a-z]{2}-[a-z]+-[0-9]{1}$')"                # Valid AWS region format
+        - "output_format == '' || ['json', 'text', 'table'].exists(f, f == output_format)"  # Valid output formats
+      run:
+        command: |
+          FORMAT_PARAM=""
+          if [ -n "{{ .output_format }}" ]; then
+            FORMAT_PARAM="--output {{ .output_format }}"
+          else
+            FORMAT_PARAM="--output table"
+          fi
+          
+          aws ec2 describe-availability-zones --region {{ .region }} $FORMAT_PARAM
+      output:
+        prefix: "Availability zones in region {{ .region }}:" 

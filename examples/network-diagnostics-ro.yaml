@@ -1,0 +1,292 @@
+mcp:
+  description: |
+    Network Diagnostics Toolkit providing a comprehensive set of tools for
+    troubleshooting network connectivity, examining routing configurations,
+    performing DNS lookups, checking port availability, and analyzing network
+    interfaces with cross-platform support.
+  run:
+    shell: bash
+  tools:
+    - name: "single_ping"
+      description: "Send a single ping packet to test basic network connectivity"
+      params:
+        hostname:
+          type: string
+          description: "The hostname or IP address to ping"
+          required: true
+      constraints:
+        - "hostname.size() > 0 && hostname.size() <= 253"        # Standard DNS name length limits
+        - "hostname.matches('^[a-zA-Z0-9._-]+$')"                # Valid hostname characters
+        - "!hostname.contains(';')"                              # Prevent command injection
+      run:
+        command: |
+          echo "Sending a single ping packet to {{ .hostname }}..."
+          
+          if [ "$(uname)" = "Darwin" ] || [ "$(uname)" = "Linux" ]; then
+            # macOS and Linux
+            ping -c 1 -W 2 "{{ .hostname }}"
+          else
+            # Windows format
+            ping -n 1 -w 2000 "{{ .hostname }}"
+          fi
+      output:
+        prefix: "Quick connectivity test to {{ .hostname }}:"
+
+    - name: "network_interfaces"
+      description: "List all network interfaces and their configuration"
+      params:
+        filter:
+          type: string
+          description: "Optional filter to narrow down results (e.g., 'eth', 'wlan')"
+      constraints:
+        - "filter == '' || filter.size() <= 20"                  # Reasonable filter length
+        - "!filter.contains(';')"                                # Prevent command injection
+        - "!filter.matches('.*[&|><`$].*')"                      # Block shell special characters
+      run:
+        command: |
+          # Detect OS and use appropriate command
+          if [ "$(uname)" = "Darwin" ]; then
+            # macOS
+            if [ -n "{{ .filter }}" ]; then
+              ifconfig | grep -A 5 -i "{{ .filter }}"
+            else
+              ifconfig
+            fi
+          elif [ "$(uname)" = "Linux" ]; then
+            # Linux
+            if [ -n "{{ .filter }}" ]; then
+              ip addr show | grep -A 6 -E "{{ .filter }}"
+            else
+              ip addr show
+            fi
+          else
+            # Windows or other (assuming PowerShell availability through WSL or similar)
+            echo "Network interfaces information:"
+            ipconfig
+          fi
+      output:
+        prefix: "Network interfaces:"
+
+    - name: "ip_address"
+      description: "Show public and private IP address information"
+      params:
+        interface:
+          type: string
+          description: "Optional network interface name (e.g., 'eth0', 'en0')"
+      constraints:
+        - "interface == '' || interface.size() <= 20"            # Reasonable interface name length
+        - "!interface.contains(';')"                             # Prevent command injection
+        - "!interface.matches('.*[&|><`$].*')"                   # Block shell special characters
+        - "interface.matches('^[a-zA-Z0-9_:.-]*$')"              # Limit to alphanumeric and common interface chars
+      run:
+        command: |
+          echo "Private IP addresses:"
+          if [ "$(uname)" = "Darwin" ]; then
+            # macOS
+            if [ -n "{{ .interface }}" ]; then
+              ifconfig "{{ .interface }}" | grep "inet " | awk '{print $2}'
+            else
+              ifconfig | grep "inet " | grep -v 127.0.0.1 | awk '{print $2}'
+            fi
+          elif [ "$(uname)" = "Linux" ]; then
+            # Linux
+            if [ -n "{{ .interface }}" ]; then
+              ip addr show "{{ .interface }}" | grep "inet " | awk '{print $2}'
+            else
+              ip addr show | grep "inet " | grep -v 127.0.0.1 | awk '{print $2}'
+            fi
+          else
+            # Windows fallback
+            ipconfig | grep -i "IPv4"
+          fi
+          
+          echo -e "\nPublic IP address:"
+          curl -s https://api.ipify.org || curl -s https://ifconfig.me
+      output:
+        prefix: "IP address information:"
+
+    - name: "routing_table"
+      description: "Display the network routing table"
+      constraints:
+        - "true"  # No user input to validate, command is fixed
+      run:
+        command: |
+          if [ "$(uname)" = "Darwin" ]; then
+            # macOS
+            netstat -nr
+          elif [ "$(uname)" = "Linux" ]; then
+            # Linux
+            ip route
+          else
+            # Windows fallback
+            route print
+          fi
+      output:
+        prefix: "Routing table:"
+
+    - name: "dns_lookup"
+      description: "Perform DNS resolution for a hostname"
+      params:
+        hostname:
+          type: string
+          description: "The hostname to resolve (e.g., 'example.com')"
+          required: true
+        record_type:
+          type: string
+          description: "Optional record type (e.g., 'A', 'AAAA', 'MX', 'TXT')"
+      constraints:
+        - "hostname.size() > 0 && hostname.size() <= 253"        # Standard DNS name length limits
+        - "hostname.matches('^[a-zA-Z0-9._-]+$')"                # Valid hostname characters
+        - "!hostname.contains(';')"                              # Prevent command injection
+        - "record_type == '' || ['A', 'AAAA', 'MX', 'CNAME', 'TXT', 'NS', 'SOA', 'SRV', 'PTR'].exists(t, t == record_type)"  # Valid record types
+      run:
+        command: |
+          if [ -n "{{ .record_type }}" ]; then
+            dig "{{ .hostname }}" {{ .record_type }} +short || nslookup -type={{ .record_type }} "{{ .hostname }}"
+          else
+            dig "{{ .hostname }}" +short || nslookup "{{ .hostname }}"
+          fi
+      output:
+        prefix: "DNS resolution for {{ .hostname }}{{ if .record_type }} ({{ .record_type }}){{ end }}:"
+
+    - name: "traceroute"
+      description: "Trace the network route to a host"
+      params:
+        hostname:
+          type: string
+          description: "The hostname or IP address to trace"
+          required: true
+        max_hops:
+          type: number
+          description: "Maximum number of hops (default: 30)"
+      constraints:
+        - "hostname.size() > 0 && hostname.size() <= 253"        # Standard DNS name length limits
+        - "hostname.matches('^[a-zA-Z0-9._-]+$')"                # Valid hostname characters
+        - "!hostname.contains(';')"                              # Prevent command injection
+        - "int(max_hops) == 0 || (int(max_hops) >= 1 && int(max_hops) <= 30)"   # Reasonable max hops
+      run:
+        command: |
+          MAX_HOPS=30
+          if [ {{ .max_hops }} -gt 0 ]; then
+            MAX_HOPS={{ .max_hops }}
+          fi
+          
+          if [ "$(uname)" = "Darwin" ]; then
+            # macOS
+            traceroute -m $MAX_HOPS "{{ .hostname }}"
+          elif [ "$(uname)" = "Linux" ]; then
+            # Linux
+            traceroute -m $MAX_HOPS "{{ .hostname }}"
+          else
+            # Windows
+            tracert -h $MAX_HOPS "{{ .hostname }}"
+          fi
+      output:
+        prefix: "Traceroute to {{ .hostname }}:"
+
+    - name: "port_check"
+      description: "Check if a TCP port is open on a host"
+      params:
+        hostname:
+          type: string
+          description: "The hostname or IP address to check"
+          required: true
+        port:
+          type: number
+          description: "The TCP port number to check"
+          required: true
+      constraints:
+        - "hostname.size() > 0 && hostname.size() <= 253"        # Standard DNS name length limits
+        - "hostname.matches('^[a-zA-Z0-9._-]+$')"                # Valid hostname characters
+        - "!hostname.contains(';')"                              # Prevent command injection
+        - "int(port) >= 1 && int(port) <= 65535"                 # Valid port range
+      run:
+        command: |
+          # Using timeout for all platforms to prevent hanging
+          if [ "$(uname)" = "Darwin" ]; then
+            # macOS
+            nc -zv -G 5 "{{ .hostname }}" {{ .port }} 2>&1
+          elif [ "$(uname)" = "Linux" ]; then
+            # Linux
+            timeout 5 nc -zv "{{ .hostname }}" {{ .port }} 2>&1 || echo "Connection failed or timed out"
+          else
+            # Windows fallback using PowerShell through WSL or similar
+            echo "Checking port {{ .port }} on {{ .hostname }}..."
+            echo "(Test-NetConnection -ComputerName {{ .hostname }} -Port {{ .port }}).TcpTestSucceeded" | powershell.exe -Command -
+          fi
+      output:
+        prefix: "Port {{ .port }} check for {{ .hostname }}:"
+
+    - name: "netstat_connections"
+      description: "Show active network connections"
+      params:
+        filter:
+          type: string
+          description: "Optional filter string (e.g., 'ESTABLISHED', '80', 'tcp')"
+      constraints:
+        - "filter == '' || filter.size() <= 20"                  # Reasonable filter length
+        - "!filter.contains(';')"                                # Prevent command injection
+        - "!filter.matches('.*[&|><`$].*')"                      # Block shell special characters
+      run:
+        command: |
+          if [ "$(uname)" = "Darwin" ]; then
+            # macOS
+            if [ -n "{{ .filter }}" ]; then
+              netstat -an | grep -i "{{ .filter }}"
+            else
+              netstat -an
+            fi
+          elif [ "$(uname)" = "Linux" ]; then
+            # Linux
+            if [ -n "{{ .filter }}" ]; then
+              ss -tuln | grep -i "{{ .filter }}"
+            else
+              ss -tuln
+            fi
+          else
+            # Windows fallback
+            netstat -an | grep -i "{{ .filter }}"
+          fi
+      output:
+        prefix: "Active network connections{{ if .filter }} (filtered by: {{ .filter }}){{ end }}:"
+
+    - name: "dns_config"
+      description: "Show DNS resolver configuration"
+      run:
+        command: |
+          echo "DNS Servers:"
+          if [ "$(uname)" = "Darwin" ]; then
+            # macOS
+            scutil --dns | grep "nameserver\[[0-9]*\]" | sort -u
+          elif [ "$(uname)" = "Linux" ]; then
+            # Linux
+            cat /etc/resolv.conf | grep "nameserver" | sort -u
+          else
+            # Windows fallback
+            ipconfig /all | grep -i "DNS Servers" -A 5
+          fi
+      output:
+        prefix: "DNS configuration:"
+
+    - name: "network_bandwidth"
+      description: "Run a simple network bandwidth test"
+      params:
+        size:
+          type: number
+          description: "Size of the test in MB (1-10)"
+      constraints:
+        - "int(size) == 0 || (int(size) >= 1 && int(size) <= 10)"        # Reasonable test size with integers
+      run:
+        command: |
+          TEST_SIZE=1
+          if [ {{ .size }} -ge 1 ]; then
+            TEST_SIZE={{ .size }}
+          fi
+          
+          echo "Running ${TEST_SIZE}MB download speed test..."
+          time curl -s -o /dev/null https://speed.cloudflare.com/__down?bytes=$((TEST_SIZE * 1024 * 1024))
+          
+          echo -e "\nRunning latency test to cloudflare.com..."
+          ping -c 3 cloudflare.com
+      output:
+        prefix: "Network bandwidth test results:" 

@@ -1,0 +1,55 @@
+name: Test
+
+on:
+  pull_request:
+    branches: [ main, master ]
+  push:
+    branches: [ main, master ]
+
+jobs:
+  test:
+    name: Run Tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Set up Go
+        uses: actions/setup-go@v3
+        with:
+          go-version: '1.23'
+
+      - name: Install dependencies
+        run: go mod download
+
+      - name: Run tests
+        run: go test -v ./...
+
+      - name: Run tests with race detection
+        run: go test -race -v ./...
+
+      - name: Check code formatting
+        run: |
+          if [ "$(gofmt -l . | wc -l)" -gt 0 ]; then
+            echo "The following files are not formatted correctly:"
+            gofmt -l .
+            exit 1
+          fi
+
+      - name: Build application
+        run: go build -o mcp-cli-adapter .
+
+      - name: Validate example configurations
+        run: |
+          echo "Validating example YAML configurations..."
+          find examples -name "*.yaml" -type f | while read file; do
+            echo "Validating $file..."
+            ./mcp-cli-adapter validate --config "$file" || exit 1
+          done
+          echo "All example configurations validated successfully"
+
+      - name: Run linters
+        uses: golangci/golangci-lint-action@v3
+        with:
+          version: latest
+          args: --timeout=5m 

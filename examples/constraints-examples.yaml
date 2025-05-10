@@ -1,0 +1,178 @@
+# MCP CLI Adapter - Constraint Examples
+#
+# This configuration file demonstrates various ways to use CEL constraints
+# to implement security and validation rules in your MCP tools.
+
+mcp:
+  description: |
+    Constraints Demonstration Toolkit showcasing advanced security
+    validation patterns, including string manipulation, regular expressions,
+    numeric bounds checking, whitelist enforcement, filesystem safety, and
+    conditional logic to build secure and robust tools.
+  tools:
+    - name: "basic_string_constraints"
+      description: "Demonstrates basic string constraint operations"
+      params:
+        text:
+          type: string
+          description: "Text input for constraint testing"
+          required: true
+      constraints:
+        # Basic string operations
+        - "text.size() >= 3"                         # Minimum length check
+        - "text.size() <= 100"                       # Maximum length check
+        - "text.startsWith('hello')"                 # Prefix check
+        - "text.contains('world')"                   # Substring check
+      run:
+        command: "echo 'Valid text: {{ .text }}'"
+
+    - name: "regex_constraints"
+      description: "Demonstrates regex pattern matching in constraints"
+      params:
+        email:
+          type: string
+          description: "Email address to validate"
+          required: true
+      constraints:
+        # Email format validation using regex
+        - "email.matches(\"^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\\\.[a-zA-Z]{2,}$\")"
+      run:
+        command: "echo 'Valid email: {{ .email }}'"
+
+    - name: "number_constraints"
+      description: "Demonstrates numeric constraint operations"
+      params:
+        value:
+          type: number
+          description: "Numeric value to validate"
+          required: true
+      constraints:
+        # Numeric validations
+        - "value >= 1.0"                             # Minimum value
+        - "value <= 100.0"                           # Maximum value
+        - "int(value) % 2 == 0"                      # Even numbers only (using int conversion)
+      run:
+        command: "echo 'Valid value: {{ .value }}'"
+
+    - name: "boolean_constraints"
+      description: "Demonstrates boolean constraint operations"
+      params:
+        flag1:
+          type: boolean
+          description: "First boolean flag"
+          required: true
+        flag2:
+          type: boolean
+          description: "Second boolean flag"
+          required: true
+      constraints:
+        # Boolean logic
+        - "flag1 == true"                            # First flag must be true
+        - "flag1 == flag2"                           # Both flags must match
+      run:
+        command: "echo 'Valid flags: {{ .flag1 }} and {{ .flag2 }}'"
+
+    - name: "list_existence_constraints"
+      description: "Demonstrates list existence checks in constraints"
+      params:
+        fruit:
+          type: string
+          description: "Fruit name to check"
+          required: true
+      constraints:
+        # List existence check using exists() function
+        - "['apple', 'banana', 'cherry', 'date', 'elderberry'].exists(f, f == fruit)"
+      run:
+        command: "echo 'Valid fruit: {{ .fruit }}'"
+
+    - name: "command_security_constraints"
+      description: "Demonstrates security constraints for shell commands"
+      params:
+        command:
+          type: string
+          description: "Command to execute"
+          required: true
+        arguments:
+          type: string
+          description: "Command arguments"
+          required: false
+      constraints:
+        # Command whitelist
+        - "['echo', 'ls', 'pwd', 'date', 'whoami'].exists(cmd, cmd == command)"
+        
+        # Multiple security checks to prevent shell injection
+        - "!arguments.contains(';')"                 # Prevent command chaining with semicolon
+        - "!arguments.contains('&&')"                # Prevent command chaining with AND
+        - "!arguments.contains('||')"                # Prevent command chaining with OR
+        - "!arguments.contains('>')"                 # Prevent output redirection
+        - "!arguments.contains('<')"                 # Prevent input redirection
+        - "!arguments.contains('|')"                 # Prevent piping
+        - "!arguments.contains('`')"                 # Prevent command substitution with backticks
+        - "!arguments.contains('$(')"                # Prevent command substitution with $()
+        - "!arguments.contains('${}')"               # Prevent variable expansion
+        
+        # Ensure reasonable argument length
+        - "arguments.size() <= 100"
+      run:
+        command: "{{ .command }} {{ .arguments }}"
+
+    - name: "combined_constraints"
+      description: "Demonstrates combining multiple constraints in one expression"
+      params:
+        username:
+          type: string
+          description: "Username to validate"
+          required: true
+        age:
+          type: number
+          description: "User age"
+          required: true
+      constraints:
+        # Complex single-line constraint combining multiple conditions
+        - "username.size() >= 3 && username.size() <= 20 && username.matches('^[a-zA-Z0-9_]+$')"
+        
+        # Age validation with error message using ternary operator
+        - "int(age) >= 18 && int(age) <= 120"
+      run:
+        command: "echo 'Valid user: {{ .username }}, age {{ .age }}'"
+
+    - name: "filesystem_safety_constraints"
+      description: "Demonstrates constraints for safe filesystem operations"
+      params:
+        filepath:
+          type: string
+          description: "Path to a file"
+          required: true
+      constraints:
+        # Path safety validations
+        - "filepath.size() > 0"                      # Non-empty path
+        - "filepath.size() <= 255"                   # Maximum path length
+        - "!filepath.contains('../')"                # Prevent directory traversal
+        - "!filepath.startsWith('/')"                # Prevent absolute paths
+        - "!filepath.startsWith('~')"                # Prevent home directory references
+        - "['.txt', '.log', '.md', '.json', '.yaml', '.yml'].exists(ext, filepath.endsWith(ext))"  # File extension whitelist
+      run:
+        command: "ls -la {{ .filepath }}"
+
+    - name: "conditional_constraints"
+      description: "Demonstrates conditional constraint logic"
+      params:
+        mode:
+          type: string
+          description: "Operation mode (read, write, admin)"
+          required: true
+        file:
+          type: string
+          description: "File to operate on"
+          required: true
+      constraints:
+        # Mode must be one of the allowed values
+        - "['read', 'write', 'admin'].exists(m, m == mode)"
+        
+        # Different file constraints based on mode
+        - "mode == 'read' || file.endsWith('.tmp')"  # For write/admin modes, only tmp files
+        
+        # Admin mode has no file restrictions
+        - "mode == 'admin' || !file.contains('system')"  # Only admin can access system files
+      run:
+        command: "echo 'Operating on {{ .file }} in {{ .mode }} mode'" 
