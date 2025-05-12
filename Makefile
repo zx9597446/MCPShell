@@ -1,4 +1,4 @@
-.PHONY: build clean test run lint lint-golangci format validate-examples docs-update-tags help
+.PHONY: build clean test run lint lint-golangci format validate-examples docs-update-tags help release
 
 # Binary name
 BINARY_NAME=mcp-cli-adapter
@@ -79,13 +79,31 @@ validate-examples: build
 	@echo ">>>"
 	@echo ">>> ... all example configurations validated SUCCESSFULLY !!!"
 
-# Update version tags in documentation
-docs-update-tags:
-	@echo ">>> Updating version tags in documentation..."
-	@LATEST_TAG=$$(git describe --tags --abbrev=0 | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$$' || echo "v0.0.1"); \
-	echo ">>> Using latest tag: $$LATEST_TAG"; \
-	find docs -name "*.md" -type f -exec sed -i.bak -E "s|github.com/inercia/mcp-cli-adapter@v[0-9]+\.[0-9]+\.[0-9]+|github.com/inercia/mcp-cli-adapter@$$LATEST_TAG|g" {} \; -exec rm {}.bak \;
-	@echo ">>> ... documentation version tags updated successfully"
+# Automated release process
+release:
+	@echo ">>> Checking repository status..."
+	@if [ -n "$$(git status --porcelain)" ]; then \
+		echo "Error: Repository has uncommitted changes. Please commit or stash them first."; \
+		exit 1; \
+	fi
+	@echo ">>> Repository is clean."
+	@echo ">>> Existing tags:"
+	@git tag -l | sort -V
+	@echo ""
+	@read -p "Enter new version tag (e.g., v1.2.3): " TAG; \
+	echo ">>> Using tag: $$TAG"; \
+	echo ">>> Updating version tags in documentation..."; \
+	find docs -name "*.md" -type f -exec sed -i.bak -E "s|github.com/inercia/mcp-cli-adapter@v[0-9]+\.[0-9]+\.[0-9]+|github.com/inercia/mcp-cli-adapter@$$TAG|g" {} \; -exec rm {}.bak \; ; \
+	echo ">>> Documentation version tags updated successfully"; \
+	echo ">>> Adding and committing documentation changes..."; \
+	git add -u ; \
+	git commit -m "chore: Update documentation version tags to $$TAG"; \
+	echo ">>> Creating git tag..."; \
+	git tag -a "$$TAG" -m "Version $$TAG"; \
+	echo ">>> Tag '$$TAG' created successfully."; \
+	echo ""; \
+	echo "To push the tag and documentation changes, run:"; \
+	echo "  git push origin main $$TAG"
 
 # Show help
 help:
@@ -101,4 +119,5 @@ help:
 	@echo "  format        - Format Go code"
 	@echo "  validate-examples - Validate all YAML configs in examples directory"
 	@echo "  docs-update-tags - Update version tags in documentation"
+	@echo "  release       - Automated release process"
 	@echo "  help          - Show this help" 
