@@ -1,7 +1,28 @@
 # MCP-CLI Adapter examples
 
-This directpory contains some examples of configurations for running
+This directory contains some examples of configurations for running
 different tools that can be used by your LLM.
+
+Some of the examples are:
+
+- **aws-networking-ro.yaml**: Read-only AWS networking tools for inspecting VPCs, subnets, and network configurations.
+- **container-diagnostics-ro.yaml**: Read-only container diagnostics for Docker and containerization tools.
+- **disk-diagnostics-ro.yaml**: Tools for analyzing disk usage, finding large files, and checking filesystem health.
+- **kubectl-ro.yaml**: Read-only Kubernetes tools for inspecting cluster resources and configurations.
+- **log-analysis-ro.yaml**: Log analysis tools for examining and filtering log files.
+- **network-diagnostics-ro.yaml**: Network diagnostic tools for testing connectivity and examining network configurations.
+- **security-diagnostics-ro.yaml**: Security-related diagnostic tools for system inspection.
+- **system-performance-ro.yaml**: Tools for monitoring and analyzing system performance metrics.
+
+You can add them in Cursor (or any other LLM client with support for MCP tools), and use
+it from your AI Chat.
+
+<p align="center">
+  <img src="chat-example-1.png" alt="chat example" width="700"/>
+</p>
+
+Some other examples are just for demonstrating the configuration file format and paramters
+(like all the `config*yaml`).
 
 ## Creating your own scripts with Cursor
 
