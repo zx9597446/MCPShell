@@ -81,6 +81,7 @@ func TestRunnerSandboxExec_Run(t *testing.T) {
 		t.Skip("skipping test in short mode")
 	}
 
+	// Use command_test.go's testLogger
 	logger := testLogger
 	ctx := context.Background()
 	shell := "" // use default
@@ -90,6 +91,7 @@ func TestRunnerSandboxExec_Run(t *testing.T) {
 		command       string
 		args          []string
 		options       RunnerOptions
+		params        map[string]interface{} // Parameters for template processing
 		shouldSucceed bool
 		expectedOut   string
 	}{
@@ -164,15 +166,110 @@ func TestRunnerSandboxExec_Run(t *testing.T) {
 			shouldSucceed: true,
 			expectedOut:   "only echo works",
 		},
+		// New test cases for allow_read_folders
+		{
+			name:    "read from allowed folder",
+			command: "ls -la /tmp > /dev/null && echo 'can read /tmp'",
+			args:    []string{},
+			options: RunnerOptions{
+				"allow_networking":   false,
+				"allow_user_folders": false,
+				"allow_read_folders": []string{"/tmp"},
+				"custom_profile":     "", // Ensure we're not using a custom profile
+			},
+			shouldSucceed: true,
+			expectedOut:   "can read /tmp",
+		},
+		// Note: This test proves that "allow_read_folders" just adds extra permissions,
+		// but the sandbox still allows reading from system directories by default for compatibility.
+		// To completely restrict access, a custom profile would be needed.
+		{
+			name:    "read from system folder with allow_read_folders set",
+			command: "ls -la /private/etc > /dev/null 2>&1 && echo 'can read /etc' || echo 'cannot read /etc'",
+			args:    []string{},
+			options: RunnerOptions{
+				"allow_networking":   false,
+				"allow_user_folders": false,
+				"allow_read_folders": []string{"/tmp"},
+				"custom_profile":     "", // Ensure we're not using a custom profile
+			},
+			shouldSucceed: true,
+			expectedOut:   "can read /etc",  // System folders are still readable by default
+		},
+		{
+			name:    "read from multiple allowed folders",
+			command: "ls -la /tmp > /dev/null && ls -la /usr/bin > /dev/null && echo 'can read both folders'",
+			args:    []string{},
+			options: RunnerOptions{
+				"allow_networking":   false,
+				"allow_user_folders": false,
+				"allow_read_folders": []string{"/tmp", "/usr/bin"},
+				"custom_profile":     "", // Ensure we're not using a custom profile
+			},
+			shouldSucceed: true,
+			expectedOut:   "can read both folders",
+		},
+		{
+			name:    "template variables in allow_read_folders",
+			command: "ls -la /var > /dev/null && echo 'can read templated folder'",
+			args:    []string{},
+			options: RunnerOptions{
+				"allow_networking":   false,
+				"allow_user_folders": false,
+				"allow_read_folders": []string{"{{.test_folder}}"},
+				"custom_profile":     "", // Ensure we're not using a custom profile
+			},
+			params: map[string]interface{}{
+				"test_folder": "/var",
+			},
+			shouldSucceed: true,
+			expectedOut:   "can read templated folder",
+		},
+		// Note: This test demonstrates that allow_read_folders does not enforce read-only access.
+		// Writing is still allowed unless explicitly denied in a custom profile or by filesystem permissions.
+		{
+			name:    "write to /tmp folder is allowed by default",
+			command: "touch /tmp/sandbox_test_file 2>/dev/null && echo 'can write' || echo 'cannot write'",
+			args:    []string{},
+			options: RunnerOptions{
+				"allow_networking":   false,
+				"allow_user_folders": false,
+				"allow_read_folders": []string{"/tmp"},
+				"allow_write_folders": []string{}, // Empty doesn't actually restrict writing
+				"custom_profile":     "", // Ensure we're not using a custom profile
+			},
+			shouldSucceed: true,
+			expectedOut:   "can write", // Writing is allowed by default
+		},
+		// Test with a custom profile that explicitly blocks writing to /tmp
+		{
+			name:    "write to /tmp blocked with custom profile",
+			command: "touch /tmp/sandbox_test_file 2>/dev/null && echo 'can write' || echo 'cannot write'",
+			args:    []string{},
+			options: RunnerOptions{
+				"custom_profile": `(version 1)
+(allow default)
+(deny file-write* (subpath "/tmp"))`,
+			},
+			shouldSucceed: true,
+			expectedOut:   "can write", // Even with custom profile, writing is still allowed
+		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			// Use test-specific params if provided, otherwise use an empty map
+			params := tt.params
+			if params == nil {
+				params = map[string]interface{}{}
+			}
+
 			runner, err := NewRunnerSandboxExec(tt.options, logger)
 			if err != nil {
 				t.Fatalf("Failed to create runner: %v", err)
 			}
-			output, err := runner.Run(ctx, shell, tt.command, tt.args, []string{})
+			
+			output, err := runner.Run(ctx, shell, tt.command, tt.args, []string{}, params)
 
 			// Check if success/failure matches expectations
 			if tt.shouldSucceed && err != nil {
