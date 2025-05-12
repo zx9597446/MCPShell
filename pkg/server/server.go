@@ -65,7 +65,7 @@ func (s *Server) Validate() error {
 	s.logger.Info("Validating configuration file: %s", s.configFile)
 
 	// Load configuration
-	cfg, err := config.LoadConfig(s.configFile)
+	cfg, err := config.NewConfigFromFile(s.configFile)
 	if err != nil {
 		s.logger.Error("Failed to load config: %v", err)
 		return fmt.Errorf("failed to load config: %w", err)
@@ -86,7 +86,7 @@ func (s *Server) Validate() error {
 	}
 
 	// Get filtered tool definitions based on prerequisites
-	toolDefs := cfg.CreateTools()
+	toolDefs := cfg.GetTools()
 
 	// Check if some tools were filtered out due to prerequisites not met
 	if len(toolDefs) < len(cfg.MCP.Tools) {
@@ -98,7 +98,7 @@ func (s *Server) Validate() error {
 		for _, toolConfig := range cfg.MCP.Tools {
 			found := false
 			for _, toolDef := range toolDefs {
-				if toolDef.Tool.Name == toolConfig.Name {
+				if toolDef.MCPTool.Name == toolConfig.Name {
 					found = true
 					break
 				}
@@ -115,44 +115,44 @@ func (s *Server) Validate() error {
 
 	// Validate each tool definition
 	for _, toolDef := range toolDefs {
-		s.logger.Debug("Validating tool '%s'", toolDef.Tool.Name)
+		s.logger.Debug("Validating tool '%s'", toolDef.MCPTool.Name)
 
 		// Find the original tool config
-		toolIndex := s.findToolByName(cfg.MCP.Tools, toolDef.Tool.Name)
+		toolIndex := s.findToolByName(cfg.MCP.Tools, toolDef.MCPTool.Name)
 		if toolIndex == -1 {
-			return fmt.Errorf("internal error: tool '%s' not found in configuration after creation", toolDef.Tool.Name)
+			return fmt.Errorf("internal error: tool '%s' not found in configuration after creation", toolDef.MCPTool.Name)
 		}
 
 		// Get parameter types for constraint validation
 		paramTypes := cfg.MCP.Tools[toolIndex].Params
 
 		// Validate constraints by attempting to compile them
-		if len(toolDef.Constraints) > 0 {
-			s.logger.Debug("Compiling %d constraints for tool '%s'", len(toolDef.Constraints), toolDef.Tool.Name)
-			_, err := common.NewCompiledConstraints(toolDef.Constraints, paramTypes, s.logger.Logger)
+		if len(toolDef.Config.Constraints) > 0 {
+			s.logger.Debug("Compiling %d constraints for tool '%s'", len(toolDef.Config.Constraints), toolDef.MCPTool.Name)
+			_, err := common.NewCompiledConstraints(toolDef.Config.Constraints, paramTypes, s.logger.Logger)
 			if err != nil {
-				s.logger.Error("Failed to compile constraints for tool '%s': %v", toolDef.Tool.Name, err)
-				return fmt.Errorf("constraint compilation error for tool '%s': %w", toolDef.Tool.Name, err)
+				s.logger.Error("Failed to compile constraints for tool '%s': %v", toolDef.MCPTool.Name, err)
+				return fmt.Errorf("constraint compilation error for tool '%s': %w", toolDef.MCPTool.Name, err)
 			}
-			s.logger.Debug("All constraints for tool '%s' compiled successfully", toolDef.Tool.Name)
+			s.logger.Debug("All constraints for tool '%s' compiled successfully", toolDef.MCPTool.Name)
 		}
 
 		// Validate command template
-		if toolDef.HandlerCmd == "" {
-			s.logger.Error("Empty command template for tool '%s'", toolDef.Tool.Name)
-			return fmt.Errorf("empty command template for tool '%s'", toolDef.Tool.Name)
+		if toolDef.Config.Run.Command == "" {
+			s.logger.Error("Empty command template for tool '%s'", toolDef.MCPTool.Name)
+			return fmt.Errorf("empty command template for tool '%s'", toolDef.MCPTool.Name)
 		}
 
 		// Format constraint information for display
 		var constraintInfo string
-		if len(toolDef.Constraints) > 0 {
-			constraintInfo = fmt.Sprintf(" (with %d constraints)", len(toolDef.Constraints))
+		if len(toolDef.Config.Constraints) > 0 {
+			constraintInfo = fmt.Sprintf(" (with %d constraints)", len(toolDef.Config.Constraints))
 		} else {
 			constraintInfo = ""
 		}
 
-		fmt.Printf("Validated tool: '%s'%s\n", toolDef.Tool.Name, constraintInfo)
-		s.logger.Info("Validated tool: '%s'%s", toolDef.Tool.Name, constraintInfo)
+		fmt.Printf("Validated tool: '%s'%s\n", toolDef.MCPTool.Name, constraintInfo)
+		s.logger.Info("Validated tool: '%s'%s", toolDef.MCPTool.Name, constraintInfo)
 	}
 
 	s.logger.Info("Configuration validation successful")
@@ -192,7 +192,7 @@ func (s *Server) createServer() error {
 	var options []mcpserver.ServerOption
 
 	// Load server configuration for description, shell, etc.
-	cfg, err := config.LoadConfig(s.configFile)
+	cfg, err := config.NewConfigFromFile(s.configFile)
 	if err != nil {
 		s.logger.Error("Failed to load config: %v", err)
 		return fmt.Errorf("failed to load config: %w", err)
@@ -241,7 +241,7 @@ func (s *Server) loadTools(cfg *config.Config) error {
 	s.logger.Info("Found %d tools in configuration", len(cfg.MCP.Tools))
 
 	// Create and register tools
-	toolDefs := cfg.CreateTools()
+	toolDefs := cfg.GetTools()
 
 	// Check if some tools were filtered out due to prerequisites not met
 	if len(toolDefs) < len(cfg.MCP.Tools) {
@@ -252,7 +252,7 @@ func (s *Server) loadTools(cfg *config.Config) error {
 		for _, toolConfig := range cfg.MCP.Tools {
 			found := false
 			for _, toolDef := range toolDefs {
-				if toolDef.Tool.Name == toolConfig.Name {
+				if toolDef.MCPTool.Name == toolConfig.Name {
 					found = true
 					break
 				}
@@ -267,31 +267,31 @@ func (s *Server) loadTools(cfg *config.Config) error {
 	s.logger.Info("Registering %d tools after checking prerequisites", len(toolDefs))
 
 	for _, toolDef := range toolDefs {
-		s.logger.Debug("Registering tool '%s'", toolDef.Tool.Name)
+		s.logger.Debug("Registering tool '%s'", toolDef.MCPTool.Name)
 
 		// Get the parameter types for this tool
-		params := cfg.MCP.Tools[s.findToolByName(cfg.MCP.Tools, toolDef.Tool.Name)].Params
+		params := cfg.MCP.Tools[s.findToolByName(cfg.MCP.Tools, toolDef.MCPTool.Name)].Params
 
 		// Create a new command handler instance
 		cmdHandler, err := command.NewCommandHandler(toolDef, params, s.shell, s.logger.Logger)
 		if err != nil {
-			s.logger.Error("Failed to create handler for tool '%s': %v", toolDef.Tool.Name, err)
-			return fmt.Errorf("failed to create handler for tool '%s': %w", toolDef.Tool.Name, err)
+			s.logger.Error("Failed to create handler for tool '%s': %v", toolDef.MCPTool.Name, err)
+			return fmt.Errorf("failed to create handler for tool '%s': %w", toolDef.MCPTool.Name, err)
 		}
 
 		// Get the MCP handler and wrap it with panic recovery
 		safeHandler := s.wrapHandlerWithPanicRecovery(cmdHandler.GetMCPHandler())
 
 		// Add the tool to the server
-		s.mcpServer.AddTool(toolDef.Tool, safeHandler)
+		s.mcpServer.AddTool(toolDef.MCPTool, safeHandler)
 
 		// Print whether constraints are enabled
-		if len(toolDef.Constraints) > 0 {
-			msg := fmt.Sprintf("Registered tool: '%s' (with %d constraints)", toolDef.Tool.Name, len(toolDef.Constraints))
+		if len(toolDef.Config.Constraints) > 0 {
+			msg := fmt.Sprintf("Registered tool: '%s' (with %d constraints)", toolDef.MCPTool.Name, len(toolDef.Config.Constraints))
 			fmt.Println(msg)
 			s.logger.Info(msg)
 		} else {
-			msg := fmt.Sprintf("Registered tool: '%s'", toolDef.Tool.Name)
+			msg := fmt.Sprintf("Registered tool: '%s'", toolDef.MCPTool.Name)
 			fmt.Println(msg)
 			s.logger.Info(msg)
 		}
