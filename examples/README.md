@@ -21,6 +21,13 @@ it from your AI Chat.
   <img src="chat-example-1.png" alt="chat example" width="700"/>
 </p>
 
+For the Kubernetes example, you can aks questions about your current cluster, pods and so on:
+
+<p align="center">
+  <img src="chat-example-2.png" alt="chat example" width="600"/>
+</p>
+
+
 Some other examples are just for demonstrating the configuration file format and paramters
 (like all the `config*yaml`).
 
@@ -41,6 +48,11 @@ Add constraints in order to make the command execution safe,
 checking paramters and so on.
 Provide only read-only commands, do not allow the execution
 of code with side effects.
+Validate the example generated with
+"go run github.com/inercia/mcp-cli-adapter@v0.0.4 validate --config FILENAME"
+where FILENAME is the configuration file you have created.
+If some errors are detected by the validation process, please try to fix them
+until the validation is successful.
 ```
 
 Once that Cursor has generated a configuration file, run the

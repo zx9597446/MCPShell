@@ -17,6 +17,9 @@ mcp:
         ns:
           type: string
           description: "Kubernetes namespace (optional, uses current context's namespace if not specified)"
+        context:
+          type: string
+          description: "Kubernetes context to use (optional, uses current context if not specified)"
         labels:
           type: string
           description: "Label selector to filter resources (e.g. 'app=nginx')"
@@ -29,12 +32,18 @@ mcp:
         - "!resource.contains(' ')"                                # No spaces in resource name
         - "!resource.contains(';')"                                # Prevent injection
         - "ns == '' || (ns.size() <= 63 && ns.matches('^[a-z0-9]([-a-z0-9]*[a-z0-9])?$'))"  # Valid k8s namespace
+        - "context == '' || context.size() <= 253"                 # Valid context name
         - "labels == '' || labels.size() <= 100"                   # Reasonable label length
         - "output_format == '' || output_format == 'wide' || output_format == 'json' || output_format == 'yaml'"  # Valid formats
       run:
         env:
           - KUBECONFIG
         command: |
+          CONTEXT_PARAM=""
+          if [ -n "{{ .context }}" ]; then
+            CONTEXT_PARAM="--context={{ .context }}"
+          fi
+          
           NAMESPACE_PARAM=""
           if [ -n "{{ .ns }}" ]; then
             NAMESPACE_PARAM="-n {{ .ns }}"
@@ -50,8 +59,7 @@ mcp:
             FORMAT_PARAM="-o {{ .output_format }}"
           fi
           
-          echo "Using KUBECONFIG from $KUBECONFIG"
-          kubectl get {{ .resource }} $NAMESPACE_PARAM $LABEL_PARAM $FORMAT_PARAM
+          kubectl $CONTEXT_PARAM get {{ .resource }} $NAMESPACE_PARAM $LABEL_PARAM $FORMAT_PARAM
       output:
         prefix: |
           Kubernetes {{ .resource }} list:
@@ -69,6 +77,9 @@ mcp:
         ns:
           type: string
           description: "Kubernetes namespace (optional, uses current context's namespace if not specified)"
+        context:
+          type: string
+          description: "Kubernetes context to use (optional, uses current context if not specified)"
       constraints:
         - "resource.size() > 0"                                    # Resource must not be empty
         - "resource.size() <= 30"                                  # Reasonable length limit
@@ -77,10 +88,16 @@ mcp:
         - "name.size() <= 253"                                     # Maximum DNS label length
         - "name == '' || !name.contains(';')"                      # Prevent injection
         - "ns == '' || (ns.size() <= 63 && ns.matches('^[a-z0-9]([-a-z0-9]*[a-z0-9])?$'))"  # Valid k8s namespace
+        - "context == '' || context.size() <= 253"                 # Valid context name
       run:
         env:
           - KUBECONFIG
         command: |
+          CONTEXT_PARAM=""
+          if [ -n "{{ .context }}" ]; then
+            CONTEXT_PARAM="--context={{ .context }}"
+          fi
+          
           NAMESPACE_PARAM=""
           if [ -n "{{ .ns }}" ]; then
             NAMESPACE_PARAM="-n {{ .ns }}"
@@ -88,8 +105,7 @@ mcp:
           
           NAME_PARAM="{{ .name }}"
           
-          echo "Using KUBECONFIG from $KUBECONFIG"
-          kubectl describe {{ .resource }} $NAME_PARAM $NAMESPACE_PARAM
+          kubectl $CONTEXT_PARAM describe {{ .resource }} $NAME_PARAM $NAMESPACE_PARAM
       output:
         prefix: |
           Details for {{ .resource }}{{ if .name }} "{{ .name }}"{{ end }}:
@@ -107,6 +123,9 @@ mcp:
         ns:
           type: string
           description: "Kubernetes namespace (optional, uses current context's namespace if not specified)"
+        context:
+          type: string
+          description: "Kubernetes context to use (optional, uses current context if not specified)"
         tail:
           type: number
           description: "Number of lines to show from the end (optional)"
@@ -126,6 +145,7 @@ mcp:
         - "!pod.contains(';')"                                     # Prevent injection
         - "container == '' || (container.size() <= 253 && !container.contains(';'))"  # Valid container name
         - "ns == '' || (ns.size() <= 63 && ns.matches('^[a-z0-9]([-a-z0-9]*[a-z0-9])?$'))"  # Valid k8s namespace
+        - "context == '' || context.size() <= 253"                 # Valid context name
         - "tail >= 0.0 && tail <= 10000.0"                         # Reasonable tail lines limit
         - "since == '' || since.matches('^[0-9]+(s|m|h|d)$')"      # Valid duration format
         - "grep == '' || (grep.size() <= 100 && !grep.contains(';'))"  # Safe grep pattern
@@ -133,6 +153,11 @@ mcp:
         env:
           - KUBECONFIG
         command: |
+          CONTEXT_PARAM=""
+          if [ -n "{{ .context }}" ]; then
+            CONTEXT_PARAM="--context={{ .context }}"
+          fi
+          
           NAMESPACE_PARAM=""
           if [ -n "{{ .ns }}" ]; then
             NAMESPACE_PARAM="-n {{ .ns }}"
@@ -158,10 +183,8 @@ mcp:
             SINCE_PARAM="--since={{ .since }}"
           fi
           
-          echo "Using KUBECONFIG from $KUBECONFIG"
-
           # Base kubectl logs command
-          CMD="kubectl logs {{ .pod }} $NAMESPACE_PARAM $CONTAINER_PARAM $TAIL_PARAM $PREVIOUS_PARAM $SINCE_PARAM"
+          CMD="kubectl $CONTEXT_PARAM logs {{ .pod }} $NAMESPACE_PARAM $CONTAINER_PARAM $TAIL_PARAM $PREVIOUS_PARAM $SINCE_PARAM"
           
           # Add grep filtering if specified
           if [ -n "{{ .grep }}" ]; then
@@ -175,30 +198,60 @@ mcp:
 
     - name: "kubectl_get_contexts"
       description: "List available Kubernetes contexts"
+      params:
+        context:
+          type: string
+          description: "Kubernetes context to use (optional, uses current context if not specified)"
       run:
         env:
           - KUBECONFIG
-        command: kubectl config get-contexts
+        command: |
+          CONTEXT_PARAM=""
+          if [ -n "{{ .context }}" ]; then
+            CONTEXT_PARAM="--context={{ .context }}"
+          fi
+          
+          kubectl $CONTEXT_PARAM config get-contexts
       output:
         prefix: |
           Available Kubernetes contexts:
 
     - name: "kubectl_current_context"
       description: "Show the current Kubernetes context"
+      params:
+        context:
+          type: string
+          description: "Kubernetes context to use (optional, uses current context if not specified)"
       run:
         env:
           - KUBECONFIG
-        command: kubectl config current-context
+        command: |
+          CONTEXT_PARAM=""
+          if [ -n "{{ .context }}" ]; then
+            CONTEXT_PARAM="--context={{ .context }}"
+          fi
+          
+          kubectl $CONTEXT_PARAM config current-context
       output:
         prefix: |
           Current Kubernetes context:
 
     - name: "kubectl_get_namespaces"
       description: "List all namespaces in the cluster"
+      params:
+        context:
+          type: string
+          description: "Kubernetes context to use (optional, uses current context if not specified)"
       run:
         env:
           - KUBECONFIG
-        command: kubectl get namespaces
+        command: |
+          CONTEXT_PARAM=""
+          if [ -n "{{ .context }}" ]; then
+            CONTEXT_PARAM="--context={{ .context }}"
+          fi
+          
+          kubectl $CONTEXT_PARAM get namespaces
       output:
         prefix: |
           Available Kubernetes namespaces:
@@ -213,17 +266,26 @@ mcp:
         ns:
           type: string
           description: "Kubernetes namespace for pods (optional, uses current context's namespace if not specified)"
+        context:
+          type: string
+          description: "Kubernetes context to use (optional, uses current context if not specified)"
         selector:
           type: string
           description: "Label selector to filter resources (e.g. 'app=nginx')"
       constraints:
         - "resource == 'pods' || resource == 'nodes'"              # Only allow pods or nodes
         - "ns == '' || (ns.size() <= 63 && ns.matches('^[a-z0-9]([-a-z0-9]*[a-z0-9])?$'))"  # Valid k8s namespace
+        - "context == '' || context.size() <= 253"                 # Valid context name
         - "selector == '' || selector.size() <= 100"              # Reasonable selector length
       run:
         env:
           - KUBECONFIG
         command: |
+          CONTEXT_PARAM=""
+          if [ -n "{{ .context }}" ]; then
+            CONTEXT_PARAM="--context={{ .context }}"
+          fi
+          
           NAMESPACE_PARAM=""
           if [ "{{ .resource }}" = "pods" ] && [ -n "{{ .ns }}" ]; then
             NAMESPACE_PARAM="-n {{ .ns }}"
@@ -234,9 +296,7 @@ mcp:
             SELECTOR_PARAM="-l {{ .selector }}"
           fi
 
-          echo "Using KUBECONFIG from $KUBECONFIG"
-
-          kubectl top {{ .resource }} $NAMESPACE_PARAM $SELECTOR_PARAM
+          kubectl $CONTEXT_PARAM top {{ .resource }} $NAMESPACE_PARAM $SELECTOR_PARAM
       output:
         prefix: |
           Resource usage for {{ .resource }}:
@@ -247,15 +307,24 @@ mcp:
         namespaced:
           type: boolean
           description: "Show only namespaced resources (optional)"
+        context:
+          type: string
+          description: "Kubernetes context to use (optional, uses current context if not specified)"
         verbs:
           type: string
           description: "Filter by verbs (e.g. 'get,list')"
       constraints:
         - "verbs == '' || verbs.size() <= 50"                     # Reasonable verbs length
+        - "context == '' || context.size() <= 253"                # Valid context name
       run:
         env:
           - KUBECONFIG
         command: |
+          CONTEXT_PARAM=""
+          if [ -n "{{ .context }}" ]; then
+            CONTEXT_PARAM="--context={{ .context }}"
+          fi
+          
           NAMESPACED_PARAM=""
           if [ "{{ .namespaced }}" = "true" ]; then
             NAMESPACED_PARAM="--namespaced=true"
@@ -266,8 +335,7 @@ mcp:
             VERBS_PARAM="--verbs={{ .verbs }}"
           fi
           
-          echo "Using KUBECONFIG from $KUBECONFIG"
-          kubectl api-resources $NAMESPACED_PARAM $VERBS_PARAM
+          kubectl $CONTEXT_PARAM api-resources $NAMESPACED_PARAM $VERBS_PARAM
       output:
         prefix: |
           Available Kubernetes API resources: 
