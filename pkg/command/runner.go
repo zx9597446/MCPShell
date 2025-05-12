@@ -25,18 +25,18 @@ func (ro RunnerOptions) ToJSON() (string, error) {
 
 // Runner is an interface for running commands
 type Runner interface {
-	Run(ctx context.Context, shell string, command string, args []string, env []string, options RunnerOptions) (string, error)
+	Run(ctx context.Context, shell string, command string, args []string, env []string) (string, error)
 }
 
 // NewRunner creates a new Runner based on the given type
-func NewRunner(runnerType RunnerType, logger *log.Logger) (Runner, error) {
+func NewRunner(runnerType RunnerType, options RunnerOptions, logger *log.Logger) (Runner, error) {
 	switch runnerType {
 	case RunnerTypeExec:
-		return NewRunnerExec(logger)
+		return NewRunnerExec(options, logger)
 	case RunnerTypeSandboxExec:
-		return NewRunnerSandboxExec(logger)
+		return NewRunnerSandboxExec(options, logger)
 	case RunnerTypeFirejail:
-		return NewRunnerFirejail(logger)
+		return NewRunnerFirejail(options, logger)
 	}
 
 	return nil, fmt.Errorf("unknown runner type: %s", runnerType)

@@ -20,6 +20,7 @@ type RunnerFirejail struct {
 	execRunner *RunnerExec
 	logger     *log.Logger
 	profileTpl *template.Template
+	options    RunnerFirejailOptions
 }
 
 // RunnerFirejailOptions is the options for the RunnerFirejail
@@ -45,7 +46,7 @@ func NewRunnerFirejailOptions(options RunnerOptions) (RunnerFirejailOptions, err
 
 // NewRunnerFirejail creates a new RunnerFirejail with the provided logger
 // If logger is nil, a default logger is created
-func NewRunnerFirejail(logger *log.Logger) (*RunnerFirejail, error) {
+func NewRunnerFirejail(options RunnerOptions, logger *log.Logger) (*RunnerFirejail, error) {
 	if logger == nil {
 		logger = log.New(os.Stderr, "runner-firejail: ", log.LstdFlags)
 	}
@@ -57,28 +58,29 @@ func NewRunnerFirejail(logger *log.Logger) (*RunnerFirejail, error) {
 		return nil, err
 	}
 
-	execRunner, err := NewRunnerExec(logger)
+	execRunner, err := NewRunnerExec(options, logger)
 	if err != nil {
 		return nil, err
+	}
+	
+	// Parse firejail-specific options
+	firejailOpts, err := NewRunnerFirejailOptions(options)
+	if err != nil {
+		logger.Printf("Failed to parse firejail options: %v", err)
+		return nil, fmt.Errorf("failed to parse firejail options: %w", err)
 	}
 
 	return &RunnerFirejail{
 		execRunner: execRunner,
 		logger:     logger,
 		profileTpl: profileTpl,
+		options:    firejailOpts,
 	}, nil
 }
 
 // Run executes a command inside the firejail sandbox and returns the output
 // It implements the Runner interface
-func (r *RunnerFirejail) Run(ctx context.Context, shell string, command string, args []string, env []string, options RunnerOptions) (string, error) {
-	// Parse firejail-specific options
-	firejailOpts, err := NewRunnerFirejailOptions(options)
-	if err != nil {
-		r.logger.Printf("Failed to parse firejail options: %v", err)
-		return "", fmt.Errorf("failed to parse firejail options: %w", err)
-	}
-
+func (r *RunnerFirejail) Run(ctx context.Context, shell string, command string, args []string, env []string) (string, error) {
 	// Combine command and args
 	fullCmd := command
 	if len(args) > 0 {
@@ -95,13 +97,13 @@ func (r *RunnerFirejail) Run(ctx context.Context, shell string, command string, 
 
 	// Generate the profile by rendering the template
 	var profileBuf bytes.Buffer
-	if err := r.profileTpl.Execute(&profileBuf, firejailOpts); err != nil {
+	if err := r.profileTpl.Execute(&profileBuf, r.options); err != nil {
 		r.logger.Printf("Failed to render firejail profile template: %v", err)
 		return "", fmt.Errorf("failed to render firejail profile: %w", err)
 	}
 
 	profile := profileBuf.String()
-	r.logger.Printf("Firejail options: %+v", firejailOpts)
+	r.logger.Printf("Firejail options: %+v", r.options)
 	r.logger.Printf("Generated firejail profile: %s", profile)
 
 	// Create a temporary file for the firejail profile
@@ -139,5 +141,5 @@ func (r *RunnerFirejail) Run(ctx context.Context, shell string, command string, 
 	r.logger.Printf("Created firejail command: %s", firejailCmd)
 
 	// Execute the command using the embedded RunnerExec
-	return r.execRunner.Run(ctx, shell, firejailCmd, []string{}, env, options)
+	return r.execRunner.Run(ctx, shell, firejailCmd, []string{}, env)
 }

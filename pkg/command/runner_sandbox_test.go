@@ -82,10 +82,6 @@ func TestRunnerSandboxExec_Run(t *testing.T) {
 	}
 
 	logger := testLogger
-	runner, err := NewRunnerSandboxExec(logger)
-	if err != nil {
-		t.Fatalf("Failed to create runner: %v", err)
-	}
 	ctx := context.Background()
 	shell := "" // use default
 
@@ -172,7 +168,11 @@ func TestRunnerSandboxExec_Run(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			output, err := runner.Run(ctx, shell, tt.command, tt.args, []string{}, tt.options)
+			runner, err := NewRunnerSandboxExec(tt.options, logger)
+			if err != nil {
+				t.Fatalf("Failed to create runner: %v", err)
+			}
+			output, err := runner.Run(ctx, shell, tt.command, tt.args, []string{})
 
 			// Check if success/failure matches expectations
 			if tt.shouldSucceed && err != nil {

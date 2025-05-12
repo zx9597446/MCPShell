@@ -13,7 +13,8 @@ import (
 
 // RunnerExec implements the Runner interface
 type RunnerExec struct {
-	logger *log.Logger
+	logger  *log.Logger
+	options RunnerExecOptions
 }
 
 // RunnerExecOptions is the options for the RunnerExec
@@ -34,18 +35,25 @@ func NewRunnerExecOptions(options RunnerOptions) (RunnerExecOptions, error) {
 
 // NewRunnerExec creates a new ExecRunner with the provided logger
 // If logger is nil, a default logger is created
-func NewRunnerExec(logger *log.Logger) (*RunnerExec, error) {
+func NewRunnerExec(options RunnerOptions, logger *log.Logger) (*RunnerExec, error) {
 	if logger == nil {
 		logger = log.New(os.Stderr, "runner-exec: ", log.LstdFlags)
 	}
+	
+	execOptions, err := NewRunnerExecOptions(options)
+	if err != nil {
+		return nil, err
+	}
+	
 	return &RunnerExec{
-		logger: logger,
+		logger:  logger,
+		options: execOptions,
 	}, nil
 }
 
 // Run executes a command with the given shell and returns the output
 // It implements the Runner interface
-func (r *RunnerExec) Run(ctx context.Context, shell string, command string, args []string, env []string, options RunnerOptions) (string, error) {
+func (r *RunnerExec) Run(ctx context.Context, shell string, command string, args []string, env []string) (string, error) {
 	// Combine command and args
 	fullCmd := command
 	if len(args) > 0 {

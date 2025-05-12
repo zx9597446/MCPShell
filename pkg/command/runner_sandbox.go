@@ -20,6 +20,7 @@ type RunnerSandboxExec struct {
 	execRunner *RunnerExec
 	logger     *log.Logger
 	profileTpl *template.Template
+	options    RunnerSandboxExecOptions
 }
 
 // RunnerSandboxExecOptions is the options for the RunnerSandboxExec
@@ -45,7 +46,7 @@ func NewRunnerSandboxExecOptions(options RunnerOptions) (RunnerSandboxExecOption
 
 // NewRunnerSandboxExec creates a new RunnerSandboxExec with the provided logger
 // If logger is nil, a default logger is created
-func NewRunnerSandboxExec(logger *log.Logger) (*RunnerSandboxExec, error) {
+func NewRunnerSandboxExec(options RunnerOptions, logger *log.Logger) (*RunnerSandboxExec, error) {
 	if logger == nil {
 		logger = log.New(os.Stderr, "runner-sandbox-exec: ", log.LstdFlags)
 	}
@@ -57,28 +58,29 @@ func NewRunnerSandboxExec(logger *log.Logger) (*RunnerSandboxExec, error) {
 		return nil, err
 	}
 
-	execRunner, err := NewRunnerExec(logger)
+	execRunner, err := NewRunnerExec(options, logger)
 	if err != nil {
 		return nil, err
+	}
+	
+	// Parse sandbox-specific options
+	sandboxOpts, err := NewRunnerSandboxExecOptions(options)
+	if err != nil {
+		logger.Printf("Failed to parse sandbox options: %v", err)
+		return nil, fmt.Errorf("failed to parse sandbox options: %w", err)
 	}
 
 	return &RunnerSandboxExec{
 		execRunner: execRunner,
 		logger:     logger,
 		profileTpl: profileTpl,
+		options:    sandboxOpts,
 	}, nil
 }
 
 // Run executes a command inside the macOS sandbox and returns the output
 // It implements the Runner interface
-func (r *RunnerSandboxExec) Run(ctx context.Context, shell string, command string, args []string, env []string, options RunnerOptions) (string, error) {
-	// Parse sandbox-specific options
-	sandboxOpts, err := NewRunnerSandboxExecOptions(options)
-	if err != nil {
-		r.logger.Printf("Failed to parse sandbox options: %v", err)
-		return "", fmt.Errorf("failed to parse sandbox options: %w", err)
-	}
-
+func (r *RunnerSandboxExec) Run(ctx context.Context, shell string, command string, args []string, env []string) (string, error) {
 	// Combine command and args
 	fullCmd := command
 	if len(args) > 0 {
@@ -95,13 +97,13 @@ func (r *RunnerSandboxExec) Run(ctx context.Context, shell string, command strin
 
 	// Generate the profile by rendering the template
 	var profileBuf bytes.Buffer
-	if err := r.profileTpl.Execute(&profileBuf, sandboxOpts); err != nil {
+	if err := r.profileTpl.Execute(&profileBuf, r.options); err != nil {
 		r.logger.Printf("Failed to render sandbox profile template: %v", err)
 		return "", fmt.Errorf("failed to render sandbox profile: %w", err)
 	}
 
 	profile := profileBuf.String()
-	r.logger.Printf("Sandbox options: %+v", sandboxOpts)
+	r.logger.Printf("Sandbox options: %+v", r.options)
 	r.logger.Printf("Generated sandbox profile: %s", profile)
 
 	// Create a temporary file for the sandbox profile
@@ -139,5 +141,5 @@ func (r *RunnerSandboxExec) Run(ctx context.Context, shell string, command strin
 	r.logger.Printf("Created sandboxed command: %s", sandboxCmd)
 
 	// Execute the command using the embedded RunnerExec
-	return r.execRunner.Run(ctx, shell, sandboxCmd, []string{}, env, options)
+	return r.execRunner.Run(ctx, shell, sandboxCmd, []string{}, env)
 }

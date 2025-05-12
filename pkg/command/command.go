@@ -158,13 +158,6 @@ func (h *CommandHandler) GetMCPHandler() func(ctx context.Context, request mcp.C
 			}
 		}
 
-		// Create the appropriate runner
-		runner, err := NewRunner(runnerType, h.logger)
-		if err != nil {
-			h.logger.Printf("Error creating runner: %v", err)
-			return mcp.NewToolResultError(fmt.Sprintf("error creating runner: %v", err)), nil
-		}
-
 		// Start with the configured runner options from the tool definition
 		runnerOptions := RunnerOptions{}
 		for k, v := range h.runnerOpts {
@@ -179,8 +172,15 @@ func (h *CommandHandler) GetMCPHandler() func(ctx context.Context, request mcp.C
 			}
 		}
 
+		// Create the appropriate runner with options
+		runner, err := NewRunner(runnerType, runnerOptions, h.logger)
+		if err != nil {
+			h.logger.Printf("Error creating runner: %v", err)
+			return mcp.NewToolResultError(fmt.Sprintf("error creating runner: %v", err)), nil
+		}
+
 		// Execute the command
-		commandOutput, err := runner.Run(ctx, h.shell, cmd, []string{}, env, runnerOptions)
+		commandOutput, err := runner.Run(ctx, h.shell, cmd, []string{}, env)
 		if err != nil {
 			h.logger.Printf("Error executing command: %v", err)
 			return mcp.NewToolResultError(err.Error()), nil
