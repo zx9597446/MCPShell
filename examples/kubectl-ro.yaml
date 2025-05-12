@@ -9,6 +9,8 @@ mcp:
   tools:
     - name: "kubectl_get"
       description: "List Kubernetes resources (pods, deployments, services, etc.)"
+      requirements:
+        executables: ["kubectl"]
       params:
         resource:
           type: string
@@ -66,6 +68,8 @@ mcp:
 
     - name: "kubectl_describe"
       description: "Show detailed information about a Kubernetes resource"
+      requirements:
+        executables: ["kubectl"]
       params:
         resource:
           type: string
@@ -112,6 +116,8 @@ mcp:
 
     - name: "kubectl_logs"
       description: "Get logs from a pod"
+      requirements:
+        executables: ["kubectl"]
       params:
         pod:
           type: string
@@ -198,6 +204,8 @@ mcp:
 
     - name: "kubectl_get_contexts"
       description: "List available Kubernetes contexts"
+      requirements:
+        executables: ["kubectl"]
       params:
         context:
           type: string
@@ -218,6 +226,8 @@ mcp:
 
     - name: "kubectl_current_context"
       description: "Show the current Kubernetes context"
+      requirements:
+        executables: ["kubectl"]
       params:
         context:
           type: string
@@ -238,6 +248,8 @@ mcp:
 
     - name: "kubectl_get_namespaces"
       description: "List all namespaces in the cluster"
+      requirements:
+        executables: ["kubectl"]
       params:
         context:
           type: string
@@ -258,6 +270,8 @@ mcp:
 
     - name: "kubectl_top"
       description: "Show resource usage (CPU/memory) of pods or nodes"
+      requirements:
+        executables: ["kubectl"]
       params:
         resource:
           type: string
@@ -303,6 +317,8 @@ mcp:
 
     - name: "kubectl_api_resources"
       description: "List available API resources in the Kubernetes cluster"
+      requirements:
+        executables: ["kubectl"]
       params:
         namespaced:
           type: boolean
