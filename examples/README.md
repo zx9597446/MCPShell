@@ -25,5 +25,8 @@ of code with side effects.
 Once that Cursor has generated a configuration file, run the
 `mcp-cli-adapter validate` command in order to validate the file.
 If it doesn't validate, pass the errors to Cursor (or allow
-Cursor to runt this command automatically). Cursor should be able
+Cursor to run this command automatically). Cursor should be able
 to fix these errors.
+
+Please submit your toolkit to this repository if you consider
+it useful for the community.

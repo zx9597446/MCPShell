@@ -6,8 +6,8 @@
 
 
 The **MCP CLI Adapter** is a tool that allows LLMs to safely execute **command-line tools**
-through the **Model Context Protocol (MCP)**. It provides a secure bridge between LLMs
-and operating system commands.
+through the [**Model Context Protocol (MCP)**](https://modelcontextprotocol.io/).
+It provides a secure bridge between LLMs and operating system commands.
 
 ## Features
 
@@ -21,6 +21,9 @@ and operating system commands.
 - **Simple integration**: Works with any LLM supporting the MCP protocol.
 
 ## Quick Start
+
+Imagine you want Cursor (or some other MCP client) help you with your
+space problems in your hard disk.
 
 1. Create a configuration file `example.yaml` defining your tools:
 
@@ -80,7 +83,8 @@ and operating system commands.
    [Visual Studio Code](docs/usage-vscode.md). Other LLMs with support for MCPs
    should be configured in a similar way.
 
-3. Make sure your MCP client is refreshed (Cursor should recognize it automatically).
+3. Make sure your MCP client is refreshed (Cursor should recognize it automatically the
+   firt time, but any change in the config file will require a refresh).
 4. Ask your LLM some questions it should be able to answer with the new tool. For example:
    _"I'm running out of space in my hard disk. Could you help me finding the problem?"_.
 
@@ -90,8 +94,13 @@ Configuration files use a YAML format defined [here](docs/configuration.md).
 
 ## Security Considerations
 
-- Use constraints to limit command execution to safe parameters
-- Consider using a restricted shell or creating a dedicated user for running the adapter
+So you will probably thing
+_"this AI has helped me finding all those big files. What if I create another tool for removing files?"_.
+**Don't do that!**.
+
+- Limit the scope of these tools to **read-only actions**, do not give the LLM the power to change things.
+- Use **constraints** to limit command execution to safe parameters
+- Consider using a **_restricted shell_** or creating a dedicated user for running the adapter
 - Review all command templates for potential injection vulnerabilities
 - Only expose tools that are safe for external use
 
