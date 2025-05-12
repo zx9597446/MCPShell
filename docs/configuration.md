@@ -458,3 +458,9 @@ The MCP CLI Adapter uses Go's text/template package for parameter substitution, 
 ```
 
 For more advanced template features, refer to the [Go text/template documentation](https://pkg.go.dev/text/template).
+
+### Functions
+
+In addition to the standard functions available in the Golang templating library,
+[these functions](https://github.com/Masterminds/sprig/blob/master/docs/index.md)
+are also available.

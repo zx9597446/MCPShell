@@ -4,6 +4,8 @@ import (
 	"bytes"
 	"html/template"
 	"strings"
+
+	"github.com/Masterminds/sprig/v3"
 )
 
 // ProcessTemplate processes a template with the given arguments.
@@ -18,7 +20,10 @@ import (
 //   - An error if template processing fails
 func ProcessTemplate(text string, args map[string]interface{}) (string, error) {
 	// Create a template from the command string
-	tmpl, err := template.New("command").Option("missingkey=zero").Parse(text)
+	tmpl, err := template.New("command").
+		Option("missingkey=zero").
+		Funcs(sprig.FuncMap()).
+		Parse(text)
 	if err != nil {
 		return "", err
 	}
