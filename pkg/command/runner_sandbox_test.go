@@ -2,6 +2,7 @@ package command
 
 import (
 	"context"
+	"os"
 	"reflect"
 	"runtime"
 	"testing"
@@ -80,6 +81,13 @@ func TestRunnerSandboxExec_Run(t *testing.T) {
 	if testing.Short() {
 		t.Skip("skipping test in short mode")
 	}
+
+	// Set environment variables for the test
+	os.Setenv("ALLOWED_FROM_ENV", "/tmp")
+	os.Setenv("USR_DIR", "/usr")
+	// Ensure cleanup
+	defer os.Unsetenv("ALLOWED_FROM_ENV")
+	defer os.Unsetenv("USR_DIR")
 
 	// Use command_test.go's testLogger
 	logger := testLogger
@@ -168,21 +176,18 @@ func TestRunnerSandboxExec_Run(t *testing.T) {
 		},
 		// New test cases for allow_read_folders
 		{
-			name:    "read from allowed folder",
+			name:    "read from allowed folder using env variable",
 			command: "ls -la /tmp > /dev/null && echo 'can read /tmp'",
 			args:    []string{},
 			options: RunnerOptions{
 				"allow_networking":   false,
 				"allow_user_folders": false,
-				"allow_read_folders": []string{"/tmp"},
+				"allow_read_folders": []string{"{{ env ALLOWED_FROM_ENV }}"},
 				"custom_profile":     "", // Ensure we're not using a custom profile
 			},
 			shouldSucceed: true,
 			expectedOut:   "can read /tmp",
 		},
-		// Note: This test proves that "allow_read_folders" just adds extra permissions,
-		// but the sandbox still allows reading from system directories by default for compatibility.
-		// To completely restrict access, a custom profile would be needed.
 		{
 			name:    "read from system folder with allow_read_folders set",
 			command: "ls -la /private/etc > /dev/null 2>&1 && echo 'can read /etc' || echo 'cannot read /etc'",
@@ -190,20 +195,20 @@ func TestRunnerSandboxExec_Run(t *testing.T) {
 			options: RunnerOptions{
 				"allow_networking":   false,
 				"allow_user_folders": false,
-				"allow_read_folders": []string{"/tmp"},
+				"allow_read_folders": []string{"{{ env ALLOWED_FROM_ENV }}"},
 				"custom_profile":     "", // Ensure we're not using a custom profile
 			},
 			shouldSucceed: true,
 			expectedOut:   "can read /etc", // System folders are still readable by default
 		},
 		{
-			name:    "read from multiple allowed folders",
+			name:    "read from multiple allowed folders with env variable",
 			command: "ls -la /tmp > /dev/null && ls -la /usr/bin > /dev/null && echo 'can read both folders'",
 			args:    []string{},
 			options: RunnerOptions{
 				"allow_networking":   false,
 				"allow_user_folders": false,
-				"allow_read_folders": []string{"/tmp", "/usr/bin"},
+				"allow_read_folders": []string{"{{ env ALLOWED_FROM_ENV }}", "/usr/bin"},
 				"custom_profile":     "", // Ensure we're not using a custom profile
 			},
 			shouldSucceed: true,
@@ -253,6 +258,37 @@ func TestRunnerSandboxExec_Run(t *testing.T) {
 			},
 			shouldSucceed: true,
 			expectedOut:   "can write", // Even with custom profile, writing is still allowed
+		},
+		// Add a new test that combines env vars and path concatenation
+		{
+			name:    "complex env variable template in allow_read_folders",
+			command: "ls -la /usr/bin > /dev/null && echo 'can read /usr/bin'",
+			args:    []string{},
+			options: RunnerOptions{
+				"allow_networking":   false,
+				"allow_user_folders": false,
+				"allow_read_folders": []string{"{{ env USR_DIR }}/bin"},
+				"custom_profile":     "", // Ensure we're not using a custom profile
+			},
+			shouldSucceed: true,
+			expectedOut:   "can read /usr/bin",
+		},
+		// Add a test that combines both env variables and template parameters
+		{
+			name:    "combined env variables and params in allow_read_folders",
+			command: "ls -la /usr/local/bin > /dev/null && echo 'can read combined path'",
+			args:    []string{},
+			options: RunnerOptions{
+				"allow_networking":   false,
+				"allow_user_folders": false,
+				"allow_read_folders": []string{"{{ env USR_DIR }}{{ .path_suffix }}/bin"},
+				"custom_profile":     "", // Ensure we're not using a custom profile
+			},
+			params: map[string]interface{}{
+				"path_suffix": "/local",
+			},
+			shouldSucceed: true,
+			expectedOut:   "can read combined path",
 		},
 	}
 

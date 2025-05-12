@@ -167,13 +167,16 @@ func TestCommandHandler(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			// Create a mock tool definition
-			toolDef := config.ToolDefinition{
-				HandlerCmd:  tt.cmdTemplate,
-				Output:      tt.output,
-				Constraints: tt.constraints,
-				EnvVars:     []string{},
-				Tool: mcp.Tool{
+			toolDef := config.Tool{
+				MCPTool: mcp.Tool{
 					Name: "test-tool",
+				},
+				Config: config.ToolConfig{
+					Run: config.RunConfig{
+						Command: tt.cmdTemplate,
+					},
+					Output:      tt.output,
+					Constraints: tt.constraints,
 				},
 			}
 

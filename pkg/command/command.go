@@ -45,51 +45,51 @@ type CommandHandler struct {
 // Returns:
 //   - A new CommandHandler instance and nil if successful
 //   - nil and an error if constraint compilation fails or if a required parameter is missing
-func NewCommandHandler(tool config.ToolDefinition, params map[string]common.ParamConfig, shell string, logger *log.Logger) (*CommandHandler, error) {
+func NewCommandHandler(tool config.Tool, params map[string]common.ParamConfig, shell string, logger *log.Logger) (*CommandHandler, error) {
 	// Check required parameters
 	if logger == nil {
 		return nil, fmt.Errorf("logger is required for CommandHandler")
 	}
 
 	// Log tool creation
-	logger.Printf("Creating handler for tool '%s'", tool.Tool.Name)
+	logger.Printf("Creating handler for tool '%s'", tool.MCPTool.Name)
 
 	// Compile constraints during initialization
 	var compiled *common.CompiledConstraints
 	var err error
 
-	if len(tool.Constraints) > 0 {
-		logger.Printf("Compiling %d constraints for tool '%s'", len(tool.Constraints), tool.Tool.Name)
+	if len(tool.Config.Constraints) > 0 {
+		logger.Printf("Compiling %d constraints for tool '%s'", len(tool.Config.Constraints), tool.MCPTool.Name)
 
-		compiled, err = common.NewCompiledConstraints(tool.Constraints, params, logger)
+		compiled, err = common.NewCompiledConstraints(tool.Config.Constraints, params, logger)
 		if err != nil {
-			logger.Printf("Failed to compile constraints for tool %s: %v", tool.Tool.Name, err)
+			logger.Printf("Failed to compile constraints for tool %s: %v", tool.MCPTool.Name, err)
 			return nil, fmt.Errorf("constraint compilation error: %w", err)
 		}
 
-		logger.Printf("Successfully compiled constraints for tool '%s'", tool.Tool.Name)
+		logger.Printf("Successfully compiled constraints for tool '%s'", tool.MCPTool.Name)
 	}
 
 	// Convert the runner options to RunnerOptions
 	runnerOpts := RunnerOptions{}
-	if tool.RunnerOpts != nil {
-		for k, v := range tool.RunnerOpts {
+	if tool.Config.Run.Options != nil {
+		for k, v := range tool.Config.Run.Options {
 			runnerOpts[k] = v
 		}
-		logger.Printf("Runner options for tool '%s': %v", tool.Tool.Name, runnerOpts)
+		logger.Printf("Runner options for tool '%s': %v", tool.MCPTool.Name, runnerOpts)
 	}
 
 	// Create and return the handler
 	return &CommandHandler{
-		cmd:                 tool.HandlerCmd,
-		output:              tool.Output,
-		constraints:         tool.Constraints,
+		cmd:                 tool.Config.Run.Command,
+		output:              tool.Config.Output,
+		constraints:         tool.Config.Constraints,
 		params:              params,
 		constraintsCompiled: compiled,
-		envVars:             tool.EnvVars,
+		envVars:             tool.Config.Run.Env,
 		shell:               shell,
-		toolName:            tool.Tool.Name,
-		runnerType:          tool.Runner,
+		toolName:            tool.MCPTool.Name,
+		runnerType:          tool.Config.Run.Runner,
 		runnerOpts:          runnerOpts,
 		logger:              logger,
 	}, nil
