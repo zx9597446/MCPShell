@@ -6,13 +6,11 @@
 package command
 
 import (
-	"bytes"
 	"context"
 	"fmt"
 	"log"
 	"os"
 	"strings"
-	"text/template"
 
 	"github.com/mark3labs/mcp-go/mcp"
 
@@ -131,7 +129,7 @@ func (h *CommandHandler) GetMCPHandler() func(ctx context.Context, request mcp.C
 		// Process the command template with the tool arguments
 		h.logger.Printf("Processing command template: %s", h.cmd)
 
-		cmd, err := h.processTemplate(h.cmd, request.Params.Arguments)
+		cmd, err := common.ProcessTemplate(h.cmd, request.Params.Arguments)
 		if err != nil {
 			h.logger.Printf("Error processing command template: %v", err)
 			return mcp.NewToolResultError(fmt.Sprintf("error processing command template: %v", err)), nil
@@ -180,7 +178,7 @@ func (h *CommandHandler) GetMCPHandler() func(ctx context.Context, request mcp.C
 		}
 
 		// Execute the command
-		commandOutput, err := runner.Run(ctx, h.shell, cmd, []string{}, env)
+		commandOutput, err := runner.Run(ctx, h.shell, cmd, []string{}, env, request.Params.Arguments)
 		if err != nil {
 			h.logger.Printf("Error executing command: %v", err)
 			return mcp.NewToolResultError(err.Error()), nil
@@ -195,7 +193,7 @@ func (h *CommandHandler) GetMCPHandler() func(ctx context.Context, request mcp.C
 			h.logger.Printf("Applying output prefix template: %s", h.output.Prefix)
 
 			// Process the prefix template with the tool arguments
-			prefix, err := h.processTemplate(h.output.Prefix, request.Params.Arguments)
+			prefix, err := common.ProcessTemplate(h.output.Prefix, request.Params.Arguments)
 			if err != nil {
 				h.logger.Printf("Error processing output prefix template: %v", err)
 				return mcp.NewToolResultError(fmt.Sprintf("error processing output prefix template: %v", err)), nil
@@ -209,35 +207,6 @@ func (h *CommandHandler) GetMCPHandler() func(ctx context.Context, request mcp.C
 		h.logger.Printf("Tool execution completed successfully")
 		return mcp.NewToolResultText(finalOutput), nil
 	}
-}
-
-// processTemplate processes a command template with the given arguments.
-// It uses Go's template engine to substitute variables in the template.
-//
-// Parameters:
-//   - args: Map of variable names to their values
-//
-// Returns:
-//   - The processed command string with substituted variables
-//   - An error if template processing fails
-func (h *CommandHandler) processTemplate(text string, args map[string]interface{}) (string, error) {
-	// Create a template from the command string
-	tmpl, err := template.New("command").Option("missingkey=zero").Parse(text)
-	if err != nil {
-		return "", err
-	}
-
-	// Execute the template with the arguments
-	var buf bytes.Buffer
-	if err := tmpl.Execute(&buf, args); err != nil {
-		return "", err
-	}
-
-	// fix https://github.com/golang/go/issues/24963
-	res := buf.String()
-	res = strings.ReplaceAll(res, "<no value>", "")
-
-	return res, nil
 }
 
 // getEnvironmentVariables gets values for specified environment variables from parent process

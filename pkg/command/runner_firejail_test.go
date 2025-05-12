@@ -16,7 +16,7 @@ func TestNewRunnerFirejail(t *testing.T) {
 	options := RunnerOptions{
 		"allow_networking": true,
 	}
-	
+
 	runner, err := NewRunnerFirejail(options, nil)
 	if err != nil {
 		t.Fatalf("Failed to create firejail runner: %v", err)
@@ -41,7 +41,7 @@ func TestRunnerFirejailRun(t *testing.T) {
 	options := RunnerOptions{
 		"allow_networking": true,
 	}
-	
+
 	runner, err := NewRunnerFirejail(options, nil)
 	if err != nil {
 		t.Fatalf("Failed to create firejail runner: %v", err)
@@ -50,7 +50,7 @@ func TestRunnerFirejailRun(t *testing.T) {
 	ctx := context.Background()
 
 	// Test simple echo command
-	output, err := runner.Run(ctx, "/bin/sh", "echo", []string{"hello world"}, nil)
+	output, err := runner.Run(ctx, "/bin/sh", "echo", []string{"hello world"}, nil, nil)
 	if err != nil {
 		t.Fatalf("Failed to run command: %v", err)
 	}
@@ -77,7 +77,7 @@ func TestRunnerFirejailNetworkRestriction(t *testing.T) {
 	networkEnabledOptions := RunnerOptions{
 		"allow_networking": true,
 	}
-	
+
 	runnerEnabled, err := NewRunnerFirejail(networkEnabledOptions, nil)
 	if err != nil {
 		t.Fatalf("Failed to create firejail runner: %v", err)
@@ -85,13 +85,13 @@ func TestRunnerFirejailNetworkRestriction(t *testing.T) {
 
 	// This might succeed or fail depending on network connectivity,
 	// but it should not be blocked by firejail
-	_, _ = runnerEnabled.Run(ctx, "/bin/sh", "ping", []string{"-c", "1", "127.0.0.1"}, nil)
+	_, _ = runnerEnabled.Run(ctx, "/bin/sh", "ping", []string{"-c", "1", "127.0.0.1"}, nil, nil)
 
 	// Test with networking disabled
 	networkDisabledOptions := RunnerOptions{
 		"allow_networking": false,
 	}
-	
+
 	runnerDisabled, err := NewRunnerFirejail(networkDisabledOptions, nil)
 	if err != nil {
 		t.Fatalf("Failed to create firejail runner: %v", err)
@@ -99,5 +99,5 @@ func TestRunnerFirejailNetworkRestriction(t *testing.T) {
 
 	// This should fail or timeout due to network restrictions
 	// Note: We're not asserting the exact behavior as it might vary based on firejail version
-	_, _ = runnerDisabled.Run(ctx, "/bin/sh", "ping", []string{"-c", "1", "127.0.0.1"}, nil)
+	_, _ = runnerDisabled.Run(ctx, "/bin/sh", "ping", []string{"-c", "1", "127.0.0.1"}, nil, nil)
 }

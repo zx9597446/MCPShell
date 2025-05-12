@@ -25,7 +25,7 @@ func (ro RunnerOptions) ToJSON() (string, error) {
 
 // Runner is an interface for running commands
 type Runner interface {
-	Run(ctx context.Context, shell string, command string, args []string, env []string) (string, error)
+	Run(ctx context.Context, shell string, command string, args []string, env []string, params map[string]interface{}) (string, error)
 }
 
 // NewRunner creates a new Runner based on the given type

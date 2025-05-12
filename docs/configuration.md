@@ -284,13 +284,17 @@ run:
     allow_read_folders:               # List of folders to explicitly allow access to
       - "/tmp"
       - "/path/to/project"
+      - {{ .param1 }}                 # Go templates can be used
 ```
 
 Available options:
 
 - `allow_networking`: When set to `false`, blocks all network access
 - `allow_user_folders`: When set to `false`, restricts access to user folders like Documents, Desktop, etc.
-- `allow_read_folders`: List of directories to explicitly allow access to read, even when other restrictions are in place
+- `allow_read_folders`: List of directories to explicitly allow access to read, even when other
+  restrictions are in place. Items in this list can use Golang template replacements (using the tool parameters).
+- `allow_write_folders`: List of directories to explicitly allow access to write, even when other
+  restrictions are in place. Items in this list can use Golang template replacements (using the tool parameters).
 - `custom_profile`: Specify a custom sandbox profile for advanced configuration
 
 ###### Custom Sandbox Profiles
@@ -355,8 +359,10 @@ Available options:
 
 - `allow_networking`: When set to `false`, blocks all network access using `net none`
 - `allow_user_folders`: When set to `false`, restricts access to common user folders like Documents, Desktop, etc.
-- `allow_read_folders`: List of directories to explicitly allow read access to, even when other restrictions are in place
-- `allow_write_folders`: List of directories to explicitly allow both read and write access to
+- `allow_read_folders`: List of directories to explicitly allow read access to, even when other restrictions
+  are in place. Items in this list can use Golang template replacements (using the tool parameters).
+- `allow_write_folders`: List of directories to explicitly allow both read and write access to.
+  Items in this list can use Golang template replacements (using the tool parameters).
 - `custom_profile`: Specify a custom firejail profile for advanced configuration
 
 ###### Security Benefits

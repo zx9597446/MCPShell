@@ -39,12 +39,12 @@ func NewRunnerExec(options RunnerOptions, logger *log.Logger) (*RunnerExec, erro
 	if logger == nil {
 		logger = log.New(os.Stderr, "runner-exec: ", log.LstdFlags)
 	}
-	
+
 	execOptions, err := NewRunnerExecOptions(options)
 	if err != nil {
 		return nil, err
 	}
-	
+
 	return &RunnerExec{
 		logger:  logger,
 		options: execOptions,
@@ -53,7 +53,7 @@ func NewRunnerExec(options RunnerOptions, logger *log.Logger) (*RunnerExec, erro
 
 // Run executes a command with the given shell and returns the output
 // It implements the Runner interface
-func (r *RunnerExec) Run(ctx context.Context, shell string, command string, args []string, env []string) (string, error) {
+func (r *RunnerExec) Run(ctx context.Context, shell string, command string, args []string, env []string, params map[string]interface{}) (string, error) {
 	// Combine command and args
 	fullCmd := command
 	if len(args) > 0 {

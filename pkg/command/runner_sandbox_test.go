@@ -194,7 +194,7 @@ func TestRunnerSandboxExec_Run(t *testing.T) {
 				"custom_profile":     "", // Ensure we're not using a custom profile
 			},
 			shouldSucceed: true,
-			expectedOut:   "can read /etc",  // System folders are still readable by default
+			expectedOut:   "can read /etc", // System folders are still readable by default
 		},
 		{
 			name:    "read from multiple allowed folders",
@@ -232,11 +232,11 @@ func TestRunnerSandboxExec_Run(t *testing.T) {
 			command: "touch /tmp/sandbox_test_file 2>/dev/null && echo 'can write' || echo 'cannot write'",
 			args:    []string{},
 			options: RunnerOptions{
-				"allow_networking":   false,
-				"allow_user_folders": false,
-				"allow_read_folders": []string{"/tmp"},
+				"allow_networking":    false,
+				"allow_user_folders":  false,
+				"allow_read_folders":  []string{"/tmp"},
 				"allow_write_folders": []string{}, // Empty doesn't actually restrict writing
-				"custom_profile":     "", // Ensure we're not using a custom profile
+				"custom_profile":      "",         // Ensure we're not using a custom profile
 			},
 			shouldSucceed: true,
 			expectedOut:   "can write", // Writing is allowed by default
@@ -268,7 +268,7 @@ func TestRunnerSandboxExec_Run(t *testing.T) {
 			if err != nil {
 				t.Fatalf("Failed to create runner: %v", err)
 			}
-			
+
 			output, err := runner.Run(ctx, shell, tt.command, tt.args, []string{}, params)
 
 			// Check if success/failure matches expectations

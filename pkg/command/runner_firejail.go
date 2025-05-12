@@ -10,6 +10,8 @@ import (
 	"os"
 	"strings"
 	"text/template"
+
+	"github.com/inercia/mcp-cli-adapter/pkg/common"
 )
 
 //go:embed runner_firejail_profile.tpl
@@ -62,7 +64,7 @@ func NewRunnerFirejail(options RunnerOptions, logger *log.Logger) (*RunnerFireja
 	if err != nil {
 		return nil, err
 	}
-	
+
 	// Parse firejail-specific options
 	firejailOpts, err := NewRunnerFirejailOptions(options)
 	if err != nil {
@@ -80,7 +82,7 @@ func NewRunnerFirejail(options RunnerOptions, logger *log.Logger) (*RunnerFireja
 
 // Run executes a command inside the firejail sandbox and returns the output
 // It implements the Runner interface
-func (r *RunnerFirejail) Run(ctx context.Context, shell string, command string, args []string, env []string) (string, error) {
+func (r *RunnerFirejail) Run(ctx context.Context, shell string, command string, args []string, env []string, params map[string]interface{}) (string, error) {
 	// Combine command and args
 	fullCmd := command
 	if len(args) > 0 {
@@ -93,6 +95,14 @@ func (r *RunnerFirejail) Run(ctx context.Context, shell string, command string, 
 		return "", ctx.Err()
 	default:
 		// Continue execution
+	}
+
+	// replace template variables in allow read and write folders
+	if len(r.options.AllowReadFolders) > 0 {
+		r.options.AllowReadFolders = common.ProcessTemplateListFlexible(r.options.AllowReadFolders, params)
+	}
+	if len(r.options.AllowWriteFolders) > 0 {
+		r.options.AllowWriteFolders = common.ProcessTemplateListFlexible(r.options.AllowWriteFolders, params)
 	}
 
 	// Generate the profile by rendering the template
@@ -141,5 +151,5 @@ func (r *RunnerFirejail) Run(ctx context.Context, shell string, command string, 
 	r.logger.Printf("Created firejail command: %s", firejailCmd)
 
 	// Execute the command using the embedded RunnerExec
-	return r.execRunner.Run(ctx, shell, firejailCmd, []string{}, env)
+	return r.execRunner.Run(ctx, shell, firejailCmd, []string{}, env, params)
 }
