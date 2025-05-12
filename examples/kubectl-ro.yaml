@@ -38,6 +38,16 @@ mcp:
         - "labels == '' || labels.size() <= 100"                   # Reasonable label length
         - "output_format == '' || output_format == 'wide' || output_format == 'json' || output_format == 'yaml'"  # Valid formats
       run:
+        runner: sandbox-exec
+        options:
+          allow_networking: true
+          allow_user_folders: false
+          allow_read_folders:
+            - "/usr/bin"
+            - "/bin"
+            - "/etc"
+            - "{{ env \"HOME\" }}/.kube"
+            - "{{ env \"KUBECONFIG\" }}"
         env:
           - KUBECONFIG
         command: |
@@ -94,6 +104,16 @@ mcp:
         - "ns == '' || (ns.size() <= 63 && ns.matches('^[a-z0-9]([-a-z0-9]*[a-z0-9])?$'))"  # Valid k8s namespace
         - "context == '' || context.size() <= 253"                 # Valid context name
       run:
+        runner: sandbox-exec
+        options:
+          allow_networking: true
+          allow_user_folders: false
+          allow_read_folders:
+            - "/usr/bin"
+            - "/bin"
+            - "/etc"
+            - "{{ env \"HOME\" }}/.kube"
+            - "{{ env \"KUBECONFIG\" }}"
         env:
           - KUBECONFIG
         command: |
@@ -156,6 +176,16 @@ mcp:
         - "since == '' || since.matches('^[0-9]+(s|m|h|d)$')"      # Valid duration format
         - "grep == '' || (grep.size() <= 100 && !grep.contains(';'))"  # Safe grep pattern
       run:
+        runner: sandbox-exec
+        options:
+          allow_networking: true
+          allow_user_folders: false
+          allow_read_folders:
+            - "/usr/bin"
+            - "/bin"
+            - "/etc"
+            - "{{ env \"HOME\" }}/.kube"
+            - "{{ env \"KUBECONFIG\" }}"
         env:
           - KUBECONFIG
         command: |
@@ -211,6 +241,16 @@ mcp:
           type: string
           description: "Kubernetes context to use (optional, uses current context if not specified)"
       run:
+        runner: sandbox-exec
+        options:
+          allow_networking: true
+          allow_user_folders: false
+          allow_read_folders:
+            - "/usr/bin"
+            - "/bin"
+            - "/etc"
+            - "{{ env \"HOME\" }}/.kube"
+            - "{{ env \"KUBECONFIG\" }}"
         env:
           - KUBECONFIG
         command: |
@@ -222,7 +262,7 @@ mcp:
           kubectl $CONTEXT_PARAM config get-contexts
       output:
         prefix: |
-          Available Kubernetes contexts:
+          Available Kubernetes contexts for user {{ env "USER" }}:
 
     - name: "kubectl_current_context"
       description: "Show the current Kubernetes context"
@@ -233,6 +273,16 @@ mcp:
           type: string
           description: "Kubernetes context to use (optional, uses current context if not specified)"
       run:
+        runner: sandbox-exec
+        options:
+          allow_networking: true
+          allow_user_folders: false
+          allow_read_folders:
+            - "/usr/bin"
+            - "/bin"
+            - "/etc"
+            - "{{ env \"HOME\" }}/.kube"
+            - "{{ env \"KUBECONFIG\" }}"
         env:
           - KUBECONFIG
         command: |
@@ -255,6 +305,16 @@ mcp:
           type: string
           description: "Kubernetes context to use (optional, uses current context if not specified)"
       run:
+        runner: sandbox-exec
+        options:
+          allow_networking: true
+          allow_user_folders: false
+          allow_read_folders:
+            - "/usr/bin"
+            - "/bin"
+            - "/etc"
+            - "{{ env \"HOME\" }}/.kube"
+            - "{{ env \"KUBECONFIG\" }}"
         env:
           - KUBECONFIG
         command: |
@@ -292,6 +352,16 @@ mcp:
         - "context == '' || context.size() <= 253"                 # Valid context name
         - "selector == '' || selector.size() <= 100"              # Reasonable selector length
       run:
+        runner: sandbox-exec
+        options:
+          allow_networking: true
+          allow_user_folders: false
+          allow_read_folders:
+            - "/usr/bin"
+            - "/bin"
+            - "/etc"
+            - "{{ env \"HOME\" }}/.kube"
+            - "{{ env \"KUBECONFIG\" }}"
         env:
           - KUBECONFIG
         command: |
@@ -333,6 +403,16 @@ mcp:
         - "verbs == '' || verbs.size() <= 50"                     # Reasonable verbs length
         - "context == '' || context.size() <= 253"                # Valid context name
       run:
+        runner: sandbox-exec
+        options:
+          allow_networking: true
+          allow_user_folders: false
+          allow_read_folders:
+            - "/usr/bin"
+            - "/bin"
+            - "/etc"
+            - "{{ env \"HOME\" }}/.kube"
+            - "{{ env \"KUBECONFIG\" }}"
         env:
           - KUBECONFIG
         command: |

@@ -52,7 +52,12 @@ func TestCheckToolPrerequisites(t *testing.T) {
 	// Run test cases
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := checkToolRequirements(tt.requirements)
+			tool := Tool{
+				Config: ToolConfig{
+					Requirements: tt.requirements,
+				},
+			}
+			result := tool.checkToolRequirements()
 			if result != tt.expected {
 				t.Errorf("checkToolPrerequisites() = %v, expected %v", result, tt.expected)
 			}
@@ -92,7 +97,7 @@ func TestCreateTools_Prerequisites(t *testing.T) {
 	}
 
 	// Create tools
-	tools := cfg.CreateTools()
+	tools := cfg.GetTools()
 
 	// We should have only one tool
 	if len(tools) != 1 {
@@ -100,7 +105,7 @@ func TestCreateTools_Prerequisites(t *testing.T) {
 	}
 
 	// Check that the correct tool was created
-	if len(tools) > 0 && tools[0].Tool.Name != "tool1" {
-		t.Errorf("Expected tool named 'tool1', got '%s'", tools[0].Tool.Name)
+	if len(tools) > 0 && tools[0].MCPTool.Name != "tool1" {
+		t.Errorf("Expected tool named 'tool1', got '%s'", tools[0].MCPTool.Name)
 	}
 }

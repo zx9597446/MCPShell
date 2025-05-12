@@ -1,4 +1,4 @@
-.PHONY: build clean test run lint lint-golangci format validate-examples
+.PHONY: build clean test run lint lint-golangci format validate-examples docs-update-tags help
 
 # Binary name
 BINARY_NAME=mcp-cli-adapter
@@ -79,6 +79,14 @@ validate-examples: build
 	@echo ">>>"
 	@echo ">>> ... all example configurations validated SUCCESSFULLY !!!"
 
+# Update version tags in documentation
+docs-update-tags:
+	@echo ">>> Updating version tags in documentation..."
+	@LATEST_TAG=$$(git describe --tags --abbrev=0 | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$$' || echo "v0.0.1"); \
+	echo ">>> Using latest tag: $$LATEST_TAG"; \
+	find docs -name "*.md" -type f -exec sed -i.bak -E "s|github.com/inercia/mcp-cli-adapter@v[0-9]+\.[0-9]+\.[0-9]+|github.com/inercia/mcp-cli-adapter@$$LATEST_TAG|g" {} \; -exec rm {}.bak \;
+	@echo ">>> ... documentation version tags updated successfully"
+
 # Show help
 help:
 	@echo "Available targets:"
@@ -92,4 +100,5 @@ help:
 	@echo "  lint-legacy   - Run legacy linting with golint"
 	@echo "  format        - Format Go code"
 	@echo "  validate-examples - Validate all YAML configs in examples directory"
+	@echo "  docs-update-tags - Update version tags in documentation"
 	@echo "  help          - Show this help" 
