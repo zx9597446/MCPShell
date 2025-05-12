@@ -15,7 +15,7 @@ mcp:
     - name: "<tool_name>"
       description: "<tool description>"
       params:
-        param_name:
+        <param name>:
           type: <string|number|boolean>
           description: "<parameter description>"
           required: <true|false>
@@ -23,6 +23,11 @@ mcp:
         - "<constraint expression>"
       run:
         command: "<command to execute>"
+        runner: "<run method>"
+        options:
+          <option>:<value>
+        env:
+          <env var>
       output:
         prefix: "<text to prepend to the output>"
 ```
