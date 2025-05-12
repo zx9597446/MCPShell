@@ -85,8 +85,36 @@ func (s *Server) Validate() error {
 		s.logger.Debug("Using shell from config: %s", cfg.MCP.Run.Shell)
 	}
 
+	// Get filtered tool definitions based on prerequisites
+	toolDefs := cfg.CreateTools()
+
+	// Check if some tools were filtered out due to prerequisites not met
+	if len(toolDefs) < len(cfg.MCP.Tools) {
+		skippedCount := len(cfg.MCP.Tools) - len(toolDefs)
+		s.logger.Info("%d tool(s) would be skipped due to unmet prerequisites", skippedCount)
+		fmt.Printf("%d tool(s) would be skipped due to unmet prerequisites\n", skippedCount)
+
+		// Log which tools were skipped
+		for _, toolConfig := range cfg.MCP.Tools {
+			found := false
+			for _, toolDef := range toolDefs {
+				if toolDef.Tool.Name == toolConfig.Name {
+					found = true
+					break
+				}
+			}
+
+			if !found {
+				s.logger.Info("Tool '%s' would be skipped due to unmet prerequisites", toolConfig.Name)
+				fmt.Printf("- Tool '%s' would be skipped due to unmet prerequisites\n", toolConfig.Name)
+			}
+		}
+	}
+
+	s.logger.Info("Validating %d tools after checking prerequisites", len(toolDefs))
+
 	// Validate each tool definition
-	for _, toolDef := range cfg.CreateTools() {
+	for _, toolDef := range toolDefs {
 		s.logger.Debug("Validating tool '%s'", toolDef.Tool.Name)
 
 		// Find the original tool config
@@ -213,7 +241,32 @@ func (s *Server) loadTools(cfg *config.Config) error {
 	s.logger.Info("Found %d tools in configuration", len(cfg.MCP.Tools))
 
 	// Create and register tools
-	for _, toolDef := range cfg.CreateTools() {
+	toolDefs := cfg.CreateTools()
+
+	// Check if some tools were filtered out due to prerequisites not met
+	if len(toolDefs) < len(cfg.MCP.Tools) {
+		skippedCount := len(cfg.MCP.Tools) - len(toolDefs)
+		s.logger.Info("Skipped %d tool(s) due to unmet prerequisites", skippedCount)
+
+		// Log which tools were skipped
+		for _, toolConfig := range cfg.MCP.Tools {
+			found := false
+			for _, toolDef := range toolDefs {
+				if toolDef.Tool.Name == toolConfig.Name {
+					found = true
+					break
+				}
+			}
+
+			if !found {
+				s.logger.Info("Tool '%s' was skipped due to unmet prerequisites", toolConfig.Name)
+			}
+		}
+	}
+
+	s.logger.Info("Registering %d tools after checking prerequisites", len(toolDefs))
+
+	for _, toolDef := range toolDefs {
 		s.logger.Debug("Registering tool '%s'", toolDef.Tool.Name)
 
 		// Get the parameter types for this tool

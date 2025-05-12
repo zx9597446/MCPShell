@@ -14,6 +14,10 @@ mcp:
   tools:
     - name: "<tool_name>"
       description: "<tool description>"
+      prerequisites:
+        os: "<OS>"
+        executables:
+          - "<executable>"
       params:
         <param name>:
           type: <string|number|boolean>
@@ -47,6 +51,11 @@ The top-level `mcp` section contains configuration for the MCP server:
 Each tool is defined with the following properties:
 
 - `name`: The name of the tool (required)
+- `prerequisites`: A list of system requirements that must be met for the tool to be available (optional)
+  - All the prerequisites must be true in order to mark this tool as available.
+  - Each prerequisite set can specify:
+    - `os`: Operating system name (e.g., "darwin", "linux", "windows")
+    - `executables`: List of executables that must be present in the system PATH
 - `description`: A description of what the tool does (required).
   This is specially important in order to instruct the LLM what this tool does.
   Otherwise, the LLM will not know that it can use this tool for fullfilling

@@ -91,6 +91,7 @@ space problems in your hard disk.
 ## Configuration
 
 Configuration files use a YAML format defined [here](docs/configuration.md).
+See the [this directory](examples) for some examples.
 
 ## Security Considerations
 

@@ -45,6 +45,9 @@ type ToolConfig struct {
 	// Name is the unique identifier for the tool
 	Name string `yaml:"name"`
 
+	// Requirements is a list of tool names that must be executed before this tool
+	Requirements ToolRequirements `yaml:"prerequisites,omitempty"`
+
 	// Description explains what the tool does (shown to AI clients)
 	Description string `yaml:"description"`
 
@@ -59,6 +62,18 @@ type ToolConfig struct {
 
 	// Output specifies how to format the tool's output
 	Output common.OutputConfig `yaml:"output,omitempty"`
+}
+
+// ToolRequirements represents a prerequisite tool configuration.
+// If these prerequisites are not met, the tool will not even be shown as
+// available to the client.
+// This allows for tools to be conditionally shown based on the user's system.
+type ToolRequirements struct {
+	// OS is the operating system that the prerequisite tool must be installed on
+	OS string `yaml:"os,omitempty"`
+
+	// Executables is a list of executable names that must be present in the system
+	Executables []string `yaml:"executables"`
 }
 
 // RunConfig represents the run configuration for a tool.
@@ -77,8 +92,10 @@ type RunConfig struct {
 }
 
 // Type aliases for common structs to simplify imports
-type OutputConfig = common.OutputConfig
-type ParamConfig = common.ParamConfig
+type (
+	OutputConfig = common.OutputConfig
+	ParamConfig  = common.ParamConfig
+)
 
 // LoadConfig loads the configuration from a YAML file at the specified path.
 //
@@ -123,6 +140,11 @@ func (c *Config) CreateTools() []ToolDefinition {
 	var tools []ToolDefinition
 
 	for _, toolConfig := range c.MCP.Tools {
+		// Check prerequisites before creating the tool
+		if !checkToolRequirements(toolConfig.Requirements) {
+			continue // Skip this tool if prerequisites are not met
+		}
+
 		tool := ToolDefinition{
 			Tool:        createMCPTool(toolConfig),
 			HandlerCmd:  toolConfig.Run.Command,
@@ -136,6 +158,33 @@ func (c *Config) CreateTools() []ToolDefinition {
 	}
 
 	return tools
+}
+
+// checkToolRequirements checks if all prerequisites for a tool are met.
+// If no prerequisites are specified, it returns true.
+// If any prerequisites are specified, all of them must be satisfied.
+//
+// Parameters:
+//   - prerequisites: A slice of ToolPrerequisites to check
+//
+// Returns:
+//   - true if all prerequisites are met or if there are no prerequisites,
+//     false otherwise
+func checkToolRequirements(prerequisites ToolRequirements) bool {
+	// Check if any of the prerequisite sets are met
+	// Check if OS matches (if specified)
+	if !common.CheckOSMatches(prerequisites.OS) {
+		return false
+	}
+
+	// Check if all required executables exist
+	for _, execName := range prerequisites.Executables {
+		if !common.CheckExecutableExists(execName) {
+			return false
+		}
+	}
+
+	return true
 }
 
 // ToolDefinition holds an MCP tool and its associated handling information.

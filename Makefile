@@ -76,7 +76,8 @@ validate-examples: build
 		echo ">>> Validating $$file..."; \
 		$(GOBIN)/$(BINARY_NAME) validate --config $$file || exit 1; \
 	done
-	@echo ">>> ... all example configurations validated successfully"
+	@echo ">>>"
+	@echo ">>> ... all example configurations validated SUCCESSFULLY !!!"
 
 # Show help
 help:

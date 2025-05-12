@@ -8,6 +8,7 @@ Some of the examples are:
 - **aws-networking-ro.yaml**: Read-only AWS networking tools for inspecting VPCs, subnets, and network configurations.
 - **container-diagnostics-ro.yaml**: Read-only container diagnostics for Docker and containerization tools.
 - **disk-diagnostics-ro.yaml**: Tools for analyzing disk usage, finding large files, and checking filesystem health.
+- **github-cli-ro.yaml**: Commands for interacting with GitHub repositories, issues, pull requests, and other GitHub resources.
 - **kubectl-ro.yaml**: Read-only Kubernetes tools for inspecting cluster resources and configurations.
 - **log-analysis-ro.yaml**: Log analysis tools for examining and filtering log files.
 - **network-diagnostics-ro.yaml**: Network diagnostic tools for testing connectivity and examining network configurations.

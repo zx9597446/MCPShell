@@ -1,0 +1,582 @@
+mcp:
+  description: |
+    GitHub CLI Toolkit providing a set of read-only commands for interacting with
+    GitHub repositories, issues, pull requests, and other GitHub resources.
+    These tools are safe and non-destructive, allowing users to query information
+    without making changes to repositories.
+  run:
+    shell: bash
+  tools:
+    - name: "gh_repo_view"
+      description: "Show detailed information about a GitHub repository"
+      requirements:
+        executables:
+          - gh
+      params:
+        repo:
+          type: string
+          description: "Repository name in the format owner/repo"
+          required: true
+        jq_filter:
+          type: string
+          description: "Optional JQ filter to extract specific fields from the JSON response"
+      constraints:
+        - "repo.size() > 0 && repo.size() <= 100"                # Reasonable repo name length
+        - "repo.matches('^[a-zA-Z0-9_.-]+/[a-zA-Z0-9_.-]+$')"    # Valid repo format (owner/repo)
+        - "!repo.contains(';')"                                  # Prevent command injection
+        - "jq_filter == '' || jq_filter.size() <= 200"           # Reasonable JQ filter length
+        - "!jq_filter.contains(';')"                             # Prevent command injection
+        - "!jq_filter.matches('.*[&|><`$].*')"                   # Block shell special characters
+      run:
+        env:
+          - GITHUB_TOKEN
+        command: |
+          if [ -n "{{ .jq_filter }}" ]; then
+            gh repo view "{{ .repo }}" --json name,description,homepageUrl,url,defaultBranchRef,isPrivate,forkCount,stargazerCount,owner | jq '{{ .jq_filter }}'
+          else
+            gh repo view "{{ .repo }}"
+          fi
+      output:
+        prefix: "Repository information for {{ .repo }}:"
+
+    - name: "gh_issue_list"
+      description: "List issues in a GitHub repository"
+      params:
+        repo:
+          type: string
+          description: "Repository name in the format owner/repo"
+          required: true
+        state:
+          type: string
+          description: "Issue state (open, closed, all)"
+        limit:
+          type: number
+          description: "Maximum number of issues to display"
+        label:
+          type: string
+          description: "Filter issues by label"
+        author:
+          type: string
+          description: "Filter issues by author"
+        assignee:
+          type: string
+          description: "Filter issues by assignee"
+      constraints:
+        - "repo.size() > 0 && repo.size() <= 100"                # Reasonable repo name length
+        - "repo.matches('^[a-zA-Z0-9_.-]+/[a-zA-Z0-9_.-]+$')"    # Valid repo format (owner/repo)
+        - "!repo.contains(';')"                                  # Prevent command injection
+        - "state == '' || ['open', 'closed', 'all'].exists(s, s == state)"  # Valid state values
+        - "int(limit) == 0 || (int(limit) > 0 && int(limit) <= 100)"  # Reasonable limit
+        - "label == '' || label.size() <= 50"                    # Reasonable label length
+        - "!label.contains(';')"                                 # Prevent command injection
+        - "author == '' || author.size() <= 50"                  # Reasonable author length
+        - "!author.contains(';')"                                # Prevent command injection
+        - "assignee == '' || assignee.size() <= 50"              # Reasonable assignee length
+        - "!assignee.contains(';')"                              # Prevent command injection
+      run:
+        env:
+          - GITHUB_TOKEN
+        command: |
+          ARGS=""
+          if [ -n "{{ .state }}" ]; then
+            ARGS="$ARGS --state {{ .state }}"
+          fi
+          if [ {{ .limit }} -gt 0 ]; then
+            ARGS="$ARGS --limit {{ .limit }}"
+          fi
+          if [ -n "{{ .label }}" ]; then
+            ARGS="$ARGS --label {{ .label }}"
+          fi
+          if [ -n "{{ .author }}" ]; then
+            ARGS="$ARGS --author {{ .author }}"
+          fi
+          if [ -n "{{ .assignee }}" ]; then
+            ARGS="$ARGS --assignee {{ .assignee }}"
+          fi
+          
+          gh issue list --repo "{{ .repo }}" $ARGS
+      output:
+        prefix: "Issues for {{ .repo }}:"
+
+    - name: "gh_issue_view"
+      description: "View a specific issue in a GitHub repository"
+      requirements:
+        executables:
+          - gh
+      params:
+        repo:
+          type: string
+          description: "Repository name in the format owner/repo"
+          required: true
+        issue_number:
+          type: number
+          description: "Issue number"
+          required: true
+        comments:
+          type: boolean
+          description: "Include comments in the output"
+      constraints:
+        - "repo.size() > 0 && repo.size() <= 100"                # Reasonable repo name length
+        - "repo.matches('^[a-zA-Z0-9_.-]+/[a-zA-Z0-9_.-]+$')"    # Valid repo format (owner/repo)
+        - "!repo.contains(';')"                                  # Prevent command injection
+        - "int(issue_number) > 0"                                # Valid issue number
+      run:
+        env:
+          - GITHUB_TOKEN
+        command: |
+          ARGS=""
+          if [ "{{ .comments }}" = "true" ]; then
+            ARGS="$ARGS --comments"
+          fi
+          
+          gh issue view {{ .issue_number }} --repo "{{ .repo }}" $ARGS
+      output:
+        prefix: "Issue #{{ .issue_number }} in {{ .repo }}:"
+
+    - name: "gh_pr_list"
+      description: "List pull requests in a GitHub repository"
+      requirements:
+        executables:
+          - gh
+      params:
+        repo:
+          type: string
+          description: "Repository name in the format owner/repo"
+          required: true
+        state:
+          type: string
+          description: "PR state (open, closed, merged, all)"
+        limit:
+          type: number
+          description: "Maximum number of PRs to display"
+        label:
+          type: string
+          description: "Filter PRs by label"
+        author:
+          type: string
+          description: "Filter PRs by author"
+        assignee:
+          type: string
+          description: "Filter PRs by assignee"
+        base:
+          type: string
+          description: "Filter PRs by base branch"
+      constraints:
+        - "repo.size() > 0 && repo.size() <= 100"                # Reasonable repo name length
+        - "repo.matches('^[a-zA-Z0-9_.-]+/[a-zA-Z0-9_.-]+$')"    # Valid repo format (owner/repo)
+        - "!repo.contains(';')"                                  # Prevent command injection
+        - "state == '' || ['open', 'closed', 'merged', 'all'].exists(s, s == state)"  # Valid state values
+        - "int(limit) == 0 || (int(limit) > 0 && int(limit) <= 100)"  # Reasonable limit
+        - "label == '' || label.size() <= 50"                    # Reasonable label length
+        - "!label.contains(';')"                                 # Prevent command injection
+        - "author == '' || author.size() <= 50"                  # Reasonable author length
+        - "!author.contains(';')"                                # Prevent command injection
+        - "assignee == '' || assignee.size() <= 50"              # Reasonable assignee length
+        - "!assignee.contains(';')"                              # Prevent command injection
+        - "base == '' || base.size() <= 50"                      # Reasonable base branch length
+        - "!base.contains(';')"                                  # Prevent command injection
+      run:
+        env:
+          - GITHUB_TOKEN
+        command: |
+          ARGS=""
+          if [ -n "{{ .state }}" ]; then
+            ARGS="$ARGS --state {{ .state }}"
+          fi
+          if [ {{ .limit }} -gt 0 ]; then
+            ARGS="$ARGS --limit {{ .limit }}"
+          fi
+          if [ -n "{{ .label }}" ]; then
+            ARGS="$ARGS --label {{ .label }}"
+          fi
+          if [ -n "{{ .author }}" ]; then
+            ARGS="$ARGS --author {{ .author }}"
+          fi
+          if [ -n "{{ .assignee }}" ]; then
+            ARGS="$ARGS --assignee {{ .assignee }}"
+          fi
+          if [ -n "{{ .base }}" ]; then
+            ARGS="$ARGS --base {{ .base }}"
+          fi
+          
+          gh pr list --repo "{{ .repo }}" $ARGS
+      output:
+        prefix: "Pull requests for {{ .repo }}:"
+
+    - name: "gh_pr_view"
+      description: "View a specific pull request in a GitHub repository"
+      requirements:
+        executables:
+          - gh
+      params:
+        repo:
+          type: string
+          description: "Repository name in the format owner/repo"
+          required: true
+        pr_number:
+          type: number
+          description: "Pull request number"
+          required: true
+        comments:
+          type: boolean
+          description: "Include comments in the output"
+      constraints:
+        - "repo.size() > 0 && repo.size() <= 100"                # Reasonable repo name length
+        - "repo.matches('^[a-zA-Z0-9_.-]+/[a-zA-Z0-9_.-]+$')"    # Valid repo format (owner/repo)
+        - "!repo.contains(';')"                                  # Prevent command injection
+        - "int(pr_number) > 0"                                   # Valid PR number
+      run:
+        env:
+          - GITHUB_TOKEN
+        command: |
+          ARGS=""
+          if [ "{{ .comments }}" = "true" ]; then
+            ARGS="$ARGS --comments"
+          fi
+          
+          gh pr view {{ .pr_number }} --repo "{{ .repo }}" $ARGS
+      output:
+        prefix: "PR #{{ .pr_number }} in {{ .repo }}:"
+
+    - name: "gh_release_list"
+      description: "List releases in a GitHub repository"
+      requirements:
+        executables:
+          - gh
+      params:
+        repo:
+          type: string
+          description: "Repository name in the format owner/repo"
+          required: true
+        limit:
+          type: number
+          description: "Maximum number of releases to display"
+      constraints:
+        - "repo.size() > 0 && repo.size() <= 100"                # Reasonable repo name length
+        - "repo.matches('^[a-zA-Z0-9_.-]+/[a-zA-Z0-9_.-]+$')"    # Valid repo format (owner/repo)
+        - "!repo.contains(';')"                                  # Prevent command injection
+        - "int(limit) == 0 || (int(limit) > 0 && int(limit) <= 50)"  # Reasonable limit
+      run:
+        env:
+          - GITHUB_TOKEN
+        command: |
+          ARGS=""
+          if [ {{ .limit }} -gt 0 ]; then
+            ARGS="$ARGS --limit {{ .limit }}"
+          fi
+          
+          gh release list --repo "{{ .repo }}" $ARGS
+      output:
+        prefix: "Releases for {{ .repo }}:"
+
+    - name: "gh_release_view"
+      description: "View a specific release in a GitHub repository"
+      requirements:
+        executables:
+          - gh
+      params:
+        repo:
+          type: string
+          description: "Repository name in the format owner/repo"
+          required: true
+        tag:
+          type: string
+          description: "Release tag name"
+          required: true
+      constraints:
+        - "repo.size() > 0 && repo.size() <= 100"                # Reasonable repo name length
+        - "repo.matches('^[a-zA-Z0-9_.-]+/[a-zA-Z0-9_.-]+$')"    # Valid repo format (owner/repo)
+        - "!repo.contains(';')"                                  # Prevent command injection
+        - "tag.size() > 0 && tag.size() <= 50"                   # Reasonable tag length
+        - "!tag.contains(';')"                                   # Prevent command injection
+        - "tag.matches('^[a-zA-Z0-9_.-]+$')"                    # Valid tag characters
+      run:
+        env:
+          - GITHUB_TOKEN
+        command: |
+          gh release view {{ .tag }} --repo "{{ .repo }}"
+      output:
+        prefix: "Release {{ .tag }} in {{ .repo }}:"
+
+    - name: "gh_repo_list"
+      description: "List repositories for a user or organization"
+      requirements:
+        executables:
+          - gh
+      params:
+        owner:
+          type: string
+          description: "GitHub username or organization name"
+          required: true
+        limit:
+          type: number
+          description: "Maximum number of repositories to display"
+        visibility:
+          type: string
+          description: "Filter by visibility (public, private, internal)"
+        language:
+          type: string
+          description: "Filter by primary language"
+      constraints:
+        - "owner.size() > 0 && owner.size() <= 50"               # Reasonable owner length
+        - "owner.matches('^[a-zA-Z0-9_.-]+$')"                  # Valid GitHub username characters
+        - "!owner.contains(';')"                                 # Prevent command injection
+        - "int(limit) == 0 || (int(limit) > 0 && int(limit) <= 50)"  # Reasonable limit
+        - "visibility == '' || ['public', 'private', 'internal'].exists(v, v == visibility)"  # Valid visibility
+        - "language == '' || language.size() <= 30"              # Reasonable language length
+        - "!language.contains(';')"                              # Prevent command injection
+      run:
+        env:
+          - GITHUB_TOKEN
+        command: |
+          ARGS=""
+          if [ {{ .limit }} -gt 0 ]; then
+            ARGS="$ARGS --limit {{ .limit }}"
+          fi
+          if [ -n "{{ .visibility }}" ]; then
+            ARGS="$ARGS --visibility {{ .visibility }}"
+          fi
+          if [ -n "{{ .language }}" ]; then
+            ARGS="$ARGS --language {{ .language }}"
+          fi
+          
+          gh repo list {{ .owner }} $ARGS
+      output:
+        prefix: "Repositories for {{ .owner }}:"
+
+    - name: "gh_search_repos"
+      description: "Search for GitHub repositories"
+      requirements:
+        executables:
+          - gh
+      params:
+        query:
+          type: string
+          description: "Search query"
+          required: true
+        limit:
+          type: number
+          description: "Maximum number of results to display"
+        sort:
+          type: string
+          description: "Sort results by (stars, forks, updated)"
+        order:
+          type: string
+          description: "Sort order (asc, desc)"
+      constraints:
+        - "query.size() > 0 && query.size() <= 200"              # Reasonable query length
+        - "!query.contains(';')"                                 # Prevent command injection
+        - "int(limit) == 0 || (int(limit) > 0 && int(limit) <= 50)"  # Reasonable limit
+        - "sort == '' || ['stars', 'forks', 'updated'].exists(s, s == sort)"  # Valid sort options
+        - "order == '' || ['asc', 'desc'].exists(o, o == order)"  # Valid order options
+      run:
+        command: |
+          ARGS=""
+          if [ {{ .limit }} -gt 0 ]; then
+            ARGS="$ARGS --limit {{ .limit }}"
+          fi
+          if [ -n "{{ .sort }}" ]; then
+            ARGS="$ARGS --sort {{ .sort }}"
+          fi
+          if [ -n "{{ .order }}" ]; then
+            ARGS="$ARGS --order {{ .order }}"
+          fi
+          
+          gh search repos "{{ .query }}" $ARGS
+      output:
+        prefix: "Repository search results for '{{ .query }}':"
+
+    - name: "gh_search_issues"
+      description: "Search for issues and pull requests"
+      requirements:
+        executables:
+          - gh
+      params:
+        query:
+          type: string
+          description: "Search query"
+          required: true
+        limit:
+          type: number
+          description: "Maximum number of results to display"
+        sort:
+          type: string
+          description: "Sort results by (comments, created, updated)"
+        order:
+          type: string
+          description: "Sort order (asc, desc)"
+        web:
+          type: boolean
+          description: "Show search results on the web instead"
+      constraints:
+        - "query.size() > 0 && query.size() <= 200"              # Reasonable query length
+        - "!query.contains(';')"                                 # Prevent command injection
+        - "int(limit) == 0 || (int(limit) > 0 && int(limit) <= 50)"  # Reasonable limit
+        - "sort == '' || ['comments', 'created', 'updated'].exists(s, s == sort)"  # Valid sort options
+        - "order == '' || ['asc', 'desc'].exists(o, o == order)"  # Valid order options
+      run:
+        env:
+          - GITHUB_TOKEN
+        command: |
+          ARGS=""
+          if [ {{ .limit }} -gt 0 ]; then
+            ARGS="$ARGS --limit {{ .limit }}"
+          fi
+          if [ -n "{{ .sort }}" ]; then
+            ARGS="$ARGS --sort {{ .sort }}"
+          fi
+          if [ -n "{{ .order }}" ]; then
+            ARGS="$ARGS --order {{ .order }}"
+          fi
+          if [ "{{ .web }}" = "true" ]; then
+            ARGS="$ARGS --web"
+          fi
+          
+          gh search issues "{{ .query }}" $ARGS
+      output:
+        prefix: "Issue search results for '{{ .query }}':"
+
+    - name: "gh_gist_list"
+      description: "List gists for a user"
+      requirements:
+        executables:
+          - gh
+      params:
+        username:
+          type: string
+          description: "GitHub username (leave empty for your own gists)"
+        limit:
+          type: number
+          description: "Maximum number of gists to display"
+        visibility:
+          type: string
+          description: "Filter by visibility (all, public, secret)"
+      constraints:
+        - "username.size() <= 50"                               # Reasonable username length
+        - "username == '' || username.matches('^[a-zA-Z0-9_.-]+$')"  # Valid GitHub username characters
+        - "!username.contains(';')"                             # Prevent command injection
+        - "int(limit) == 0 || (int(limit) > 0 && int(limit) <= 50)"  # Reasonable limit
+        - "visibility == '' || ['all', 'public', 'secret'].exists(v, v == visibility)"  # Valid visibility
+      run:
+        env:
+          - GITHUB_TOKEN
+        command: |
+          ARGS=""
+          if [ {{ .limit }} -gt 0 ]; then
+            ARGS="$ARGS --limit {{ .limit }}"
+          fi
+          if [ -n "{{ .visibility }}" ]; then
+            ARGS="$ARGS --visibility {{ .visibility }}"
+          fi
+          
+          if [ -n "{{ .username }}" ]; then
+            gh gist list --user {{ .username }} $ARGS
+          else
+            gh gist list $ARGS
+          fi
+      output:
+        prefix: "{{ if .username }}Gists for user {{ .username }}{{ else }}Your gists{{ end }}:"
+
+    - name: "gh_workflow_list"
+      description: "List workflows in a GitHub repository"
+      requirements:
+        executables:
+          - gh
+      params:
+        repo:
+          type: string
+          description: "Repository name in the format owner/repo"
+          required: true
+      constraints:
+        - "repo.size() > 0 && repo.size() <= 100"                # Reasonable repo name length
+        - "repo.matches('^[a-zA-Z0-9_.-]+/[a-zA-Z0-9_.-]+$')"    # Valid repo format (owner/repo)
+        - "!repo.contains(';')"                                  # Prevent command injection
+      run:
+        env:
+          - GITHUB_TOKEN
+        command: |
+          gh workflow list --repo "{{ .repo }}"
+      output:
+        prefix: "Workflows for {{ .repo }}:"
+
+    - name: "gh_workflow_view"
+      description: "View a specific workflow in a GitHub repository"
+      requirements:
+        executables:
+          - gh
+      params:
+        repo:
+          type: string
+          description: "Repository name in the format owner/repo"
+          required: true
+        workflow:
+          type: string
+          description: "Workflow name or ID"
+          required: true
+      constraints:
+        - "repo.size() > 0 && repo.size() <= 100"                # Reasonable repo name length
+        - "repo.matches('^[a-zA-Z0-9_.-]+/[a-zA-Z0-9_.-]+$')"    # Valid repo format (owner/repo)
+        - "!repo.contains(';')"                                  # Prevent command injection
+        - "workflow.size() > 0 && workflow.size() <= 100"        # Reasonable workflow name/ID length
+        - "!workflow.contains(';')"                              # Prevent command injection
+      run:
+        env:
+          - GITHUB_TOKEN
+        command: |
+          gh workflow view "{{ .workflow }}" --repo "{{ .repo }}"
+      output:
+        prefix: "Workflow {{ .workflow }} in {{ .repo }}:"
+
+    - name: "gh_run_list"
+      description: "List workflow runs in a GitHub repository"
+      requirements:
+        executables:
+          - gh
+      params:
+        repo:
+          type: string
+          description: "Repository name in the format owner/repo"
+          required: true
+        workflow:
+          type: string
+          description: "Workflow name or ID"
+        status:
+          type: string
+          description: "Filter by status (success, failure, cancelled, skipped, in_progress)"
+        limit:
+          type: number
+          description: "Maximum number of runs to display"
+        branch:
+          type: string
+          description: "Filter by branch"
+      constraints:
+        - "repo.size() > 0 && repo.size() <= 100"                # Reasonable repo name length
+        - "repo.matches('^[a-zA-Z0-9_.-]+/[a-zA-Z0-9_.-]+$')"    # Valid repo format (owner/repo)
+        - "!repo.contains(';')"                                  # Prevent command injection
+        - "workflow == '' || workflow.size() <= 100"             # Reasonable workflow name/ID length
+        - "!workflow.contains(';')"                              # Prevent command injection
+        - "status == '' || ['success', 'failure', 'cancelled', 'skipped', 'in_progress'].exists(s, s == status)"  # Valid status
+        - "int(limit) == 0 || (int(limit) > 0 && int(limit) <= 50)"  # Reasonable limit
+        - "branch == '' || branch.size() <= 50"                 # Reasonable branch length
+        - "!branch.contains(';')"                               # Prevent command injection
+      run:
+        env:
+          - GITHUB_TOKEN
+        command: |
+          ARGS=""
+          if [ -n "{{ .workflow }}" ]; then
+            ARGS="$ARGS --workflow {{ .workflow }}"
+          fi
+          if [ -n "{{ .status }}" ]; then
+            ARGS="$ARGS --status {{ .status }}"
+          fi
+          if [ {{ .limit }} -gt 0 ]; then
+            ARGS="$ARGS --limit {{ .limit }}"
+          fi
+          if [ -n "{{ .branch }}" ]; then
+            ARGS="$ARGS --branch {{ .branch }}"
+          fi
+          
+          gh run list --repo "{{ .repo }}" $ARGS
+      output:
+        prefix: "Workflow runs for {{ .repo }}:" 
