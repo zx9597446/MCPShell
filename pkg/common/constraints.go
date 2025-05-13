@@ -9,8 +9,9 @@ import (
 
 // CompiledConstraints holds the compiled CEL programs for a tool's constraints
 type CompiledConstraints struct {
-	programs []cel.Program
-	logger   *log.Logger
+	programs    []cel.Program
+	expressions []string // Original constraint expressions
+	logger      *log.Logger
 }
 
 // NewCompiledConstraints compiles a list of CEL constraint expressions
@@ -55,6 +56,7 @@ func NewCompiledConstraints(constraints []string, paramTypes map[string]ParamCon
 
 	// Compile each constraint expression
 	var programs []cel.Program
+	var expressions []string
 	for _, expr := range constraints {
 		ast, issues := env.Compile(expr)
 		if issues != nil && issues.Err() != nil {
@@ -68,16 +70,18 @@ func NewCompiledConstraints(constraints []string, paramTypes map[string]ParamCon
 		}
 
 		programs = append(programs, prg)
+		expressions = append(expressions, expr)
 	}
 
 	return &CompiledConstraints{
-		programs: programs,
-		logger:   logger,
+		programs:    programs,
+		expressions: expressions,
+		logger:      logger,
 	}, nil
 }
 
 // Evaluate evaluates all compiled constraints against the provided arguments
-// Returns true if all constraints pass, false otherwise
+// and returns details about which constraints failed.
 //
 // Parameters:
 //   - args: Map of argument names to their values
@@ -85,19 +89,20 @@ func NewCompiledConstraints(constraints []string, paramTypes map[string]ParamCon
 //
 // Returns:
 //   - true if all constraints pass, false otherwise
+//   - slice of strings containing the failed constraint expressions
 //   - error if evaluation fails or if a required parameter is missing
-func (cc *CompiledConstraints) Evaluate(args map[string]interface{}, paramTypes map[string]ParamConfig) (bool, error) {
+func (cc *CompiledConstraints) Evaluate(args map[string]interface{}, params map[string]ParamConfig) (bool, []string, error) {
 	if cc == nil {
-		return true, nil
+		return true, nil, nil
 	}
 
 	if len(cc.programs) == 0 {
 		// If there are no constraints, evaluation passes by default
 		cc.logger.Println("No constraints to evaluate, passing by default")
-		return true, nil
+		return true, nil, nil
 	}
 
-	cc.logger.Printf("Evaluating %d constraints", len(cc.programs))
+	cc.logger.Printf("Evaluating %d constraints with details", len(cc.programs))
 
 	// Create a copy of args to avoid modifying the original
 	evalArgs := make(map[string]interface{})
@@ -107,7 +112,7 @@ func (cc *CompiledConstraints) Evaluate(args map[string]interface{}, paramTypes 
 	}
 
 	// Ensure all parameters have at least empty values if not provided
-	for name, param := range paramTypes {
+	for name, param := range params {
 		if _, exists := evalArgs[name]; !exists {
 			// Parameter not provided, add default empty value based on type
 			switch param.Type {
@@ -124,33 +129,54 @@ func (cc *CompiledConstraints) Evaluate(args map[string]interface{}, paramTypes 
 		}
 	}
 
+	var failedConstraints []string
+
 	// Evaluate each constraint program
 	for i, prg := range cc.programs {
 		// Execute the program
-		cc.logger.Printf("Evaluating constraint #%d", i+1)
+		cc.logger.Printf("Evaluating constraint #%d: %s", i+1, cc.expressions[i])
 		val, _, err := prg.Eval(evalArgs)
 		if err != nil {
 			cc.logger.Printf("Constraint #%d evaluation error: %v", i+1, err)
-			return false, fmt.Errorf("constraint evaluation error: %w", err)
+			return false, nil, fmt.Errorf("constraint evaluation error: %w", err)
 		}
 
 		// Check if the result is a boolean and is true
 		boolVal, ok := val.Value().(bool)
 		if !ok {
 			cc.logger.Printf("Constraint #%d did not evaluate to a boolean", i+1)
-			return false, fmt.Errorf("constraint did not evaluate to a boolean")
+			return false, nil, fmt.Errorf("constraint did not evaluate to a boolean")
 		}
 
 		if !boolVal {
-			// If any constraint fails, the evaluation fails
-			cc.logger.Printf("Constraint #%d failed evaluation", i+1)
-			return false, nil
+			// If any constraint fails, add it to the failed constraints list
+			failureMsg := fmt.Sprintf("%s (with values: %s)", cc.expressions[i], formatArgValues(evalArgs))
+			failedConstraints = append(failedConstraints, failureMsg)
+			cc.logger.Printf("Constraint #%d failed evaluation: %s", i+1, failureMsg)
+		} else {
+			cc.logger.Printf("Constraint #%d passed evaluation", i+1)
 		}
+	}
 
-		cc.logger.Printf("Constraint #%d passed evaluation", i+1)
+	// Return failure if any constraints failed
+	if len(failedConstraints) > 0 {
+		cc.logger.Printf("%d constraints failed evaluation", len(failedConstraints))
+		return false, failedConstraints, nil
 	}
 
 	// All constraints passed
 	cc.logger.Println("All constraints passed evaluation")
-	return true, nil
+	return true, nil, nil
+}
+
+// formatArgValues returns a formatted string of the argument values for error reporting
+func formatArgValues(args map[string]interface{}) string {
+	result := ""
+	for k, v := range args {
+		if result != "" {
+			result += ", "
+		}
+		result += fmt.Sprintf("%s=%v", k, v)
+	}
+	return result
 }

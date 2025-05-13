@@ -387,17 +387,27 @@ func TestConstraints(t *testing.T) {
 			}
 
 			// Test the evaluation phase
-			got, err := compiled.Evaluate(tt.args, tt.paramTypes)
+			got, failedConstraints, err := compiled.Evaluate(tt.args, tt.paramTypes)
 
 			// Check evaluation error expectation
 			if (err != nil) != tt.wantEvalErr {
-				t.Errorf("CompiledConstraints.Evaluate() error = %v, wantEvalErr %v", err, tt.wantEvalErr)
+				t.Errorf("CompiledConstraints.EvaluateWithDetails() error = %v, wantEvalErr %v", err, tt.wantEvalErr)
 				return
 			}
 
 			// Check evaluation result expectation
 			if got != tt.wantEvalResult {
-				t.Errorf("CompiledConstraints.Evaluate() = %v, want %v", got, tt.wantEvalResult)
+				t.Errorf("CompiledConstraints.EvaluateWithDetails() = %v, want %v", got, tt.wantEvalResult)
+			}
+
+			// Verify failed constraints array is consistent with the result
+			if err == nil {
+				if !got && len(failedConstraints) == 0 {
+					t.Errorf("CompiledConstraints.EvaluateWithDetails() returned false but no failed constraints")
+				}
+				if got && failedConstraints != nil {
+					t.Errorf("CompiledConstraints.EvaluateWithDetails() returned true but had failed constraints: %v", failedConstraints)
+				}
 			}
 		})
 	}
@@ -405,13 +415,16 @@ func TestConstraints(t *testing.T) {
 	// Test with nil CompiledConstraints (special case)
 	t.Run("Nil constraints pass by default", func(t *testing.T) {
 		emptyConstraints := &CompiledConstraints{logger: testLogger}
-		got, err := emptyConstraints.Evaluate(map[string]interface{}{"value": 42.0}, nil)
+		got, failedConstraints, err := emptyConstraints.Evaluate(map[string]interface{}{"value": 42.0}, nil)
 		if err != nil {
-			t.Errorf("CompiledConstraints.Evaluate() error = %v, wantErr false", err)
+			t.Errorf("CompiledConstraints.EvaluateWithDetails() error = %v, wantErr false", err)
 			return
 		}
 		if !got {
-			t.Errorf("CompiledConstraints.Evaluate() = %v, want true", got)
+			t.Errorf("CompiledConstraints.EvaluateWithDetails() = %v, want true", got)
+		}
+		if failedConstraints != nil {
+			t.Errorf("CompiledConstraints.EvaluateWithDetails() returned failed constraints when result is true: %v", failedConstraints)
 		}
 	})
 }

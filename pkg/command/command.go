@@ -109,25 +109,30 @@ func (h *CommandHandler) GetMCPHandler() func(ctx context.Context, request mcp.C
 
 		// Validate constraints before executing command
 		if h.constraintsCompiled != nil {
-			h.logger.Printf("Evaluating %d constraints", len(h.constraints))
-
-			// Evaluate constraints with logging
-			valid, err := h.constraintsCompiled.Evaluate(request.Params.Arguments, h.params)
-			if !valid {
-				s := "Command execution blocked by constraints"
-				if err != nil {
-					s = fmt.Sprintf("%s: %v", s, err)
-				}
-				h.logger.Print(s)
-				return mcp.NewToolResultError(s), nil
-			}
+			h.logger.Printf("Checking %d constraints", len(h.constraints))
+			satisfied, failedConstraints, err := h.constraintsCompiled.Evaluate(request.Params.Arguments, h.params)
 			if err != nil {
-				h.logger.Printf("Constraint evaluation error: %v", err)
-				return mcp.NewToolResultError(fmt.Sprintf("constraint evaluation error: %v", err)), nil
+				h.logger.Printf("Error evaluating constraints: %v", err)
+				return mcp.NewToolResultError(fmt.Sprintf("error evaluating constraints: %v", err)), nil
 			}
+			if !satisfied {
+				h.logger.Printf("Constraints not satisfied, blocking execution")
+				errorMsg := "command execution blocked by constraints"
 
+				// Add details about which constraints failed
+				if len(failedConstraints) > 0 {
+					errorMsg += ":\n"
+					for i, fc := range failedConstraints {
+						errorMsg += fmt.Sprintf("- Constraint %d: %s", i+1, fc)
+						if i < len(failedConstraints)-1 {
+							errorMsg += "\n"
+						}
+					}
+				}
 
-			h.logger.Printf("All constraints passed validation")
+				return mcp.NewToolResultError(errorMsg), nil
+			}
+			h.logger.Printf("All constraints satisfied")
 		}
 
 		// Process the command template with the tool arguments

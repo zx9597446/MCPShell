@@ -8,6 +8,7 @@ import (
 	"log"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 )
 
@@ -54,12 +55,6 @@ func NewRunnerExec(options RunnerOptions, logger *log.Logger) (*RunnerExec, erro
 // Run executes a command with the given shell and returns the output
 // It implements the Runner interface
 func (r *RunnerExec) Run(ctx context.Context, shell string, command string, args []string, env []string, params map[string]interface{}) (string, error) {
-	// Combine command and args
-	fullCmd := command
-	if len(args) > 0 {
-		fullCmd += " " + strings.Join(args, " ")
-	}
-
 	// Check if context is done
 	select {
 	case <-ctx.Done():
@@ -68,15 +63,45 @@ func (r *RunnerExec) Run(ctx context.Context, shell string, command string, args
 		// Continue execution
 	}
 
+	// Create a temporary file for the command
+	tmpDir, err := os.MkdirTemp("", "mcp-cli-adapter")
+	if err != nil {
+		r.logger.Printf("Failed to create temp directory: %v", err)
+		return "", err
+	}
+	defer os.RemoveAll(tmpDir)
+
+	// Format the command with proper shell syntax
+	var scriptContent strings.Builder
+	scriptContent.WriteString("#!/bin/sh\n")
+	scriptContent.WriteString(command)
+
+	// Add arguments with proper escaping
+	for _, arg := range args {
+		scriptContent.WriteString(" ")
+		// Escape quotes and other special characters
+		escaped := strings.ReplaceAll(arg, "'", "'\\''")
+		scriptContent.WriteString("'")
+		scriptContent.WriteString(escaped)
+		scriptContent.WriteString("'")
+	}
+
+	tmpFile := filepath.Join(tmpDir, "script.sh")
+	err = os.WriteFile(tmpFile, []byte(scriptContent.String()), 0700)
+	if err != nil {
+		r.logger.Printf("Failed to write temporary file: %v", err)
+		return "", err
+	}
+
+	r.logger.Printf("Created temporary script file at: %s", tmpFile)
+
 	// Set up the command
 	configShell := getShell(shell)
-
 	r.logger.Printf("Using shell: %s", configShell)
 
-	// Create the command
-	execCmd := exec.Command(configShell, "-c", fullCmd)
-
-	r.logger.Printf("Created command: %s -c %s", configShell, fullCmd)
+	// Create the command to execute the script file
+	execCmd := exec.Command(configShell, tmpFile)
+	r.logger.Printf("Created command: %s %s", configShell, tmpFile)
 
 	// Set environment variables if provided
 	if len(env) > 0 {
@@ -95,7 +120,7 @@ func (r *RunnerExec) Run(ctx context.Context, shell string, command string, args
 	// Run the command
 	r.logger.Printf("Executing command")
 
-	err := execCmd.Run()
+	err = execCmd.Run()
 	if err != nil {
 		// If there's error output, include it in the error
 		if stderr.Len() > 0 {
