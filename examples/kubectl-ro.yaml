@@ -51,25 +51,10 @@ mcp:
         env:
           - KUBECONFIG
         command: |
-          CONTEXT_PARAM=""
-          if [ -n "{{ .context }}" ]; then
-            CONTEXT_PARAM="--context={{ .context }}"
-          fi
-          
-          NAMESPACE_PARAM=""
-          if [ -n "{{ .ns }}" ]; then
-            NAMESPACE_PARAM="-n {{ .ns }}"
-          fi
-          
-          LABEL_PARAM=""
-          if [ -n "{{ .labels }}" ]; then
-            LABEL_PARAM="-l {{ .labels }}"
-          fi
-          
-          FORMAT_PARAM=""
-          if [ -n "{{ .output_format }}" ]; then
-            FORMAT_PARAM="-o {{ .output_format }}"
-          fi
+          CONTEXT_PARAM="{{ if .context }}--context={{ .context }}{{ end }}"
+          NAMESPACE_PARAM="{{ if .ns }}-n {{ .ns }}{{ end }}"
+          LABEL_PARAM="{{ if .labels }}-l {{ .labels }}{{ end }}"
+          FORMAT_PARAM="{{ if .output_format }}-o {{ .output_format }}{{ end }}"
           
           kubectl $CONTEXT_PARAM get {{ .resource }} $NAMESPACE_PARAM $LABEL_PARAM $FORMAT_PARAM
       output:
@@ -117,16 +102,8 @@ mcp:
         env:
           - KUBECONFIG
         command: |
-          CONTEXT_PARAM=""
-          if [ -n "{{ .context }}" ]; then
-            CONTEXT_PARAM="--context={{ .context }}"
-          fi
-          
-          NAMESPACE_PARAM=""
-          if [ -n "{{ .ns }}" ]; then
-            NAMESPACE_PARAM="-n {{ .ns }}"
-          fi
-          
+          CONTEXT_PARAM="{{ if .context }}--context={{ .context }}{{ end }}"
+          NAMESPACE_PARAM="{{ if .ns }}-n {{ .ns }}{{ end }}"          
           NAME_PARAM="{{ .name }}"
           
           kubectl $CONTEXT_PARAM describe {{ .resource }} $NAME_PARAM $NAMESPACE_PARAM
@@ -189,35 +166,13 @@ mcp:
         env:
           - KUBECONFIG
         command: |
-          CONTEXT_PARAM=""
-          if [ -n "{{ .context }}" ]; then
-            CONTEXT_PARAM="--context={{ .context }}"
-          fi
-          
-          NAMESPACE_PARAM=""
-          if [ -n "{{ .ns }}" ]; then
-            NAMESPACE_PARAM="-n {{ .ns }}"
-          fi
-          
-          CONTAINER_PARAM=""
-          if [ -n "{{ .container }}" ]; then
-            CONTAINER_PARAM="-c {{ .container }}"
-          fi
-          
-          TAIL_PARAM=""
-          if [ "{{ .tail }}" != "" ] && [ "{{ .tail }}" != "0" ]; then
-            TAIL_PARAM="--tail={{ .tail }}"
-          fi
-          
-          PREVIOUS_PARAM=""
-          if [ "{{ .previous }}" = "true" ]; then
-            PREVIOUS_PARAM="--previous"
-          fi
-          
-          SINCE_PARAM=""
-          if [ -n "{{ .since }}" ]; then
-            SINCE_PARAM="--since={{ .since }}"
-          fi
+          CONTEXT_PARAM="{{ if .context }}--context={{ .context }}{{ end }}"
+          NAMESPACE_PARAM="{{ if .ns }}-n {{ .ns }}{{ end }}"
+          CONTAINER_PARAM="{{ if .container }}-c {{ .container }}{{ end }}"
+          TAIL_PARAM="{{ if .tail }}-t {{ .tail }}{{ end }}"
+          PREVIOUS_PARAM="{{ if .previous }}-p {{ end }}"
+          SINCE_PARAM="{{ if .since }}-s {{ .since }}{{ end }}"
+          GREP_PARAM="{{ if .grep }}-g {{ .grep }}{{ end }}"
           
           # Base kubectl logs command
           CMD="kubectl $CONTEXT_PARAM logs {{ .pod }} $NAMESPACE_PARAM $CONTAINER_PARAM $TAIL_PARAM $PREVIOUS_PARAM $SINCE_PARAM"
@@ -254,10 +209,7 @@ mcp:
         env:
           - KUBECONFIG
         command: |
-          CONTEXT_PARAM=""
-          if [ -n "{{ .context }}" ]; then
-            CONTEXT_PARAM="--context={{ .context }}"
-          fi
+          CONTEXT_PARAM="{{ if .context }}--context={{ .context }}{{ end }}"
           
           kubectl $CONTEXT_PARAM config get-contexts
       output:
@@ -286,10 +238,7 @@ mcp:
         env:
           - KUBECONFIG
         command: |
-          CONTEXT_PARAM=""
-          if [ -n "{{ .context }}" ]; then
-            CONTEXT_PARAM="--context={{ .context }}"
-          fi
+          CONTEXT_PARAM="{{ if .context }}--context={{ .context }}{{ end }}"
           
           kubectl $CONTEXT_PARAM config current-context
       output:
@@ -318,39 +267,60 @@ mcp:
         env:
           - KUBECONFIG
         command: |
-          CONTEXT_PARAM=""
-          if [ -n "{{ .context }}" ]; then
-            CONTEXT_PARAM="--context={{ .context }}"
-          fi
+          CONTEXT_PARAM="{{ if .context }}--context={{ .context }}{{ end }}"
           
           kubectl $CONTEXT_PARAM get namespaces
       output:
         prefix: |
           Available Kubernetes namespaces:
 
-    - name: "kubectl_top"
-      description: "Show resource usage (CPU/memory) of pods or nodes"
+    - name: "kubectl_portforward_curl"
+      description: "Create a port forward to a Pod:Port and run curl to that target"
       requirements:
-        executables: ["kubectl"]
+        os: darwin
+        executables: 
+          - "kubectl"
+          - "nc"
+          - "curl"
+          - "jq"
+          - "grep"
       params:
-        resource:
+        context:
           type: string
-          description: "Resource type to show usage for (pods or nodes)"
-          required: true
+          description: "Kubernetes context to use (optional, uses current context if not specified)"
         ns:
           type: string
-          description: "Kubernetes namespace for pods (optional, uses current context's namespace if not specified)"
-        context:
+          description: "Kubernetes namespace (optional, uses current context's namespace if not specified)"
+        pod:
           type: string
-          description: "Kubernetes context to use (optional, uses current context if not specified)"
-        selector:
+          description: "Pod name"
+          required: true
+        pod_port:
           type: string
-          description: "Label selector to filter resources (e.g. 'app=nginx')"
+          description: "Remote port in the Pod to connect to (e.g. 8080). Only one port can be provided."
+          required: true
+        local_port:
+          type: number
+          description: "Local port to bind to (e.g. 54320). Only one port can be provided. A defautl one will be used if not specified"
+        curl_args:
+          type: string
+          description: "Additional arguments to pass to curl (e.g. '-I' for headers only)"
+        path:
+          type: string
+          description: "URL's path (e.g. '/index.html'). Make sure it starts with a '/'."
+        filter_jq:
+          type: string
+          description: "jq expression to apply to the response (optional)"
+        filter_grep:
+          type: string
+          description: "grep expression to apply to the response (optional)"
       constraints:
-        - "resource == 'pods' || resource == 'nodes'"              # Only allow pods or nodes
         - "ns == '' || (ns.size() <= 63 && ns.matches('^[a-z0-9]([-a-z0-9]*[a-z0-9])?$'))"  # Valid k8s namespace
         - "context == '' || context.size() <= 253"                 # Valid context name
-        - "selector == '' || selector.size() <= 100"              # Reasonable selector length
+        - "pod_port.size() > 0"                                        # Port must not be empty
+        - "pod_port.matches('^[0-9]+$')"                               # Port must be a number
+        - "path.size() > 0"                                        # Path must not be empty
+        - "path.matches('^/[^ ]+$')"                               # Path must start with a '/' and contain no spaces
       run:
         runner: sandbox-exec
         options:
@@ -365,43 +335,114 @@ mcp:
         env:
           - KUBECONFIG
         command: |
-          CONTEXT_PARAM=""
-          if [ -n "{{ .context }}" ]; then
-            CONTEXT_PARAM="--context={{ .context }}"
-          fi
-          
-          NAMESPACE_PARAM=""
-          if [ "{{ .resource }}" = "pods" ] && [ -n "{{ .ns }}" ]; then
-            NAMESPACE_PARAM="-n {{ .ns }}"
-          fi
-          
-          SELECTOR_PARAM=""
-          if [ -n "{{ .selector }}" ]; then
-            SELECTOR_PARAM="-l {{ .selector }}"
-          fi
 
-          kubectl $CONTEXT_PARAM top {{ .resource }} $NAMESPACE_PARAM $SELECTOR_PARAM
-      output:
-        prefix: |
-          Resource usage for {{ .resource }}:
+          CONTEXT_PARAM="{{ if .context }}--context={{ .context }}{{ end }}"
+          NAMESPACE_PARAM="{{ if .ns }}-n {{ .ns }}{{ end }}"
+          CURL_ARGS="-s {{ if .curl_args }}{{ .curl_args }}{{ end }}"
+          localport="{{ if .local_port }}{{ .local_port }}{{ else }}54320{{ end }}"
+          remoteport="{{ .pod_port }}"
 
-    - name: "kubectl_api_resources"
-      description: "List available API resources in the Kubernetes cluster"
+          # nmap -sT -p $localport localhost || true   # This would show that the port is closed
+
+          kubectl $CONTEXT_PARAM port-forward $NAMESPACE_PARAM pod/{{ .pod }} $localport:$remoteport >/dev/null &
+          pid=$!
+          trap '{
+              kill $pid
+          }' EXIT
+
+          # wait for $localport to become available
+          while ! nc -vz localhost $localport > /dev/null 2>&1 ; do
+              sleep 0.1
+          done
+
+          # nmap -sT -p $localport localhost    # This would show that the port is open
+
+          {{ if .filter_jq }}
+          curl $CURL_ARGS "http://localhost:$localport{{ .path }}" | jq "{{ .filter_jq }}"
+          {{ else if .filter_grep }}
+          curl $CURL_ARGS "http://localhost:$localport{{ .path }}" | grep "{{ .filter_grep }}"
+          {{ else }}
+          curl $CURL_ARGS "http://localhost:$localport{{ .path }}"
+          {{ end }}
+
+          # the 'trap ... EXIT' above will take care of kill $pid
+
+    - name: "kubectl_envoy"
+      description: |
+        Get some configuration information from Envoy by running a port forward
+        to the given Envoy pod and then using curl to access the desired path.
+
+        Some of the most useful paths are:
+          
+        /certs: List out all loaded TLS certificates, including file name, serial number, subject alternate names and days until expiration in JSON format conforming to the certificate proto definition.
+        /clusters: List out all configured cluster manager clusters. This information includes all discovered upstream hosts in each cluster along with per host statistics. This is useful for debugging service discovery issues.
+        /clusters?format=json: List out all configured cluster manager clusters in JSON format.
+        /config_dump: Dump currently loaded configuration from various Envoy components as JSON-serialized proto messages. See the response definition for more information.
+        /config_dump?resource=RESOURCE: Dump only the currently loaded configuration that matches the specified resource. The resource must be a repeated field in one of the top level config dumps such as static_listeners from ListenersConfigDump or dynamic_active_clusters from ClustersConfigDump. If you need a non-repeated field, use the mask query parameter documented above. If you want only a subset of fields from the repeated resource, use both as documented below.
+        /config_dump?name_regex=REGEX: Dump only the currently loaded configurations whose names match the specified regex. Can be used with both resource and mask query parameters.
+        /listeners: List out all configured listeners. This information includes the names of listeners as well as the addresses that they are listening on. If a listener is configured to listen on port 0, then the output will contain the actual port that was allocated by the OS.
+        /listeners?format=json: List out all configured listeners in JSON format.
+        /server_info: Get the server information for the Envoy instance.
+        /stats: Get the stats for the Envoy instance.
+        /stats?filter=REGEX: Filters the returned stats to those with names matching the regular expression regex. Compatible with usedonly. Performs partial matching by default, so /stats?filter=server will return all stats containing the word server. Full-string matching can be specified with begin- and end-line anchors. (i.e. /stats?filter=^server.concurrency$).
+        /stats?format=json: List out all stats in JSON format.
+        /stats/recentlookups: This endpoint helps Envoy developers debug potential contention issues in the stats system. Initially, only the count of StatName lookups is acumulated, not the specific names that are being looked up. In order to see specific recent requests, you must enable the feature by POSTing to /stats/recentlookups/enable. There may be approximately 40-100 nanoseconds of added overhead per lookup.
+
+        Information provided by these paths is useful for debugging Envoy configuration
+        and service discovery issues.
+
+        This information is usually VERY VERBOSE. Try to filter it with grep or jq to get
+        the information you need. Do not try to show or process this information as it is,
+        or you will end up with a lot of noise and a lot of data to process.
+
+        Read the Envoy documentation located at https://www.envoyproxy.io/docs/envoy/latest/operations/admin
+        for more information about these Envoy paths and the information they provide.
+
       requirements:
-        executables: ["kubectl"]
+        os: darwin
+        executables: 
+          - "kubectl"
+          - "nc"
+          - "curl"
+          - "jq"
+          - "grep"
       params:
-        namespaced:
-          type: boolean
-          description: "Show only namespaced resources (optional)"
         context:
           type: string
           description: "Kubernetes context to use (optional, uses current context if not specified)"
-        verbs:
+        ns:
           type: string
-          description: "Filter by verbs (e.g. 'get,list')"
+          description: "Kubernetes namespace (optional, uses current context's namespace if not specified)"
+        pod:
+          type: string
+          description: "Pod name"
+          required: true
+        pod_port:
+          type: string
+          description: "Remote port in the Pod to connect to (e.g. 8080). Only one port can be provided."
+          required: true
+        local_port:
+          type: number
+          description: "Local port to bind to (e.g. 54320). Only one port can be provided. A defautl one will be used if not specified"
+        curl_args:
+          type: string
+          description: "Additional arguments to pass to curl (e.g. '-I' for headers only)"
+        path:
+          type: string
+          description: "URL's path (e.g. '/index.html'). Make sure it starts with a '/'."
+        filter_jq:
+          type: string
+          description: "jq expression to apply to the response (optional)"
+        filter_grep:
+          type: string
+          description: "grep expression to apply to the response (optional)"
       constraints:
-        - "verbs == '' || verbs.size() <= 50"                     # Reasonable verbs length
-        - "context == '' || context.size() <= 253"                # Valid context name
+        - "ns == '' || (ns.size() <= 63 && ns.matches('^[a-z0-9]([-a-z0-9]*[a-z0-9])?$'))"  # Valid k8s namespace
+        - "context == '' || context.size() <= 253"                 # Valid context name
+        - "pod_port.size() > 0"                                        # Port must not be empty
+        - "pod_port.matches('^[0-9]+$')"                               # Port must be a number
+        - "path.size() > 0"                                        # Path must not be empty
+        - "path.matches('^/[^ ]+$')"                               # Path must start with a '/' and contain no spaces
       run:
         runner: sandbox-exec
         options:
@@ -416,22 +457,34 @@ mcp:
         env:
           - KUBECONFIG
         command: |
-          CONTEXT_PARAM=""
-          if [ -n "{{ .context }}" ]; then
-            CONTEXT_PARAM="--context={{ .context }}"
-          fi
-          
-          NAMESPACED_PARAM=""
-          if [ "{{ .namespaced }}" = "true" ]; then
-            NAMESPACED_PARAM="--namespaced=true"
-          fi
-          
-          VERBS_PARAM=""
-          if [ -n "{{ .verbs }}" ]; then
-            VERBS_PARAM="--verbs={{ .verbs }}"
-          fi
-          
-          kubectl $CONTEXT_PARAM api-resources $NAMESPACED_PARAM $VERBS_PARAM
-      output:
-        prefix: |
-          Available Kubernetes API resources: 
+
+          CONTEXT_PARAM="{{ if .context }}--context={{ .context }}{{ end }}"
+          NAMESPACE_PARAM="{{ if .ns }}-n {{ .ns }}{{ end }}"
+          CURL_ARGS="-s {{ if .curl_args }}{{ .curl_args }}{{ end }}"
+          localport="{{ if .local_port }}{{ .local_port }}{{ else }}54320{{ end }}"
+          remoteport="{{ .pod_port }}"
+
+          # nmap -sT -p $localport localhost || true   # This would show that the port is closed
+
+          kubectl $CONTEXT_PARAM port-forward $NAMESPACE_PARAM pod/{{ .pod }} $localport:$remoteport >/dev/null &
+          pid=$!
+          trap '{
+              kill $pid
+          }' EXIT
+
+          # wait for $localport to become available
+          while ! nc -vz localhost $localport > /dev/null 2>&1 ; do
+              sleep 0.1
+          done
+
+          # nmap -sT -p $localport localhost    # This would show that the port is open
+
+          {{ if .filter_jq }}
+          curl $CURL_ARGS "http://localhost:$localport{{ .path }}" | jq "{{ .filter_jq }}"
+          {{ else if .filter_grep }}
+          curl $CURL_ARGS "http://localhost:$localport{{ .path }}" | grep "{{ .filter_grep }}"
+          {{ else }}
+          curl $CURL_ARGS "http://localhost:$localport{{ .path }}"
+          {{ end }}
+
+          # the 'trap ... EXIT' above will take care of kill $pid
