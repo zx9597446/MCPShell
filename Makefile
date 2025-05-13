@@ -93,7 +93,7 @@ release:
 	@read -p "Enter new version tag (e.g., v1.2.3): " TAG; \
 	echo ">>> Using tag: $$TAG"; \
 	echo ">>> Updating version tags in documentation..."; \
-	find docs -name "*.md" -type f -exec sed -i.bak -E "s|github.com/inercia/mcp-cli-adapter@v[0-9]+\.[0-9]+\.[0-9]+|github.com/inercia/mcp-cli-adapter@$$TAG|g" {} \; -exec rm {}.bak \; ; \
+	find . -name "*.md" -type f -exec sed -i.bak -E "s|github.com/inercia/mcp-cli-adapter@v[0-9]+\.[0-9]+\.[0-9]+|github.com/inercia/mcp-cli-adapter@$$TAG|g" {} \; -exec rm {}.bak \; ; \
 	echo ">>> Documentation version tags updated successfully"; \
 	echo ">>> Adding and committing documentation changes..."; \
 	git add -u ; \
