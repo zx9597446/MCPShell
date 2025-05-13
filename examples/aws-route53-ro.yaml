@@ -1,0 +1,972 @@
+mcp:
+  description: |
+    AWS Route53 DNS Inspection Toolkit providing read-only access to AWS Route53 DNS records
+    and configurations. This toolkit helps inspect DNS configurations, trace alias chains,
+    analyze geographic DNS routing, and troubleshoot DNS-related issues through a secure,
+    constrained interface to the AWS CLI.
+
+    NOTE FOR LLM: Authentication with AWS CLI is required to use these tools. If commands fail
+    with authentication errors, use the "aws_list_profiles" tool if available, and suggest
+    to use one of those profiles. If this tool is not available, please suggest to
+    add the tools in the "aws-ro.yaml" configuration, that provide:
+    1. aws_list_profiles - To list and manage AWS profiles
+    2. Use a specific profile with the 'profile' parameter on any command
+
+  run:
+    shell: bash
+  tools:
+    - name: "route53_list_hosted_zones"
+      description: "List all hosted zones in Route53"
+      params:
+        output_format:
+          type: string
+          description: "Output format (json, text, table)"
+        profile:
+          type: string
+          description: |
+            AWS profile to use (optional, uses default if not specified).
+            If this tool produces an authentication error, try using the aws_list_profiles tool
+            from aws-ro.yaml to list available profiles and then specify the profile name in this parameter.
+      constraints:
+        - "output_format == '' || ['json', 'text', 'table'].exists(f, f == output_format)"  # Valid output formats
+        - "profile == '' || profile.matches('^[a-zA-Z0-9_-]+$')"  # Valid profile name format
+      run:
+        env:
+          - HOME
+          - AWS_PROFILE
+          - AWS_DEFAULT_PROFILE
+          - AWS_ACCESS_KEY_ID
+          - AWS_SECRET_ACCESS_KEY
+          - AWS_SESSION_TOKEN
+          - AWS_SHARED_CREDENTIALS_FILE
+          - AWS_CONFIG_FILE
+          - DEBUG
+        command: |
+          {{ if .output_format }}
+          FORMAT_PARAM="--output {{ .output_format }}"
+          {{ else }}
+          FORMAT_PARAM="--output table"
+          {{ end }}
+                    
+          PROFILE_PARAM=""
+          {{ if .profile }}
+          PROFILE_PARAM="--profile {{ .profile }}"
+          {{ end }}
+          
+          if [ -z "$AWS_SHARED_CREDENTIALS_FILE" ]; then
+            export AWS_SHARED_CREDENTIALS_FILE="$HOME/.aws/credentials"
+          fi
+
+          if [ -z "$AWS_CONFIG_FILE" ]; then
+            export AWS_CONFIG_FILE="$HOME/.aws/config"
+          fi
+          
+          if [ -n "$DEBUG" ]; then
+            echo "Using AWS_SHARED_CREDENTIALS_FILE: $AWS_SHARED_CREDENTIALS_FILE"
+            echo "Using AWS_CONFIG_FILE: $AWS_CONFIG_FILE"
+          fi
+
+          # Attempt to run the command and capture the output and exit status
+          aws $PROFILE_PARAM route53 list-hosted-zones $FORMAT_PARAM
+      output:
+        prefix: "Route53 Hosted Zones:"
+
+    - name: "route53_get_hosted_zone"
+      description: "Get detailed information about a specific hosted zone"
+      params:
+        zone_id:
+          type: string
+          description: "Hosted Zone ID (e.g., Z1234567890ABC)"
+          required: true
+        output_format:
+          type: string
+          description: "Output format (json, text, table)"
+        profile:
+          type: string
+          description: |
+            AWS profile to use (optional, uses default if not specified).
+            If this tool produces an authentication error, try using the aws_list_profiles tool
+            from aws-ro.yaml to list available profiles and then specify the profile name in this parameter.
+      constraints:
+        - "zone_id.matches('^Z[A-Z0-9]+$')"  # Valid hosted zone ID format
+        - "output_format == '' || ['json', 'text', 'table'].exists(f, f == output_format)"  # Valid output formats
+        - "profile == '' || profile.matches('^[a-zA-Z0-9_-]+$')"  # Valid profile name format
+      run:
+        env:
+          - HOME
+          - AWS_PROFILE
+          - AWS_DEFAULT_PROFILE
+          - AWS_ACCESS_KEY_ID
+          - AWS_SECRET_ACCESS_KEY
+          - AWS_SESSION_TOKEN
+          - AWS_SHARED_CREDENTIALS_FILE
+          - AWS_CONFIG_FILE
+          - DEBUG
+        command: |
+          {{ if .output_format }}
+          FORMAT_PARAM="--output {{ .output_format }}"
+          {{ else }}
+          FORMAT_PARAM="--output table"
+          {{ end }}
+          
+          PROFILE_PARAM=""
+          {{ if .profile }}
+          PROFILE_PARAM="--profile {{ .profile }}"
+          {{ end }}
+          
+          if [ -z "$AWS_SHARED_CREDENTIALS_FILE" ]; then
+            export AWS_SHARED_CREDENTIALS_FILE="$HOME/.aws/credentials"
+          fi
+
+          if [ -z "$AWS_CONFIG_FILE" ]; then
+            export AWS_CONFIG_FILE="$HOME/.aws/config"
+          fi
+          
+          if [ -n "$DEBUG" ]; then
+            echo "Using AWS_SHARED_CREDENTIALS_FILE: $AWS_SHARED_CREDENTIALS_FILE"
+            echo "Using AWS_CONFIG_FILE: $AWS_CONFIG_FILE"
+          fi
+          
+          # Attempt to run the command and capture the output and exit status
+          aws $PROFILE_PARAM route53 get-hosted-zone --id {{ .zone_id }} $FORMAT_PARAM
+      output:
+        prefix: "Hosted Zone {{ .zone_id }} details:"
+
+    - name: "route53_list_resource_record_sets"
+      description: |
+        List DNS records in a hosted zone, with flexible filtering options.
+        Make sure to include the trailing dot in the name and name_pattern parameters.
+      params:
+        zone_id:
+          type: string
+          description: "Hosted Zone ID (e.g., Z1234567890ABC)"
+          required: true
+        name:
+          type: string
+          description: |
+            DNS name to filter records (e.g., example.com.).
+            Make sure to include the trailing dot.
+        name_pattern:
+          type: string
+          description: |
+            Pattern to filter DNS names (e.g., '*.stage.adobe.io.').
+            Use JMESPath pattern with ends_with() or contains() functions.
+            Make sure to include the trailing dot.
+        record_type:
+          type: string
+          description: "Record type to filter (A, AAAA, CNAME, MX, etc.)"
+        max_items:
+          type: integer
+          description: "Maximum number of items to return (default: 100)"
+        output_format:
+          type: string
+          description: "Output format (json, text, table)"
+        profile:
+          type: string
+          description: |
+            AWS profile to use (optional, uses default if not specified).
+            If this tool produces an authentication error, try using the aws_list_profiles tool
+            from aws-ro.yaml to list available profiles and then specify the profile name in this parameter.
+      constraints:
+        - "zone_id.matches('^Z[A-Z0-9]+$')"  # Valid hosted zone ID format
+        - "name == '' || name.matches('^[a-zA-Z0-9][a-zA-Z0-9\\\\-\\\\.]+\\\\.[a-zA-Z]{2,}\\\\.$')"  # Valid domain name format with trailing dot
+        - "name_pattern == '' || name_pattern.matches('^[\\\\*\\\\?a-zA-Z0-9][a-zA-Z0-9\\\\-\\\\.\\\\*\\\\?]+\\\\.[a-zA-Z]{2,}\\\\.$')"  # Allow wildcard patterns
+        - "record_type == '' || ['A', 'AAAA', 'CNAME', 'MX', 'TXT', 'NS', 'SOA', 'SRV', 'PTR', 'CAA', 'DS', 'NAPTR', 'SPF', 'ALIAS'].exists(t, t == record_type)"  # Valid record types
+        - "output_format == '' || ['json', 'text', 'table'].exists(f, f == output_format)"  # Valid output formats
+        - "profile == '' || profile.matches('^[a-zA-Z0-9_-]+$')"  # Valid profile name format
+      run:
+        env:
+          - HOME
+          - AWS_PROFILE
+          - AWS_DEFAULT_PROFILE
+          - AWS_ACCESS_KEY_ID
+          - AWS_SECRET_ACCESS_KEY
+          - AWS_SESSION_TOKEN
+          - AWS_SHARED_CREDENTIALS_FILE
+          - AWS_CONFIG_FILE
+          - DEBUG
+        command: |
+          {{ if .output_format }}
+          FORMAT_PARAM="--output {{ .output_format }}"
+          {{ else }}
+          FORMAT_PARAM="--output table"
+          {{ end }}
+          
+          NAME_FILTER=""
+          {{ if .name }}
+          NAME_FILTER="--start-record-name {{ .name }}"
+          {{ end }}
+          
+          TYPE_FILTER=""
+          {{ if .record_type }}
+          TYPE_FILTER="--start-record-type {{ .record_type }}"
+          {{ end }}
+          
+          MAX_ITEMS=""
+          {{ if .max_items }}
+          # Validate max_items
+          if [ {{ .max_items }} -gt 0 ] && [ {{ .max_items }} -le 1000 ]; then
+            MAX_ITEMS="--max-items {{ .max_items }}"
+          else
+            echo "Warning: max_items must be between 1 and 1000. Using default value of 100."
+            MAX_ITEMS="--max-items 100"
+          fi
+          {{ else }}
+          MAX_ITEMS="--max-items 100"
+          {{ end }}
+          
+          PROFILE_PARAM=""
+          {{ if .profile }}
+          PROFILE_PARAM="--profile {{ .profile }}"
+          {{ end }}
+          
+          QUERY_FILTER=""
+          {{ if .name_pattern }}
+          # Convert the pattern for JMESPath query
+          PATTERN="{{ .name_pattern }}"
+          
+          # Replace * with appropriate JMESPath function
+          if [[ "$PATTERN" == *"*"* ]]; then
+            # If pattern starts with *, use ends_with
+            if [[ "$PATTERN" == \**.* ]]; then
+              SUFFIX="${PATTERN#\*}"
+              QUERY_FILTER="--query \"ResourceRecordSets[?ends_with(Name, '$SUFFIX')]\""
+            # If pattern ends with *, use starts_with
+            elif [[ "$PATTERN" == *\* ]]; then
+              PREFIX="${PATTERN%\*}"
+              QUERY_FILTER="--query \"ResourceRecordSets[?starts_with(Name, '$PREFIX')]\""
+            # If * is in the middle, use contains
+            else
+              QUERY_FILTER="--query \"ResourceRecordSets[?contains(Name, '${PATTERN//\*/}')]\""
+            fi
+          fi
+          {{ end }}
+          
+          if [ -z "$AWS_SHARED_CREDENTIALS_FILE" ]; then
+            export AWS_SHARED_CREDENTIALS_FILE="$HOME/.aws/credentials"
+          fi
+
+          if [ -z "$AWS_CONFIG_FILE" ]; then
+            export AWS_CONFIG_FILE="$HOME/.aws/config"
+          fi
+          
+          if [ -n "$DEBUG" ]; then
+            echo "Using AWS_SHARED_CREDENTIALS_FILE: $AWS_SHARED_CREDENTIALS_FILE"
+            echo "Using AWS_CONFIG_FILE: $AWS_CONFIG_FILE"
+          fi
+
+          # Attempt to run the command and capture the output and exit status
+          if [ -n "$QUERY_FILTER" ]; then
+            # Use eval to properly process the query filter
+            eval aws $PROFILE_PARAM route53 list-resource-record-sets --hosted-zone-id {{ .zone_id }} $NAME_FILTER $TYPE_FILTER $MAX_ITEMS $FORMAT_PARAM $QUERY_FILTER
+          else
+            aws $PROFILE_PARAM route53 list-resource-record-sets --hosted-zone-id {{ .zone_id }} $NAME_FILTER $TYPE_FILTER $MAX_ITEMS $FORMAT_PARAM
+          fi
+      output:
+        prefix: "DNS records for Hosted Zone {{ .zone_id }}{{ if .name }} starting with name {{ .name }}{{ end }}{{ if .name_pattern }} matching pattern {{ .name_pattern }}{{ end }}{{ if .record_type }} of type {{ .record_type }}{{ end }}:"
+
+    - name: "route53_list_subdomains"
+      description: |
+        List all DNS names (subdomains) under a parent domain in a hosted zone.
+        This tool is optimized for finding all records under a specific domain.
+      params:
+        zone_id:
+          type: string
+          description: "Hosted Zone ID (e.g., Z1234567890ABC)"
+          required: true
+        parent_domain:
+          type: string
+          description: |
+            Parent domain to list subdomains for (e.g., stage.adobe.io.).
+            Make sure to include the trailing dot.
+          required: true
+        record_type:
+          type: string
+          description: "Record type to filter (A, AAAA, CNAME, MX, etc.)"
+        output_format:
+          type: string
+          description: "Output format (json, text, table)"
+        profile:
+          type: string
+          description: |
+            AWS profile to use (optional, uses default if not specified).
+            If this tool produces an authentication error, try using the aws_list_profiles tool
+            from aws-ro.yaml to list available profiles and then specify the profile name in this parameter.
+      constraints:
+        - "zone_id.matches('^Z[A-Z0-9]+$')"  # Valid hosted zone ID format
+        - "parent_domain.matches('^[a-zA-Z0-9][a-zA-Z0-9\\\\-\\\\.]+\\\\.[a-zA-Z]{2,}\\\\.$')"  # Valid domain name format with trailing dot
+        - "record_type == '' || ['A', 'AAAA', 'CNAME', 'MX', 'TXT', 'NS', 'SOA', 'SRV', 'PTR', 'CAA', 'DS', 'NAPTR', 'SPF', 'ALIAS'].exists(t, t == record_type)"  # Valid record types
+        - "output_format == '' || ['json', 'text', 'table'].exists(f, f == output_format)"  # Valid output formats
+        - "profile == '' || profile.matches('^[a-zA-Z0-9_-]+$')"  # Valid profile name format
+      run:
+        env:
+          - HOME
+          - AWS_PROFILE
+          - AWS_DEFAULT_PROFILE
+          - AWS_ACCESS_KEY_ID
+          - AWS_SECRET_ACCESS_KEY
+          - AWS_SESSION_TOKEN
+          - AWS_SHARED_CREDENTIALS_FILE
+          - AWS_CONFIG_FILE
+          - DEBUG
+        command: |
+          {{ if .output_format }}
+          FORMAT_PARAM="--output {{ .output_format }}"
+          {{ else }}
+          FORMAT_PARAM="--output table"
+          {{ end }}
+          
+          TYPE_FILTER=""
+          {{ if .record_type }}
+          TYPE_FILTER="--start-record-type {{ .record_type }}"
+          {{ end }}
+          
+          PROFILE_PARAM=""
+          {{ if .profile }}
+          PROFILE_PARAM="--profile {{ .profile }}"
+          {{ end }}
+          
+          if [ -z "$AWS_SHARED_CREDENTIALS_FILE" ]; then
+            export AWS_SHARED_CREDENTIALS_FILE="$HOME/.aws/credentials"
+          fi
+
+          if [ -z "$AWS_CONFIG_FILE" ]; then
+            export AWS_CONFIG_FILE="$HOME/.aws/config"
+          fi
+          
+          if [ -n "$DEBUG" ]; then
+            echo "Using AWS_SHARED_CREDENTIALS_FILE: $AWS_SHARED_CREDENTIALS_FILE"
+            echo "Using AWS_CONFIG_FILE: $AWS_CONFIG_FILE"
+          fi
+          
+          # Get all records and filter for the parent domain
+          echo "Listing all DNS records under {{ .parent_domain }} in zone {{ .zone_id }}..."
+          
+          # First, get all records and filter them using JMESPath
+          # This will include records that are exact matches and subdomains
+          aws $PROFILE_PARAM route53 list-resource-record-sets \
+            --hosted-zone-id {{ .zone_id }} \
+            $TYPE_FILTER \
+            --max-items 1000 \
+            --query "ResourceRecordSets[?ends_with(Name, '.{{ .parent_domain }}') || Name == '{{ .parent_domain }}']" \
+            $FORMAT_PARAM
+          
+          echo ""
+          echo "Summary:"
+          
+          # Get a count of different record types
+          aws $PROFILE_PARAM route53 list-resource-record-sets \
+            --hosted-zone-id {{ .zone_id }} \
+            --query "ResourceRecordSets[?ends_with(Name, '.{{ .parent_domain }}') || Name == '{{ .parent_domain }}']" \
+            --output json | \
+            jq -r '.[] | .Type' | sort | uniq -c | \
+            awk '{printf "%-10s: %s records\n", $2, $1}'
+      output:
+        prefix: "DNS subdomains under {{ .parent_domain }}:"
+
+    - name: "route53_trace_alias_chain"
+      description: "Trace a chain of DNS aliases to their final destination"
+      params:
+        zone_id:
+          type: string
+          description: "Initial Hosted Zone ID (e.g., Z1234567890ABC)"
+          required: true
+        name:
+          type: string
+          description: "Initial DNS name to trace (e.g., example.com.)"
+          required: true
+        output_format:
+          type: string
+          description: "Output format (json, text, table)"
+        profile:
+          type: string
+          description: |
+            AWS profile to use (optional, uses default if not specified).
+            If this tool produces an authentication error, try using the aws_list_profiles tool
+            to list available profiles and then specify the profile name in this parameter.
+      constraints:
+        - "zone_id.matches('^Z[A-Z0-9]+$')"  # Valid hosted zone ID format 
+        - "name.matches('^[a-zA-Z0-9][a-zA-Z0-9\\\\-\\\\.]+\\\\.[a-zA-Z]{2,}\\\\.$')"  # Valid domain name format with trailing dot
+        - "output_format == '' || ['json', 'text', 'table'].exists(f, f == output_format)"  # Valid output formats
+        - "profile == '' || profile.matches('^[a-zA-Z0-9_-]+$')"  # Valid profile name format
+      run:
+        env:
+          - HOME
+          - AWS_PROFILE
+          - AWS_DEFAULT_PROFILE
+          - AWS_ACCESS_KEY_ID
+          - AWS_SECRET_ACCESS_KEY
+          - AWS_SESSION_TOKEN
+          - AWS_SHARED_CREDENTIALS_FILE
+          - AWS_CONFIG_FILE
+          - DEBUG
+        command: |
+          {{ if .output_format }}
+          FORMAT_PARAM="--output {{ .output_format }}"
+          {{ else }}
+          FORMAT_PARAM="--output json"  # For alias tracing, JSON is easier to parse
+          {{ end }}
+          
+          PROFILE_PARAM=""
+          {{ if .profile }}
+          PROFILE_PARAM="--profile {{ .profile }}"
+          {{ end }}
+          
+          if [ -z "$AWS_SHARED_CREDENTIALS_FILE" ]; then
+            export AWS_SHARED_CREDENTIALS_FILE="$HOME/.aws/credentials"
+          fi
+
+          if [ -z "$AWS_CONFIG_FILE" ]; then
+            export AWS_CONFIG_FILE="$HOME/.aws/config"
+          fi
+          
+          if [ -n "$DEBUG" ]; then
+            echo "Using AWS_SHARED_CREDENTIALS_FILE: $AWS_SHARED_CREDENTIALS_FILE"
+            echo "Using AWS_CONFIG_FILE: $AWS_CONFIG_FILE"
+          fi
+
+          echo "Tracing alias chain starting from {{ .name }} in zone {{ .zone_id }}..."
+          echo ""
+          
+          CURRENT_ZONE="{{ .zone_id }}"
+          CURRENT_NAME="{{ .name }}"
+          MAX_ITERATIONS=10  # Prevent infinite loops
+          ITERATION=0
+          
+          while [ $ITERATION -lt $MAX_ITERATIONS ]; do
+            ITERATION=$((ITERATION + 1))
+            echo "Step $ITERATION: Checking $CURRENT_NAME in zone $CURRENT_ZONE"
+            
+            # Query the current record
+            RECORD_OUTPUT=$(aws $PROFILE_PARAM route53 list-resource-record-sets --hosted-zone-id $CURRENT_ZONE --start-record-name $CURRENT_NAME --max-items 1 $FORMAT_PARAM)
+            
+            # For complex parsing, we need to ensure we're using JSON output
+            PARSED_OUTPUT=""
+            if [ "{{ .output_format }}" == "text" ] || [ "{{ .output_format }}" == "table" ]; then
+              echo "$RECORD_OUTPUT"
+              PARSED_OUTPUT=$(aws $PROFILE_PARAM route53 list-resource-record-sets --hosted-zone-id $CURRENT_ZONE --start-record-name $CURRENT_NAME --max-items 1 --output json)
+            else
+              echo "$RECORD_OUTPUT"
+              PARSED_OUTPUT="$RECORD_OUTPUT"
+            fi
+            
+            # Check if this is an alias record
+            IS_ALIAS=$(echo "$PARSED_OUTPUT" | grep -o '"AliasTarget": {' || true)
+            
+            if [ -z "$IS_ALIAS" ]; then
+              echo ""
+              echo "✅ Reached end of alias chain. This is not an alias record."
+              break
+            fi
+            
+            # Extract the target DNS name and hosted zone ID from the alias target
+            TARGET_DNS_NAME=$(echo "$PARSED_OUTPUT" | grep -o '"DNSName": "[^"]*"' | head -1 | cut -d'"' -f4)
+            TARGET_ZONE_ID=$(echo "$PARSED_OUTPUT" | grep -o '"HostedZoneId": "[^"]*"' | head -1 | cut -d'"' -f4)
+            
+            if [ -z "$TARGET_DNS_NAME" ] || [ -z "$TARGET_ZONE_ID" ]; then
+              echo ""
+              echo "❌ Could not parse alias target information."
+              break
+            fi
+            
+            echo "→ Alias points to: $TARGET_DNS_NAME in zone $TARGET_ZONE_ID"
+            echo ""
+            
+            # Check if this results in a loop
+            if [ "$TARGET_DNS_NAME" == "$CURRENT_NAME" ] && [ "$TARGET_ZONE_ID" == "$CURRENT_ZONE" ]; then
+              echo "⚠️ Detected a loop in alias chain. Stopping trace."
+              break
+            fi
+            
+            # Continue the trace with the next target
+            CURRENT_NAME="$TARGET_DNS_NAME"
+            CURRENT_ZONE="$TARGET_ZONE_ID"
+          done
+          
+          if [ $ITERATION -ge $MAX_ITERATIONS ]; then
+            echo "⚠️ Reached maximum number of steps ($MAX_ITERATIONS). The alias chain may be longer."
+          fi
+      output:
+        prefix: "Alias Chain Trace Results:"
+
+    - name: "route53_get_traffic_policy"
+      description: "Get detailed information about a Route53 traffic policy"
+      params:
+        policy_id:
+          type: string
+          description: "Traffic Policy ID"
+          required: true
+        version:
+          type: string
+          description: "Traffic Policy Version"
+          required: true
+        output_format:
+          type: string
+          description: "Output format (json, text, table)"
+        profile:
+          type: string
+          description: |
+            AWS profile to use (optional, uses default if not specified).
+            If this tool produces an authentication error, try using the aws_list_profiles tool
+            to list available profiles and then specify the profile name in this parameter.
+      constraints:
+        - "policy_id.matches('^[a-z0-9-]+$')"  # Valid policy ID format
+        - "version.matches('^[0-9]+$')"  # Ensure version is numeric
+        - "output_format == '' || ['json', 'text', 'table'].exists(f, f == output_format)"  # Valid output formats
+        - "profile == '' || profile.matches('^[a-zA-Z0-9_-]+$')"  # Valid profile name format
+      run:
+        env:
+          - HOME
+          - AWS_PROFILE
+          - AWS_DEFAULT_PROFILE
+          - AWS_ACCESS_KEY_ID
+          - AWS_SECRET_ACCESS_KEY
+          - AWS_SESSION_TOKEN
+          - AWS_SHARED_CREDENTIALS_FILE
+          - AWS_CONFIG_FILE
+          - DEBUG
+        command: |
+          {{ if .output_format }}
+          FORMAT_PARAM="--output {{ .output_format }}"
+          {{ else }}
+          FORMAT_PARAM="--output table"
+          {{ end }}
+          
+          PROFILE_PARAM=""
+          {{ if .profile }}
+          PROFILE_PARAM="--profile {{ .profile }}"
+          {{ end }}
+          
+          if [ -z "$AWS_SHARED_CREDENTIALS_FILE" ]; then
+            export AWS_SHARED_CREDENTIALS_FILE="$HOME/.aws/credentials"
+          fi
+
+          if [ -z "$AWS_CONFIG_FILE" ]; then
+            export AWS_CONFIG_FILE="$HOME/.aws/config"
+          fi
+          
+          if [ -n "$DEBUG" ]; then
+            echo "Using AWS_SHARED_CREDENTIALS_FILE: $AWS_SHARED_CREDENTIALS_FILE"
+            echo "Using AWS_CONFIG_FILE: $AWS_CONFIG_FILE"
+          fi
+
+          aws $PROFILE_PARAM route53 get-traffic-policy --id {{ .policy_id }} --version {{ .version }} $FORMAT_PARAM
+      output:
+        prefix: "Traffic Policy {{ .policy_id }} (version {{ .version }}) details:"
+
+    - name: "route53_list_traffic_policies"
+      description: "List traffic policies in Route53 (for geographic routing, etc.)"
+      params:
+        output_format:
+          type: string
+          description: "Output format (json, text, table)"
+        profile:
+          type: string
+          description: |
+            AWS profile to use (optional, uses default if not specified).
+            If this tool produces an authentication error, try using the aws_list_profiles tool
+            to list available profiles and then specify the profile name in this parameter.
+      constraints:
+        - "output_format == '' || ['json', 'text', 'table'].exists(f, f == output_format)"  # Valid output formats
+        - "profile == '' || profile.matches('^[a-zA-Z0-9_-]+$')"  # Valid profile name format
+      run:
+        env:
+          - HOME
+          - AWS_PROFILE
+          - AWS_DEFAULT_PROFILE
+          - AWS_ACCESS_KEY_ID
+          - AWS_SECRET_ACCESS_KEY
+          - AWS_SESSION_TOKEN
+          - AWS_SHARED_CREDENTIALS_FILE
+          - AWS_CONFIG_FILE
+          - DEBUG
+        command: |
+          {{ if .output_format }}
+          FORMAT_PARAM="--output {{ .output_format }}"
+          {{ else }}
+          FORMAT_PARAM="--output table"
+          {{ end }}
+          
+          PROFILE_PARAM=""
+          {{ if .profile }}
+          PROFILE_PARAM="--profile {{ .profile }}"
+          {{ end }}
+          
+          if [ -z "$AWS_SHARED_CREDENTIALS_FILE" ]; then
+            export AWS_SHARED_CREDENTIALS_FILE="$HOME/.aws/credentials"
+          fi
+
+          if [ -z "$AWS_CONFIG_FILE" ]; then
+            export AWS_CONFIG_FILE="$HOME/.aws/config"
+          fi
+          
+          if [ -n "$DEBUG" ]; then
+            echo "Using AWS_SHARED_CREDENTIALS_FILE: $AWS_SHARED_CREDENTIALS_FILE"
+            echo "Using AWS_CONFIG_FILE: $AWS_CONFIG_FILE"
+          fi
+
+          aws $PROFILE_PARAM route53 list-traffic-policies --max-items 100 $FORMAT_PARAM
+      output:
+        prefix: "Route53 Traffic Policies:"
+
+    - name: "route53_list_geo_locations"
+      description: "List geographic locations supported by Route53 for geolocation routing"
+      params:
+        output_format:
+          type: string
+          description: "Output format (json, text, table)"
+        profile:
+          type: string
+          description: "AWS profile to use (optional, uses default if not specified)"
+      constraints:
+        - "output_format == '' || ['json', 'text', 'table'].exists(f, f == output_format)"  # Valid output formats
+        - "profile == '' || profile.matches('^[a-zA-Z0-9_-]+$')"  # Valid profile name format
+      run:
+        env:
+          - HOME
+          - AWS_PROFILE
+          - AWS_DEFAULT_PROFILE
+          - AWS_ACCESS_KEY_ID
+          - AWS_SECRET_ACCESS_KEY
+          - AWS_SESSION_TOKEN
+          - AWS_SHARED_CREDENTIALS_FILE
+          - AWS_CONFIG_FILE
+          - DEBUG
+        command: |
+          {{ if .output_format }}
+          FORMAT_PARAM="--output {{ .output_format }}"
+          {{ else }}
+          FORMAT_PARAM="--output table"
+          {{ end }}
+          
+          PROFILE_PARAM=""
+          {{ if .profile }}
+          PROFILE_PARAM="--profile {{ .profile }}"
+          {{ end }}
+          
+          if [ -z "$AWS_SHARED_CREDENTIALS_FILE" ]; then
+            export AWS_SHARED_CREDENTIALS_FILE="$HOME/.aws/credentials"
+          fi
+
+          if [ -z "$AWS_CONFIG_FILE" ]; then
+            export AWS_CONFIG_FILE="$HOME/.aws/config"
+          fi
+          
+          if [ -n "$DEBUG" ]; then
+            echo "Using AWS_SHARED_CREDENTIALS_FILE: $AWS_SHARED_CREDENTIALS_FILE"
+            echo "Using AWS_CONFIG_FILE: $AWS_CONFIG_FILE"
+          fi
+
+          aws $PROFILE_PARAM route53 list-geo-locations $FORMAT_PARAM
+      output:
+        prefix: "Geographic Locations Supported for Route53 Geolocation Routing:"
+
+    - name: "route53_list_traffic_policy_instances"
+      description: "List traffic policy instances (applied traffic policies)"
+      params:
+        hosted_zone_id:
+          type: string
+          description: "Hosted Zone ID to filter results (e.g., Z1234567890ABC)"
+        output_format:
+          type: string
+          description: "Output format (json, text, table)"
+        profile:
+          type: string
+          description: |
+            AWS profile to use (optional, uses default if not specified).
+            If this tool produces an authentication error, try using the aws_list_profiles tool
+            to list available profiles and then specify the profile name in this parameter.
+      constraints:
+        - "hosted_zone_id == '' || hosted_zone_id.matches('^Z[A-Z0-9]+$')"  # Valid hosted zone ID format
+        - "output_format == '' || ['json', 'text', 'table'].exists(f, f == output_format)"  # Valid output formats
+        - "profile == '' || profile.matches('^[a-zA-Z0-9_-]+$')"  # Valid profile name format
+      run:
+        env:
+          - HOME
+          - AWS_PROFILE
+          - AWS_DEFAULT_PROFILE
+          - AWS_ACCESS_KEY_ID
+          - AWS_SECRET_ACCESS_KEY
+          - AWS_SESSION_TOKEN
+          - AWS_SHARED_CREDENTIALS_FILE
+          - AWS_CONFIG_FILE
+          - DEBUG
+        command: |
+          {{ if .output_format }}
+          FORMAT_PARAM="--output {{ .output_format }}"
+          {{ else }}
+          FORMAT_PARAM="--output table"
+          {{ end }}
+          
+          ZONE_FILTER=""
+          {{ if .hosted_zone_id }}
+          ZONE_FILTER="--hosted-zone-id {{ .hosted_zone_id }}"
+          {{ end }}
+          
+          PROFILE_PARAM=""
+          {{ if .profile }}
+          PROFILE_PARAM="--profile {{ .profile }}"
+          {{ end }}
+          
+          if [ -z "$AWS_SHARED_CREDENTIALS_FILE" ]; then
+            export AWS_SHARED_CREDENTIALS_FILE="$HOME/.aws/credentials"
+          fi
+
+          if [ -z "$AWS_CONFIG_FILE" ]; then
+            export AWS_CONFIG_FILE="$HOME/.aws/config"
+          fi
+          
+          if [ -n "$DEBUG" ]; then
+            echo "Using AWS_SHARED_CREDENTIALS_FILE: $AWS_SHARED_CREDENTIALS_FILE"
+            echo "Using AWS_CONFIG_FILE: $AWS_CONFIG_FILE"
+          fi
+          
+          aws $PROFILE_PARAM route53 list-traffic-policy-instances $ZONE_FILTER $FORMAT_PARAM
+      output:
+        prefix: "Traffic Policy Instances{{ if .hosted_zone_id }} in zone {{ .hosted_zone_id }}{{ end }}:"
+
+    - name: "route53_get_health_check"
+      description: "Get details about a Route53 health check"
+      params:
+        health_check_id:
+          type: string
+          description: "Health Check ID"
+          required: true
+        output_format:
+          type: string
+          description: "Output format (json, text, table)"
+        profile:
+          type: string
+          description: |
+            AWS profile to use (optional, uses default if not specified).
+            If this tool produces an authentication error, try using the aws_list_profiles tool
+            to list available profiles and then specify the profile name in this parameter.
+      constraints:
+        - "health_check_id.matches('^[a-z0-9-]+$')"  # Valid health check ID format
+        - "output_format == '' || ['json', 'text', 'table'].exists(f, f == output_format)"  # Valid output formats
+        - "profile == '' || profile.matches('^[a-zA-Z0-9_-]+$')"  # Valid profile name format
+      run:
+        env:
+          - HOME
+          - AWS_PROFILE
+          - AWS_DEFAULT_PROFILE
+          - AWS_ACCESS_KEY_ID
+          - AWS_SECRET_ACCESS_KEY
+          - AWS_SESSION_TOKEN
+          - AWS_SHARED_CREDENTIALS_FILE
+          - AWS_CONFIG_FILE
+          - DEBUG
+        command: |
+          {{ if .output_format }}
+          FORMAT_PARAM="--output {{ .output_format }}"
+          {{ else }}
+          FORMAT_PARAM="--output table"
+          {{ end }}
+          
+          PROFILE_PARAM=""
+          {{ if .profile }}
+          PROFILE_PARAM="--profile {{ .profile }}"
+          {{ end }}
+          
+          if [ -z "$AWS_SHARED_CREDENTIALS_FILE" ]; then
+            export AWS_SHARED_CREDENTIALS_FILE="$HOME/.aws/credentials"
+          fi
+
+          if [ -z "$AWS_CONFIG_FILE" ]; then
+            export AWS_CONFIG_FILE="$HOME/.aws/config"
+          fi
+          
+          if [ -n "$DEBUG" ]; then
+            echo "Using AWS_SHARED_CREDENTIALS_FILE: $AWS_SHARED_CREDENTIALS_FILE"
+            echo "Using AWS_CONFIG_FILE: $AWS_CONFIG_FILE"
+          fi
+
+          aws $PROFILE_PARAM route53 get-health-check --health-check-id {{ .health_check_id }} $FORMAT_PARAM
+      output:
+        prefix: "Health Check {{ .health_check_id }} details:"
+
+    - name: "route53_list_health_checks"
+      description: "List health checks used by Route53"
+      params:
+        output_format:
+          type: string
+          description: "Output format (json, text, table)"
+        profile:
+          type: string
+          description: |
+            AWS profile to use (optional, uses default if not specified).
+            If this tool produces an authentication error, try using the aws_list_profiles tool
+            to list available profiles and then specify the profile name in this parameter.
+      constraints:
+        - "output_format == '' || ['json', 'text', 'table'].exists(f, f == output_format)"  # Valid output formats
+        - "profile == '' || profile.matches('^[a-zA-Z0-9_-]+$')"  # Valid profile name format
+      run:
+        env:
+          - HOME
+          - AWS_PROFILE
+          - AWS_DEFAULT_PROFILE
+          - AWS_ACCESS_KEY_ID
+          - AWS_SECRET_ACCESS_KEY
+          - AWS_SESSION_TOKEN
+          - AWS_SHARED_CREDENTIALS_FILE
+          - AWS_CONFIG_FILE
+          - DEBUG
+        command: |
+          {{ if .output_format }}
+          FORMAT_PARAM="--output {{ .output_format }}"
+          {{ else }}
+          FORMAT_PARAM="--output table"
+          {{ end }}
+          
+          PROFILE_PARAM=""
+          {{ if .profile }}
+          PROFILE_PARAM="--profile {{ .profile }}"
+          {{ end }}
+          
+          if [ -z "$AWS_SHARED_CREDENTIALS_FILE" ]; then
+            export AWS_SHARED_CREDENTIALS_FILE="$HOME/.aws/credentials"
+          fi
+
+          if [ -z "$AWS_CONFIG_FILE" ]; then
+            export AWS_CONFIG_FILE="$HOME/.aws/config"
+          fi
+          
+          if [ -n "$DEBUG" ]; then
+            echo "Using AWS_SHARED_CREDENTIALS_FILE: $AWS_SHARED_CREDENTIALS_FILE"
+            echo "Using AWS_CONFIG_FILE: $AWS_CONFIG_FILE"
+          fi
+
+          aws $PROFILE_PARAM route53 list-health-checks $FORMAT_PARAM
+      output:
+        prefix: "Route53 Health Checks:"
+
+    - name: "dig_dns_lookup"
+      description: "Perform a DNS lookup using dig tool"
+      prerequisites:
+        executables:
+          - "dig"
+      params:
+        domain:
+          type: string
+          description: "Domain name to query"
+          required: true
+        record_type:
+          type: string
+          description: "DNS record type (A, AAAA, CNAME, MX, TXT, NS, etc.)"
+        nameserver:
+          type: string
+          description: "Specific nameserver to query (e.g., ns-1234.awsdns-12.org)"
+      constraints:
+        - "domain.matches('^[a-zA-Z0-9][a-zA-Z0-9\\\\-\\\\.]+\\\\.[a-zA-Z]{2,}$')"  # Valid domain name format
+        - "record_type == '' || ['A', 'AAAA', 'CNAME', 'MX', 'TXT', 'NS', 'SOA', 'SRV', 'PTR', 'CAA', 'DS', 'NAPTR', 'SPF', 'ANY'].exists(t, t == record_type)"  # Valid record types
+        - "nameserver == '' || nameserver.matches('^[a-zA-Z0-9][a-zA-Z0-9\\\\-\\\\.]+\\\\.[a-zA-Z]{2,}$')"  # Valid nameserver format
+      run:
+        command: |
+          TYPE_PARAM=""
+          {{ if .record_type }}
+          TYPE_PARAM="{{ .record_type }}"
+          {{ else }}
+          TYPE_PARAM="A"  # Default to A record if not specified
+          {{ end }}
+          
+          NS_PARAM=""
+          {{ if .nameserver }}
+          NS_PARAM="@{{ .nameserver }}"
+          {{ end }}
+          
+          # Run a more comprehensive dig query
+          echo "Basic DNS query:"
+          dig +noall +answer $NS_PARAM {{ .domain }} $TYPE_PARAM
+          
+          echo -e "\nDetailed query with trace information:"
+          dig +trace $NS_PARAM {{ .domain }} $TYPE_PARAM
+      output:
+        prefix: "DNS lookup for {{ .domain }} (type {{ if .record_type }}{{ .record_type }}{{ else }}A{{ end }}){{ if .nameserver }} using nameserver {{ .nameserver }}{{ end }}:"
+
+    - name: "route53_query_dns_with_aws"
+      description: "Query DNS using AWS Route53 test-dns-answer API"
+      params:
+        hosted_zone_id:
+          type: string
+          description: "Hosted Zone ID (e.g., Z1234567890ABC)"
+          required: true
+        record_name:
+          type: string
+          description: "DNS record name to query (e.g., example.com.)"
+          required: true
+        record_type:
+          type: string
+          description: "DNS record type to query (A, AAAA, CNAME, MX, etc.)"
+          required: true
+        resolver_ip:
+          type: string
+          description: "Optional resolver IP to simulate query from"
+        edns_client_subnet:
+          type: string
+          description: "Optional EDNS client subnet to simulate geographic location (e.g., 192.168.1.0/24)"
+        output_format:
+          type: string
+          description: "Output format (json, text, table)"
+        profile:
+          type: string
+          description: |
+            AWS profile to use (optional, uses default if not specified).
+            If this tool produces an authentication error, try using the aws_list_profiles tool
+            to list available profiles and then specify the profile name in this parameter.
+      constraints:
+        - "hosted_zone_id.matches('^Z[A-Z0-9]+$')"  # Valid hosted zone ID format
+        - "record_name.matches('^[a-zA-Z0-9][a-zA-Z0-9\\\\-\\\\.]+\\\\.[a-zA-Z]{2,}\\\\.$')"  # Valid domain name format with trailing dot
+        - "['A', 'AAAA', 'CNAME', 'MX', 'TXT', 'NS', 'SOA', 'SRV', 'PTR', 'CAA', 'DS', 'NAPTR', 'SPF'].exists(t, t == record_type)"  # Valid record types
+        - "resolver_ip == '' || resolver_ip.matches('^[0-9]{1,3}\\\\.[0-9]{1,3}\\\\.[0-9]{1,3}\\\\.[0-9]{1,3}$')"  # Valid IPv4 format
+        - "edns_client_subnet == '' || edns_client_subnet.matches('^[0-9]{1,3}\\\\.[0-9]{1,3}\\\\.[0-9]{1,3}\\\\.[0-9]{1,3}/[0-9]{1,2}$')"  # Valid CIDR format
+        - "output_format == '' || ['json', 'text', 'table'].exists(f, f == output_format)"  # Valid output formats
+        - "profile == '' || profile.matches('^[a-zA-Z0-9_-]+$')"  # Valid profile name format
+      run:
+        env:
+          - HOME
+          - AWS_PROFILE
+          - AWS_DEFAULT_PROFILE
+          - AWS_ACCESS_KEY_ID
+          - AWS_SECRET_ACCESS_KEY
+          - AWS_SESSION_TOKEN
+          - AWS_SHARED_CREDENTIALS_FILE
+          - AWS_CONFIG_FILE
+          - DEBUG
+        command: |
+          {{ if .output_format }}
+          FORMAT_PARAM="--output {{ .output_format }}"
+          {{ else }}
+          FORMAT_PARAM="--output table"
+          {{ end }}
+          
+          RESOLVER_PARAM=""
+          {{ if .resolver_ip }}
+          RESOLVER_PARAM="--resolver-ip {{ .resolver_ip }}"
+          {{ end }}
+          
+          EDNS_PARAM=""
+          {{ if .edns_client_subnet }}
+          EDNS_PARAM="--edns-client-subnet {{ .edns_client_subnet }}"
+          {{ end }}
+          
+          PROFILE_PARAM=""
+          {{ if .profile }}
+          PROFILE_PARAM="--profile {{ .profile }}"
+          {{ end }}
+          
+          if [ -z "$AWS_SHARED_CREDENTIALS_FILE" ]; then
+            export AWS_SHARED_CREDENTIALS_FILE="$HOME/.aws/credentials"
+          fi
+
+          if [ -z "$AWS_CONFIG_FILE" ]; then
+            export AWS_CONFIG_FILE="$HOME/.aws/config"
+          fi
+          
+          if [ -n "$DEBUG" ]; then
+            echo "Using AWS_SHARED_CREDENTIALS_FILE: $AWS_SHARED_CREDENTIALS_FILE"
+            echo "Using AWS_CONFIG_FILE: $AWS_CONFIG_FILE"
+          fi
+          
+          aws $PROFILE_PARAM route53 test-dns-answer --hosted-zone-id {{ .hosted_zone_id }} --record-name {{ .record_name }} --record-type {{ .record_type }} $RESOLVER_PARAM $EDNS_PARAM $FORMAT_PARAM
+      output:
+        prefix: "Route53 DNS query results for {{ .record_name }} ({{ .record_type }}){{ if .resolver_ip }} from resolver {{ .resolver_ip }}{{ end }}{{ if .edns_client_subnet }} for subnet {{ .edns_client_subnet }}{{ end }}:" 

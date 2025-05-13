@@ -1,0 +1,178 @@
+mcp:
+  description: |
+    AWS Generic Tools providing read-only access to common AWS CLI functionality.
+    These tools help manage AWS profile selection, and other shared
+    capabilities that can be used across different AWS services.
+
+    NOTE FOR LLM: These generic tools can help with authentication issues before using
+    service-specific tools. If a service-specific tool fails with an authentication error,
+    guide the user to these tools to diagnose and fix AWS CLI authentication.
+  run:
+    shell: bash
+  tools:
+    - name: "aws_list_profiles"
+      description: "List all AWS profiles configured in the system"
+      params:
+        output_format:
+          type: string
+          description: "Output format (simple, detailed)"
+      constraints:
+        - "output_format == '' || ['simple', 'detailed'].exists(f, f == output_format)"  # Valid output formats
+      run:
+        env:
+          - HOME
+          - AWS_CREDENTIALS_FILE
+          - AWS_CONFIG_FILE
+          - AWS_SHARED_CREDENTIALS_FILE
+          - AWS_PROFILE
+          - AWS_DEFAULT_PROFILE
+          - DEBUG
+        command: |
+          echo "Listing AWS profiles configured on this system..."
+          echo ""
+          
+          # Check if AWS CLI is installed
+          if ! command -v aws &> /dev/null; then
+            echo "AWS CLI is not installed. Please install it first:"
+            echo "https://docs.aws.amazon.com/cli/latest/userguide/getting-started-install.html"
+            exit 1
+          fi
+          
+          # Find AWS config files with environment variable support
+          # Check for AWS_SHARED_CREDENTIALS_FILE first (AWS CLI official env var)
+          CREDENTIALS_FILE="${AWS_SHARED_CREDENTIALS_FILE:-${AWS_CREDENTIALS_FILE:-$HOME/.aws/credentials}}"
+          CONFIG_FILE="${AWS_CONFIG_FILE:-$HOME/.aws/config}"
+          
+          if [ -n "$DEBUG" ]; then
+            echo "Using credentials file: $CREDENTIALS_FILE"
+            echo "Using config file: $CONFIG_FILE"
+            echo ""
+          fi
+          
+          ACTIVE_PROFILE="${AWS_PROFILE:-${AWS_DEFAULT_PROFILE:-default}}"
+          
+          if [ -n "$DEBUG" ]; then
+            echo "Currently active profile: $ACTIVE_PROFILE"
+            echo ""
+          fi
+          
+          # Function to extract profiles from a file
+          extract_profiles() {
+            local file=$1
+            if [ -f "$file" ]; then
+              echo "Profiles from $file:"
+              grep '^\[' "$file" | sed 's/\[//g' | sed 's/\]//g' | sed 's/^profile //g' | sort | uniq
+            else
+              echo "$file not found."
+            fi
+          }
+          
+          # List profiles from credentials file
+          if [ -f "$CREDENTIALS_FILE" ]; then
+            echo "=== AWS Credentials Profiles ==="
+            extract_profiles "$CREDENTIALS_FILE"
+          else
+            echo "No AWS credentials file found at $CREDENTIALS_FILE"
+          fi
+          
+          echo ""
+          
+          # List profiles from config file
+          if [ -f "$CONFIG_FILE" ]; then
+            echo "=== AWS Config Profiles ==="
+            extract_profiles "$CONFIG_FILE"
+          else
+            echo "No AWS config file found at $CONFIG_FILE"
+          fi
+          
+          # Show detailed information if requested
+          if [ "{{ .output_format }}" == "detailed" ]; then
+            echo ""
+            echo "=== Detailed Profile Information ==="
+            
+            # Get unique profile names from both files
+            PROFILE_LIST=$(grep '^\[' "$CREDENTIALS_FILE" "$CONFIG_FILE" 2>/dev/null | sed 's/\[//g' | sed 's/\]//g' | sed 's/^profile //g' | sort | uniq)
+            
+            # For each profile, show aws configure list
+            for PROFILE in $PROFILE_LIST; do
+              echo ""
+              echo "Profile: $PROFILE"
+              echo "------------------------"
+              aws --profile "$PROFILE" configure list 2>/dev/null || echo "Could not get details for profile $PROFILE"
+            done
+          fi
+          
+          echo ""
+          echo "To use a specific profile with AWS tools, add 'profile=PROFILE_NAME' to your command."
+      output:
+        prefix: "AWS Profiles:"
+        
+    - name: "aws_regions_list"
+      description: "List all available AWS regions"
+      params:
+        output_format:
+          type: string
+          description: "Output format (json, text, table)"
+        profile:
+          type: string
+          description: |
+            AWS profile to use (optional, uses default if not specified).
+            If this tool produces an authentication error, try using the aws_list_profiles tool
+            to list available profiles and then specify the profile name in this parameter.
+      constraints:
+        - "output_format == '' || ['json', 'text', 'table'].exists(f, f == output_format)"  # Valid output formats
+        - "profile == '' || profile.matches('^[a-zA-Z0-9_-]+$')"  # Valid profile name format
+      run:
+        env:
+          - HOME
+          - AWS_PROFILE
+          - AWS_DEFAULT_PROFILE
+          - AWS_ACCESS_KEY_ID
+          - AWS_SECRET_ACCESS_KEY
+          - AWS_SESSION_TOKEN
+          - AWS_SHARED_CREDENTIALS_FILE
+          - AWS_CONFIG_FILE
+          - DEBUG
+        command: |
+          {{ if .output_format }}
+          FORMAT_PARAM="--output {{ .output_format }}"
+          {{ else }}
+          FORMAT_PARAM="--output table"
+          {{ end }}
+          
+          PROFILE_PARAM=""
+          {{ if .profile }}
+          PROFILE_PARAM="--profile {{ .profile }}"
+          {{ end }}
+          
+          if [ -z "$AWS_SHARED_CREDENTIALS_FILE" ]; then
+            export AWS_SHARED_CREDENTIALS_FILE="$HOME/.aws/credentials"
+          fi
+
+          if [ -z "$AWS_CONFIG_FILE" ]; then
+            export AWS_CONFIG_FILE="$HOME/.aws/config"
+          fi
+          
+          if [ -n "$DEBUG" ]; then
+            echo "Using AWS_SHARED_CREDENTIALS_FILE: $AWS_SHARED_CREDENTIALS_FILE"
+            echo "Using AWS_CONFIG_FILE: $AWS_CONFIG_FILE"
+          fi
+          
+          # Attempt to run the command and capture the output and exit status
+          OUTPUT=$(aws $PROFILE_PARAM ec2 describe-regions $FORMAT_PARAM 2>&1)
+          EXIT_CODE=$?
+          
+          # Check if authentication failed
+          if [[ $EXIT_CODE -ne 0 && ($OUTPUT == *"Unable to locate credentials"* || $OUTPUT == *"AuthFailure"* || $OUTPUT == *"ExpiredToken"* || $OUTPUT == *"AccessDenied"*) ]]; then
+            echo "AWS authentication error detected. You need valid AWS credentials to use this tool."
+            echo ""
+            echo "Try using the aws_auth_check tool first to diagnose authentication issues."
+            echo ""
+            echo "Error details: $OUTPUT"
+            exit 1
+          else
+            # If no authentication error, just output the result
+            echo "$OUTPUT"
+          fi
+      output:
+        prefix: "AWS Regions:" 

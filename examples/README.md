@@ -5,7 +5,7 @@ different tools that can be used by your LLM.
 
 Some of the examples are:
 
-- **aws-networking-ro.yaml**: Read-only AWS networking tools for inspecting VPCs, subnets, and network configurations.
+- **aws-ro.yaml**, **aws-networking-ro.yaml** and **aws-route53-ro.yaml**: Read-only AWS networking tools for inspecting VPCs, subnets, route53 and network configurations.
 - **container-diagnostics-ro.yaml**: Read-only container diagnostics for Docker and containerization tools.
 - **disk-diagnostics-ro.yaml**: Tools for analyzing disk usage, finding large files, and checking filesystem health.
 - **github-cli-ro.yaml**: Commands for interacting with GitHub repositories, issues, pull requests, and other GitHub resources.
