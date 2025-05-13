@@ -2,9 +2,9 @@ package root
 
 import (
 	"fmt"
-	"os"
 
 	"github.com/inercia/mcp-cli-adapter/pkg/common"
+	"github.com/inercia/mcp-cli-adapter/pkg/config"
 	"github.com/inercia/mcp-cli-adapter/pkg/server"
 	"github.com/spf13/cobra"
 )
@@ -31,20 +31,14 @@ The server loads tool definitions from a YAML configuration file and makes them
 available to AI applications via the MCP protocol.`,
 	PreRunE: func(cmd *cobra.Command, args []string) error {
 		// Initialize logger
-		logger, err := setupLogger()
+		level := common.LogLevelFromString(logLevel)
+		logger, err := common.NewLogger("[mcp-cli-adapter] ", logFile, level, true)
 		if err != nil {
 			return fmt.Errorf("failed to set up logger: %w", err)
 		}
 
-		// Set global logger for application-wide use
-		SetLogger(logger)
-
-		// Setup panic handler
-		defer func() {
-			if logger != nil {
-				common.RecoverPanic(logger.Logger, logger.FilePath())
-			}
-		}()
+		common.SetLogger(logger)
+		defer common.RecoverPanic()
 
 		logger.Info("Starting MCP CLI Adapter")
 
@@ -54,29 +48,25 @@ available to AI applications via the MCP protocol.`,
 			return fmt.Errorf("configuration file is required. Use --config or -c flag to specify the path")
 		}
 
-		// Check if the config file exists
-		if _, err := os.Stat(configFile); os.IsNotExist(err) {
-			logger.Error("Configuration file does not exist: %s", configFile)
-			return fmt.Errorf("configuration file does not exist: %s", configFile)
-		}
-
-		logger.Info("Using configuration file: %s", configFile)
 		return nil
 	},
 	RunE: func(cmd *cobra.Command, args []string) error {
-		// Get the logger
-		logger := GetLogger()
+		logger := common.GetLogger()
+		defer common.RecoverPanic()
 
-		// Setup panic handler
-		defer func() {
-			if logger != nil {
-				common.RecoverPanic(logger.Logger, logger.FilePath())
-			}
-		}()
+		// Load the configuration file (local or remote)
+		localConfigPath, cleanup, err := config.ResolveConfigPath(configFile, logger)
+		if err != nil {
+			logger.Error("Failed to load configuration: %v", err)
+			return fmt.Errorf("failed to load configuration: %w", err)
+		}
+
+		// Ensure temporary files are cleaned up
+		defer cleanup()
 
 		// Create and start the server
 		srv := server.New(server.Config{
-			ConfigFile:  configFile,
+			ConfigFile:  localConfigPath,
 			Logger:      logger,
 			Version:     version,
 			Description: description,
@@ -89,7 +79,7 @@ available to AI applications via the MCP protocol.`,
 // init adds flags to the run command
 func init() {
 	// Add flags for the run command
-	runCommand.Flags().StringVarP(&configFile, "config", "c", "", "Path to the YAML configuration file (required)")
+	runCommand.Flags().StringVarP(&configFile, "config", "c", "", "Path to the YAML configuration file or URL (required)")
 	runCommand.Flags().StringVarP(&logFile, "logfile", "l", "", "Path to the log file (optional)")
 	runCommand.Flags().StringVarP(&logLevel, "log-level", "", "info", "Log level: none, error, info, debug")
 	runCommand.Flags().StringVarP(&description, "description", "d", "", "Server description (optional)")

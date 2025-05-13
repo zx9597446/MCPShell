@@ -41,28 +41,6 @@ func ProcessTemplate(text string, args map[string]interface{}) (string, error) {
 	return res, nil
 }
 
-// ProcessTemplateList processes a list of templates with the given arguments.
-// It uses Go's template engine to substitute variables in the templates.
-//
-// Parameters:
-//   - list: The list of templates to process
-//   - args: Map of variable names to their values
-//
-// Returns:
-//   - The processed list of templates with substituted variables
-//   - An error if template processing fails
-func ProcessTemplateList(list []string, args map[string]interface{}) ([]string, error) {
-	res := []string{}
-	for _, item := range list {
-		processedItem, err := ProcessTemplate(item, args)
-		if err != nil {
-			return nil, err
-		}
-		res = append(res, processedItem)
-	}
-	return res, nil
-}
-
 // ProcessTemplateListFlexible processes a list of templates with the given arguments.
 // It uses Go's template engine to substitute variables in the templates.
 // If the template processing fails, the original text is added to the result list.

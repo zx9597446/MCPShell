@@ -15,9 +15,6 @@ import (
 // ApplicationName is the name of the application used in various places
 const ApplicationName = "mcp-cli-adapter"
 
-// Global application logger
-var globalLogger *common.Logger
-
 // rootCmd represents the base command when called without any subcommands
 var rootCmd = &cobra.Command{
 	Use:   ApplicationName,
@@ -34,20 +31,10 @@ the Model Context Protocol (MCP).`,
 // Execute adds all child commands to the root command and sets flags appropriately.
 // This is called by main.main(). It only needs to happen once to the rootCmd.
 func Execute() {
-	// Set up global panic recovery
-	defer func() {
-		// Use the global logger for panic recovery if available
-		if globalLogger != nil {
-			common.RecoverPanic(globalLogger.Logger, globalLogger.FilePath())
-		} else {
-			common.RecoverPanic(nil, "")
-		}
-	}()
+	defer common.RecoverPanic()
 
 	if err := rootCmd.Execute(); err != nil {
-		if globalLogger != nil {
-			globalLogger.Error("Command execution failed: %v", err)
-		}
+		common.GetLogger().Error("Command execution failed: %v", err)
 		fmt.Println(err)
 		os.Exit(1)
 	}

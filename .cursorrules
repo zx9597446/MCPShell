@@ -30,3 +30,4 @@
 - When changing examples in the "/examples" directory, always verify that the configuration file is valid
   by running the executable with the "validate" subcommand, followed by the filename of the example.
   Try to fix any validation errors you see.
+- After any signicant changes in the code, please run `make format` in order to indent all the code.

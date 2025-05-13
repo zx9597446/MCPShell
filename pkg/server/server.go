@@ -307,7 +307,7 @@ func (s *Server) wrapHandlerWithPanicRecovery(handler mcpserver.ToolHandlerFunc)
 		defer func() {
 			if r := recover(); r != nil {
 				// Use the common panic recovery logic but don't exit
-				common.RecoverPanic(s.logger.Logger, "")
+				common.RecoverPanic()
 
 				// Return an error instead of crashing
 				err = fmt.Errorf("tool execution failed: internal server error")

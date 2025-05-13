@@ -17,7 +17,7 @@ func main() {
 	// Setup global panic recovery that will catch any unhandled panics
 	// and prevent the application from crashing uncleanly
 	defer func() {
-		common.RecoverPanic(nil, "")
+		common.RecoverPanic()
 	}()
 
 	// Execute the root command

@@ -8,6 +8,9 @@ import (
 	"os"
 )
 
+// Global application logger
+var globalLogger *Logger
+
 // LogLevel represents logging verbosity levels
 type LogLevel int
 
@@ -150,4 +153,28 @@ func (l *Logger) Level() LogLevel {
 // SetLevel changes the current log level
 func (l *Logger) SetLevel(level LogLevel) {
 	l.level = level
+}
+
+//////////////////////////////////////////////////////////////////////
+
+// GetLogger returns the global application logger.
+// If the logger hasn't been initialized yet, it returns a default stderr logger.
+func GetLogger() *Logger {
+	if globalLogger == nil {
+		// Create a default stderr logger at info level
+		logger, err := NewLogger("[mcp-cli-adapter] ", "", LogLevelInfo, false)
+		if err != nil {
+			// If we can't even create a basic logger, just return a minimal one
+			fmt.Fprintf(os.Stderr, "Error creating default logger: %v\n", err)
+			minimalLogger, _ := NewLogger("[MCP-CLI] ", "", LogLevelError, false)
+			return minimalLogger
+		}
+		return logger
+	}
+	return globalLogger
+}
+
+// SetLogger sets the global application logger
+func SetLogger(logger *Logger) {
+	globalLogger = logger
 }
