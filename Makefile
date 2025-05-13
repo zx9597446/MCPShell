@@ -118,6 +118,5 @@ help:
 	@echo "  lint-legacy   - Run legacy linting with golint"
 	@echo "  format        - Format Go code"
 	@echo "  validate-examples - Validate all YAML configs in examples directory"
-	@echo "  docs-update-tags - Update version tags in documentation"
 	@echo "  release       - Automated release process"
 	@echo "  help          - Show this help" 
