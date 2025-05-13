@@ -11,12 +11,12 @@ import (
 	"github.com/mark3labs/mcp-go/mcp"
 	mcpserver "github.com/mark3labs/mcp-go/server"
 
-	"github.com/inercia/mcp-cli-adapter/pkg/command"
-	"github.com/inercia/mcp-cli-adapter/pkg/common"
-	"github.com/inercia/mcp-cli-adapter/pkg/config"
+	"github.com/inercia/MCPShell/pkg/command"
+	"github.com/inercia/MCPShell/pkg/common"
+	"github.com/inercia/MCPShell/pkg/config"
 )
 
-// Server represents the MCP CLI adapter server that handles tool registration
+// Server represents the MCPShell server that handles tool registration
 // and request processing.
 type Server struct {
 	configFile  string
@@ -188,7 +188,7 @@ func (s *Server) Start() error {
 // createServer initializes the MCP server instance
 func (s *Server) createServer() error {
 	// First create the MCP server
-	serverName := "MCP CLI Adapter"
+	serverName := "MCPShell"
 	var options []mcpserver.ServerOption
 
 	// Load server configuration for description, shell, etc.

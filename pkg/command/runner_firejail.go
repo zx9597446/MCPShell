@@ -11,7 +11,7 @@ import (
 	"strings"
 	"text/template"
 
-	"github.com/inercia/mcp-cli-adapter/pkg/common"
+	"github.com/inercia/MCPShell/pkg/common"
 )
 
 //go:embed runner_firejail_profile.tpl

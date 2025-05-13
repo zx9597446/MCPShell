@@ -37,14 +37,14 @@ jobs:
           fi
 
       - name: Build application
-        run: go build -o mcp-cli-adapter .
+        run: go build -o mcpshell .
 
       - name: Validate example configurations
         run: |
           echo "Validating example YAML configurations..."
           find examples -name "*.yaml" -type f | while read file; do
             echo "Validating $file..."
-            ./mcp-cli-adapter validate --config "$file" || exit 1
+            ./mcpshell validate --config "$file" || exit 1
           done
           echo "All example configurations validated successfully"
 

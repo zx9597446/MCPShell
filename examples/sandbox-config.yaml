@@ -1,5 +1,5 @@
 ---
-# Configuration for MCP CLI Adapter with sandbox runner examples
+# Configuration for MCPShell with sandbox runner examples
 #
 # This configuration demonstrates how to use different runners for command execution,
 # including the macOS sandbox-exec runner for enhanced security.

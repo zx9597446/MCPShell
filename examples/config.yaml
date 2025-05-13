@@ -1,6 +1,6 @@
 mcp:
   description: |
-    MCP CLI Adapter for basic utility tools that provides various command-line
+    MCPShell for basic utility tools that provides various command-line
     utilities including greetings, weather information, calculation, file
     operations, and environment inspection in a secure, controlled environment.
   run:

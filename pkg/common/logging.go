@@ -1,4 +1,4 @@
-// Package common provides shared utilities and types used across the MCP CLI Adapter.
+// Package common provides shared utilities and types used across the MCPShell.
 package common
 
 import (
@@ -162,7 +162,7 @@ func (l *Logger) SetLevel(level LogLevel) {
 func GetLogger() *Logger {
 	if globalLogger == nil {
 		// Create a default stderr logger at info level
-		logger, err := NewLogger("[mcp-cli-adapter] ", "", LogLevelInfo, false)
+		logger, err := NewLogger("[mcpshell] ", "", LogLevelInfo, false)
 		if err != nil {
 			// If we can't even create a basic logger, just return a minimal one
 			fmt.Fprintf(os.Stderr, "Error creating default logger: %v\n", err)

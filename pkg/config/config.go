@@ -12,7 +12,7 @@ import (
 
 	"gopkg.in/yaml.v3"
 
-	"github.com/inercia/mcp-cli-adapter/pkg/common"
+	"github.com/inercia/MCPShell/pkg/common"
 )
 
 // Config represents the top-level configuration structure for the application.

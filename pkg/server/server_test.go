@@ -5,8 +5,8 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/inercia/mcp-cli-adapter/pkg/common"
-	"github.com/inercia/mcp-cli-adapter/pkg/config"
+	"github.com/inercia/MCPShell/pkg/common"
+	"github.com/inercia/MCPShell/pkg/config"
 )
 
 func TestServer_New(t *testing.T) {

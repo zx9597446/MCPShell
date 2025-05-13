@@ -64,7 +64,7 @@ func (r *RunnerExec) Run(ctx context.Context, shell string, command string, args
 	}
 
 	// Create a temporary file for the command
-	tmpDir, err := os.MkdirTemp("", "mcp-cli-adapter")
+	tmpDir, err := os.MkdirTemp("", "mcpshell")
 	if err != nil {
 		r.logger.Printf("Failed to create temp directory: %v", err)
 		return "", err

@@ -7,7 +7,7 @@ import (
 	"net/url"
 	"os"
 
-	"github.com/inercia/mcp-cli-adapter/pkg/common"
+	"github.com/inercia/MCPShell/pkg/common"
 )
 
 // ResolveConfigPath tries to resolve the configuration file path.

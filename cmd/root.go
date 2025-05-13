@@ -1,4 +1,4 @@
-// Package root contains the command-line interface implementation for the MCP CLI Adapter.
+// Package root contains the command-line interface implementation for the MCPShell.
 //
 // It defines the root command and all subcommands using Cobra and manages CLI flags,
 // execution flow, and global application state.
@@ -8,18 +8,18 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/inercia/mcp-cli-adapter/pkg/common"
+	"github.com/inercia/MCPShell/pkg/common"
 	"github.com/spf13/cobra"
 )
 
 // ApplicationName is the name of the application used in various places
-const ApplicationName = "mcp-cli-adapter"
+const ApplicationName = "mcpshell"
 
 // rootCmd represents the base command when called without any subcommands
 var rootCmd = &cobra.Command{
 	Use:   ApplicationName,
-	Short: "MCP CLI Adapter",
-	Long: `MCP CLI Adapter is a command line interface for the MCP platform.
+	Short: "MCPShell",
+	Long: `MCPShell is a command line interface for the MCP platform.
 This CLI application enables AI systems to securely execute commands through
 the Model Context Protocol (MCP).`,
 	Run: func(cmd *cobra.Command, args []string) {
@@ -43,7 +43,7 @@ func Execute() {
 // init registers all subcommands and sets up global flags
 func init() {
 	// Global flags can be set here
-	// rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default is $HOME/.mcp-cli-adapter.yaml)")
+	// rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default is $HOME/.mcpshell.yaml)")
 
 	// Add version flag to all commands
 	rootCmd.PersistentFlags().BoolP("version", "v", false, "Print version information")

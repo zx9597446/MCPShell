@@ -1,4 +1,4 @@
-// Package common provides shared utilities and types used across the MCP CLI Adapter.
+// Package common provides shared utilities and types used across the MCPShell.
 package common
 
 import (

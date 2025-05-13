@@ -9,8 +9,8 @@ import (
 
 	"github.com/mark3labs/mcp-go/mcp"
 
-	"github.com/inercia/mcp-cli-adapter/pkg/common"
-	"github.com/inercia/mcp-cli-adapter/pkg/config"
+	"github.com/inercia/MCPShell/pkg/common"
+	"github.com/inercia/MCPShell/pkg/config"
 )
 
 // Create a test logger that discards output to keep test output clean

@@ -5,8 +5,8 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/inercia/mcp-cli-adapter/pkg/common"
-	"github.com/inercia/mcp-cli-adapter/pkg/server"
+	"github.com/inercia/MCPShell/pkg/common"
+	"github.com/inercia/MCPShell/pkg/server"
 )
 
 func TestServerStartup(t *testing.T) {
@@ -17,7 +17,7 @@ func TestServerStartup(t *testing.T) {
 	}
 
 	// Create a temporary config file
-	tempDir, err := os.MkdirTemp("", "mcp-cli-adapter-test")
+	tempDir, err := os.MkdirTemp("", "mcpshell-test")
 	if err != nil {
 		t.Fatalf("Failed to create temp directory: %v", err)
 	}

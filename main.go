@@ -1,4 +1,4 @@
-// Package main provides the entry point for the MCP CLI Adapter application.
+// Package main provides the entry point for the MCPShell application.
 //
 // The application implements the Model Context Protocol (MCP) for executing
 // command-line tools in a secure and configurable manner, allowing AI-powered
@@ -6,8 +6,8 @@
 package main
 
 import (
-	cmdroot "github.com/inercia/mcp-cli-adapter/cmd"
-	"github.com/inercia/mcp-cli-adapter/pkg/common"
+	cmdroot "github.com/inercia/MCPShell/cmd"
+	"github.com/inercia/MCPShell/pkg/common"
 )
 
 // main is the entry point of the application. It sets up the panic recovery system

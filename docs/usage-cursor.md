@@ -44,10 +44,10 @@ The MCP-CLI adapter uses the "stdio" transport type, which runs locally on your 
 ```json
 {
     "mcpServers": {
-        "mcp-cli-adapter": {
+        "mcpshell": {
             "command": "go",
             "args": [
-                "run", "github.com/inercia/mcp-cli-adapter@v0.0.8",
+                "run", "github.com/inercia/MCPShell@v0.0.8",
                 "run", "--config", "/absolute/path/to/mcp-cli.yaml"
             ]
         }
@@ -55,13 +55,13 @@ The MCP-CLI adapter uses the "stdio" transport type, which runs locally on your 
 }
 ```
 
-#### If you've downloaded the `mcp-cli-adapter` binary
+#### If you've downloaded the `mcpshell` binary
 
 ```json
 {
     "mcpServers": {
-        "mcp-cli-adapter": {
-            "command": "/absolute/path/to/mcp-cli-adapter",
+        "mcpshell": {
+            "command": "/absolute/path/to/mcpshell",
             "args": [
                 "run", "--config", "/absolute/path/to/mcp-cli.yaml"
             ]
@@ -82,21 +82,21 @@ You can configure multiple instances of the MCP-CLI adapter, each with different
 {
     "mcpServers": {
         "mcp-cli-examples": {
-            "command": "/some/path/mcp-cli-adapter/build/mcp-cli-adapter",
+            "command": "/some/path/mcpshell/build/mcpshell",
             "args": [
                 "run",
-                "--config", "/some/path/mcp-cli-adapter/examples/config.yaml",
-                "--logfile", "/some/path/mcp-cli-adapter/debug.log"
+                "--config", "/some/path/mcpshell/examples/config.yaml",
+                "--logfile", "/some/path/mcpshell/debug.log"
             ],
             "env": {
             }
         },
         "mcp-cli-kubernetes-ro": {
-            "command": "/some/path/mcp-cli-adapter/build/mcp-cli-adapter",
+            "command": "/some/path/mcpshell/build/mcpshell",
             "args": [
                 "run",
-                "--config", "/some/path/mcp-cli-adapter/examples/kubectl-ro.yaml",
-                "--logfile", "/some/path/mcp-cli-adapter/debug.kubernetes-ro.log"
+                "--config", "/some/path/mcpshell/examples/kubectl-ro.yaml",
+                "--logfile", "/some/path/mcpshell/debug.kubernetes-ro.log"
             ],
             "env": {
                 "KUBECONFIG": "/some/path/ethos/kubeconfig/kubeconfig.yaml"
@@ -117,8 +117,8 @@ You can provide authentication credentials and other sensitive information using
 ```json
 {
     "mcpServers": {
-        "mcp-cli-adapter": {
-            "command": "/absolute/path/to/mcp-cli-adapter",
+        "mcpshell": {
+            "command": "/absolute/path/to/mcpshell",
             "args": [
                 "run", "--config", "/absolute/path/to/mcp-cli.yaml"
             ],

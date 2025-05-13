@@ -3,9 +3,9 @@ package root
 import (
 	"fmt"
 
-	"github.com/inercia/mcp-cli-adapter/pkg/common"
-	"github.com/inercia/mcp-cli-adapter/pkg/config"
-	"github.com/inercia/mcp-cli-adapter/pkg/server"
+	"github.com/inercia/MCPShell/pkg/common"
+	"github.com/inercia/MCPShell/pkg/config"
+	"github.com/inercia/MCPShell/pkg/server"
 	"github.com/spf13/cobra"
 )
 
@@ -22,7 +22,7 @@ This command checks the configuration file for errors including:
 	PreRunE: func(cmd *cobra.Command, args []string) error {
 		// Initialize logger
 		level := common.LogLevelFromString(logLevel)
-		logger, err := common.NewLogger("[mcp-cli-adapter] ", logFile, level, true)
+		logger, err := common.NewLogger("[mcpshell] ", logFile, level, true)
 		if err != nil {
 			return fmt.Errorf("failed to set up logger: %w", err)
 		}

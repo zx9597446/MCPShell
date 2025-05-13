@@ -23,8 +23,8 @@
 1. Clone the repository:
 
    ```console
-   git clone https://github.com/inercia/mcp-cli-adapter.git
-   cd mcp-cli-adapter
+   git clone https://github.com/inercia/MCPShell.git
+   cd mcpshell
    ```
 
 2. Build the application:

@@ -2,7 +2,7 @@
 
 ## ⚠️ WARNING: Potential Security Risks
 
-The MCP-CLI-Adapter allows Large Language Models (LLMs) to execute commands on your local machine. This functionality comes with significant security implications that all users must understand before deployment.
+The MCPShell allows Large Language Models (LLMs) to execute commands on your local machine. This functionality comes with significant security implications that all users must understand before deployment.
 
 ## Primary Security Concerns
 
@@ -87,9 +87,9 @@ Example constraint approach:
 
 ## Disclaimer of Liability
 
-**THE MCP-CLI-ADAPTER IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED.**
+**THE MCPShell IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED.**
 
-By using the MCP-CLI-Adapter, you acknowledge and accept all risks associated with allowing an LLM to execute commands on your system. The developers, contributors, and associated organizations are not responsible for any damage, data loss, security breaches, or other negative consequences resulting from the use of this software.
+By using the MCPShell, you acknowledge and accept all risks associated with allowing an LLM to execute commands on your system. The developers, contributors, and associated organizations are not responsible for any damage, data loss, security breaches, or other negative consequences resulting from the use of this software.
 
 It is your responsibility to:
 
@@ -99,8 +99,8 @@ It is your responsibility to:
 4. Maintain regular backups of important data
 5. Deploy in a manner consistent with your own security requirements
 
-**If you cannot accept these risks, do not use the MCP-CLI-Adapter for command execution.**
+**If you cannot accept these risks, do not use the MCPShell for command execution.**
 
 ## Reporting Security Issues
 
-If you discover security vulnerabilities in the MCP-CLI-Adapter, please report them responsibly by [creating an issue](https://github.com/inercia/mcp-cli-adapter/issues) with appropriate security labels.
+If you discover security vulnerabilities in the MCPShell, please report them responsibly by [creating an issue](https://github.com/inercia/MCPShell/issues) with appropriate security labels.

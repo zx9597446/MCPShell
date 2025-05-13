@@ -1,6 +1,6 @@
 mcp:
   description: |
-    Configuration Defaults Example showing how the MCP CLI Adapter handles
+    Configuration Defaults Example showing how the MCPShell handles
     default type values for parameters, allowing for simpler configuration
     files with reasonable defaults while supporting explicit type declarations
     when needed.

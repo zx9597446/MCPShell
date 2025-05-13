@@ -1,11 +1,11 @@
-# MCP CLI Adapter
+# MCPShell
 
-<p align="center">
+<!--p align="center">
   <img src="docs/banner.png" alt="banner" width="600"/>
-</p>
+</p-->
 
 
-The **MCP CLI Adapter** is a tool that allows LLMs to safely execute **command-line tools**
+The **MCPShell** is a tool that allows LLMs to safely execute **command-line tools**
 through the [**Model Context Protocol (MCP)**](https://modelcontextprotocol.io/).
 It provides a secure bridge between LLMs and operating system commands.
 
@@ -71,8 +71,8 @@ space problems in your hard disk.
            "mcp-cli-examples": {
                "command": "go",
                "args": [
-                  "run", "github.com/inercia/mcp-cli-adapter@v0.0.8",
-                  "run", "--config", "/my/example.yaml", "--logfile", "/some/path/mcp-cli-adapter/example.log"
+                  "run", "github.com/inercia/MCPShell@v0.0.8",
+                  "run", "--config", "/my/example.yaml", "--logfile", "/some/path/mcpshell/example.log"
                ]
            }
        }

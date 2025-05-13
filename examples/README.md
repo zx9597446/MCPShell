@@ -40,24 +40,24 @@ chat and type something like.
 
 ```text
 Please take a look at the examples found in
-https://github.com/inercia/mcp-cli-adapter/tree/main/examples.
+https://github.com/inercia/MCPShell/tree/main/examples.
 They are YAML files that define groups of tools that can be used by an LLM.
 The configuration format is defined in
-https://github.com/inercia/mcp-cli-adapter/blob/main/docs/configuration.md
+https://github.com/inercia/MCPShell/blob/main/docs/configuration.md
 Please create a new configuration file for running [YOUR COMMAND].
 Add constraints in order to make the command execution safe,
 checking paramters and so on.
 Provide only read-only commands, do not allow the execution
 of code with side effects.
 Validate the example generated with
-"go run github.com/inercia/mcp-cli-adapter@v0.0.8 validate --config FILENAME"
+"go run github.com/inercia/MCPShell@v0.0.8 validate --config FILENAME"
 where FILENAME is the configuration file you have created.
 If some errors are detected by the validation process, please try to fix them
 until the validation is successful.
 ```
 
 Once that Cursor has generated a configuration file, run the
-`mcp-cli-adapter validate` command in order to validate the file.
+`mcpshell validate` command in order to validate the file.
 If it doesn't validate, pass the errors to Cursor (or allow
 Cursor to run this command automatically). Cursor should be able
 to fix these errors.

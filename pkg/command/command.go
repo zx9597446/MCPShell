@@ -14,8 +14,8 @@ import (
 
 	"github.com/mark3labs/mcp-go/mcp"
 
-	"github.com/inercia/mcp-cli-adapter/pkg/common"
-	"github.com/inercia/mcp-cli-adapter/pkg/config"
+	"github.com/inercia/MCPShell/pkg/common"
+	"github.com/inercia/MCPShell/pkg/config"
 )
 
 // CommandHandler encapsulates the configuration and behavior needed to handle tool commands.

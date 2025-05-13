@@ -23,21 +23,21 @@ If your LLM isn't using the tools you've configured:
 
 If you encounter other issues, try the following steps:
 
-1. Make sure you're using the latest version of MCP CLI Adapter
+1. Make sure you're using the latest version of MCPShell
 2. Check the logs for any error messages
 3. Verify your configuration files for syntax errors
-4. Visit the [GitHub repository](https://github.com/inercia/mcp-cli-adapter) for
+4. Visit the [GitHub repository](https://github.com/inercia/MCPShell) for
    known issues and solutions.
 
 ## Logging and Debugging
 
-If you need to troubleshoot issues with the MCP CLI adapter:
+If you need to troubleshoot issues with the MCPShell:
 
 1. **Enable detailed logging**: Start the adapter with the `--logfile` argument to
    capture detailed logs:
 
    ```console
-   mcp-cli-adapter --logfile debug.log
+   mcpshell --logfile debug.log
    ```
 
 2. **Inspect log output**: Review the generated log file for error messages,
@@ -78,7 +78,7 @@ When writing MCP tool configurations, syntax errors or constraint problems can b
 Use the `validate` command with the `--config` flag to check a single configuration file:
 
 ```console
-mcp-cli-adapter validate --config examples/config.yaml
+mcpshell validate --config examples/config.yaml
 ```
 
 Successful validation will show each tool found and verified:

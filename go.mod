@@ -1,4 +1,4 @@
-module github.com/inercia/mcp-cli-adapter
+module github.com/inercia/MCPShell
 
 go 1.23.0
 

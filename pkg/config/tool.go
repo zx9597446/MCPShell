@@ -3,7 +3,7 @@ package config
 import (
 	"github.com/mark3labs/mcp-go/mcp"
 
-	"github.com/inercia/mcp-cli-adapter/pkg/common"
+	"github.com/inercia/MCPShell/pkg/common"
 )
 
 // Tool holds an MCP tool and its associated handling information.

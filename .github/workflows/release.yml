@@ -36,7 +36,7 @@ jobs:
           GOARCH: ${{ matrix.goarch }}
         run: |
           VERSION=${GITHUB_REF#refs/tags/}
-          BINARY_NAME=mcp-cli-adapter
+          BINARY_NAME=mcpshell
           OUTPUT_NAME=${BINARY_NAME}-${VERSION}-${{ matrix.goos }}-${{ matrix.goarch }}
           
           if [ "${{ matrix.goos }}" = "windows" ]; then

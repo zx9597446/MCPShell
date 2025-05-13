@@ -1,6 +1,6 @@
 # Configuration File
 
-The MCP CLI Adapter can be configured using a YAML configuration file to define the tools that the MCP server provides.
+The MCPShell can be configured using a YAML configuration file to define the tools that the MCP server provides.
 
 ## Basic Structure
 
@@ -91,11 +91,11 @@ constraints:
 
 #### Understanding CEL Constraint Language
 
-CEL (Common Expression Language) is a simple, portable expression language developed by Google. In the MCP CLI Adapter, CEL is used to define safety constraints that validate parameters before command execution.
+CEL (Common Expression Language) is a simple, portable expression language developed by Google. In the MCPShell, CEL is used to define safety constraints that validate parameters before command execution.
 
 ##### Basic Types and Operations
 
-CEL supports three basic parameter types in MCP CLI Adapter:
+CEL supports three basic parameter types in MCPShell:
 
 1. **String operations**:
 
@@ -416,7 +416,7 @@ Similar to commands, prefixes can include parameter values using the same Go tem
 
 ## Go Template Features
 
-The MCP CLI Adapter uses Go's text/template package for parameter substitution, which supports a variety of powerful features:
+The MCPShell uses Go's text/template package for parameter substitution, which supports a variety of powerful features:
 
 ### Basic Substitution
 

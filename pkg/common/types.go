@@ -1,4 +1,4 @@
-// Package common provides shared utilities and types used across the MCP CLI Adapter.
+// Package common provides shared utilities and types used across the MCPShell.
 package common
 
 // OutputConfig defines how tool output should be formatted before being returned.

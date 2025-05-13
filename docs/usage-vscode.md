@@ -36,9 +36,9 @@ To use MCP-CLI adapter with Visual Studio Code, follow these steps:
    ```json
    {
      "servers": {
-       "mcp-cli-adapter": {
+       "mcpshell": {
          "type": "stdio",
-         "command": "/absolute/path/to/mcp-cli-adapter",
+         "command": "/absolute/path/to/mcpshell",
          "args": [
            "run", "--config", "/absolute/path/to/mcp-cli.yaml"
          ]
@@ -52,11 +52,11 @@ To use MCP-CLI adapter with Visual Studio Code, follow these steps:
    ```json
    {
      "servers": {
-       "mcp-cli-adapter": {
+       "mcpshell": {
          "type": "stdio",
          "command": "go",
          "args": [
-           "run", "github.com/inercia/mcp-cli-adapter",
+           "run", "github.com/inercia/MCPShell",
            "run", "--config", "${workspaceFolder}/mcp-cli.yaml"
          ]
        }
@@ -78,7 +78,7 @@ each with different tool configurations:
   "servers": {
     "mcp-cli-example": {
       "type": "stdio",
-      "command": "/absolute/path/to/mcp-cli-adapter",
+      "command": "/absolute/path/to/mcpshell",
       "args": [
         "run",
         "--config", "${workspaceFolder}/examples/config.yaml",
@@ -87,7 +87,7 @@ each with different tool configurations:
     },
     "mcp-cli-kubernetes-ro": {
       "type": "stdio",
-      "command": "/absolute/path/to/mcp-cli-adapter",
+      "command": "/absolute/path/to/mcpshell",
       "args": [
         "run",
         "--config", "${workspaceFolder}/examples/kubectl-ro.yaml",
@@ -116,9 +116,9 @@ If your tools require API keys or other sensitive information, you can use input
     }
   ],
   "servers": {
-    "mcp-cli-adapter": {
+    "mcpshell": {
       "type": "stdio",
-      "command": "/absolute/path/to/mcp-cli-adapter",
+      "command": "/absolute/path/to/mcpshell",
       "args": [
         "run", "--config", "${workspaceFolder}/mcp-cli.yaml"
       ],
