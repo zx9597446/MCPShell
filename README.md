@@ -71,7 +71,7 @@ space problems in your hard disk.
            "mcp-cli-examples": {
                "command": "go",
                "args": [
-                  "run", "github.com/inercia/mcp-cli-adapter@v0.0.7",
+                  "run", "github.com/inercia/mcp-cli-adapter@v0.0.8",
                   "run", "--config", "/my/example.yaml", "--logfile", "/some/path/mcp-cli-adapter/example.log"
                ]
            }
