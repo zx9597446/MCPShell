@@ -113,15 +113,19 @@ func (h *CommandHandler) GetMCPHandler() func(ctx context.Context, request mcp.C
 
 			// Evaluate constraints with logging
 			valid, err := h.constraintsCompiled.Evaluate(request.Params.Arguments, h.params)
+			if !valid {
+				s := "Command execution blocked by constraints"
+				if err != nil {
+					s = fmt.Sprintf("%s: %v", s, err)
+				}
+				h.logger.Print(s)
+				return mcp.NewToolResultError(s), nil
+			}
 			if err != nil {
 				h.logger.Printf("Constraint evaluation error: %v", err)
 				return mcp.NewToolResultError(fmt.Sprintf("constraint evaluation error: %v", err)), nil
 			}
 
-			if !valid {
-				h.logger.Printf("Command execution blocked by constraints")
-				return mcp.NewToolResultError("command execution blocked by constraints"), nil
-			}
 
 			h.logger.Printf("All constraints passed validation")
 		}
@@ -200,7 +204,7 @@ func (h *CommandHandler) GetMCPHandler() func(ctx context.Context, request mcp.C
 			}
 
 			// Combine prefix and command output
-			finalOutput = strings.TrimSpace(prefix) + " " + finalOutput
+			finalOutput = strings.TrimSpace(prefix) + "\n\n" + finalOutput
 			h.logger.Printf("Final output with prefix: %s", finalOutput)
 		}
 
