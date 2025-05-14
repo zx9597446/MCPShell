@@ -40,9 +40,18 @@ rm -f "$LOG_FILE"
 FILENAME="agent_test_output-${RANDOM}.txt"
 CONTENT="This is a test file created by the agent."
 
+echo -e "${BLUE}----------------------------------------${RESET}"
+echo -e "${BLUE}1. Checking the URL of the LLM${RESET}"
+echo -e "${BLUE}----------------------------------------${RESET}"
+
+if ! curl -X GET "$OPENAI_API_BASE/models" 2>/dev/null | grep -q "data"; then
+    echo -e "${RED}✗ Skipping the rest of the tests because the LLM is not available${RESET}"
+    exit 0
+fi
+echo -e "${GREEN}✓ ... LLM is available. Continuing... ${RESET}"
 
 echo -e "${BLUE}----------------------------------------${RESET}"
-echo -e "${BLUE}1. Testing direct tool execution${RESET}"
+echo -e "${BLUE}2. Testing direct tool execution${RESET}"
 echo -e "${BLUE}----------------------------------------${RESET}"
 go run main.go exe --config "$CONFIG_FILE" "create_test_file" \
     "filename=$FILENAME" \
@@ -63,7 +72,7 @@ FILENAME="agent_test_output-${RANDOM}.txt"
 
 # Run the agent...
 echo -e "${BLUE}----------------------------------------${RESET}"
-echo -e "${BLUE}2. Running agent with OpenAI API${RESET}"
+echo -e "${BLUE}3. Running agent with OpenAI API${RESET}"
 echo -e "${BLUE}----------------------------------------${RESET}"
 
 # Run the agent with the test config
