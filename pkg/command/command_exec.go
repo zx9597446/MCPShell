@@ -57,7 +57,7 @@ func (h *CommandHandler) executeToolCommand(ctx context.Context, params map[stri
 	}
 
 	// Process the command template with the tool arguments
-	h.logger.Printf("Processing command template: %s", h.cmd)
+	h.logger.Printf("Processing command template:\n%s", h.cmd)
 
 	cmd, err := common.ProcessTemplate(h.cmd, params)
 	if err != nil {
@@ -118,7 +118,6 @@ func (h *CommandHandler) executeToolCommand(ctx context.Context, params map[stri
 
 	// Process the output
 	finalOutput := commandOutput
-	h.logger.Printf("Command output: %s", finalOutput)
 
 	// Apply prefix if provided
 	if h.output.Prefix != "" {
@@ -133,7 +132,7 @@ func (h *CommandHandler) executeToolCommand(ctx context.Context, params map[stri
 
 		// Combine prefix and command output
 		finalOutput = strings.TrimSpace(prefix) + "\n\n" + finalOutput
-		h.logger.Printf("Final output with prefix: %s", finalOutput)
+		h.logger.Printf("Final output with prefix:\n--------------------------------\n%s\n--------------------------------", finalOutput)
 	}
 
 	h.logger.Printf("Tool execution completed successfully")

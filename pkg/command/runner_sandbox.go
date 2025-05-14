@@ -114,7 +114,7 @@ func (r *RunnerSandboxExec) Run(ctx context.Context, shell string, command strin
 
 	profile := profileBuf.String()
 	r.logger.Printf("Sandbox options: %+v", r.options)
-	r.logger.Printf("Generated sandbox profile: %s", profile)
+	r.logger.Printf("Generated sandbox profile:\n%s", profile)
 
 	// Create a temporary file for the sandbox profile
 	profileFile, err := os.CreateTemp("", "sandbox-profile-*.sb")
