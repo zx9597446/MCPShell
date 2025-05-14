@@ -45,7 +45,7 @@ type ToolConfig struct {
 	Name string `yaml:"name"`
 
 	// Requirements is a list of tool names that must be executed before this tool
-	Requirements ToolRequirements `yaml:"prerequisites,omitempty"`
+	Requirements ToolRequirements `yaml:"requirements,omitempty"`
 
 	// Description explains what the tool does (shown to AI clients)
 	Description string `yaml:"description"`

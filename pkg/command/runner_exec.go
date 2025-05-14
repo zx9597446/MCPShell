@@ -69,7 +69,11 @@ func (r *RunnerExec) Run(ctx context.Context, shell string, command string, args
 		r.logger.Printf("Failed to create temp directory: %v", err)
 		return "", err
 	}
-	defer os.RemoveAll(tmpDir)
+	defer func() {
+		if err := os.RemoveAll(tmpDir); err != nil {
+			r.logger.Printf("Failed to remove temporary directory: %v", err)
+		}
+	}()
 
 	// Format the command with proper shell syntax
 	var scriptContent strings.Builder

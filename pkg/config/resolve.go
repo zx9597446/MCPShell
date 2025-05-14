@@ -59,8 +59,12 @@ func ResolveConfigPath(configPath string, logger *common.Logger) (string, func()
 
 		// Create cleanup function for the temporary file
 		cleanup := func() {
-			tmpFile.Close()
-			os.Remove(tmpFilePath)
+			if err := tmpFile.Close(); err != nil {
+				logger.Error("Failed to close temporary file: %v", err)
+			}
+			if err := os.Remove(tmpFilePath); err != nil {
+				logger.Error("Failed to remove temporary file: %v", err)
+			}
 			logger.Debug("Cleaned up temporary configuration file: %s", tmpFilePath)
 		}
 
@@ -70,7 +74,11 @@ func ResolveConfigPath(configPath string, logger *common.Logger) (string, func()
 			cleanup()
 			return "", noopCleanup, fmt.Errorf("failed to download configuration: %w", err)
 		}
-		defer resp.Body.Close()
+		defer func() {
+			if err := resp.Body.Close(); err != nil {
+				logger.Error("Failed to close response body: %v", err)
+			}
+		}()
 
 		if resp.StatusCode != http.StatusOK {
 			cleanup()

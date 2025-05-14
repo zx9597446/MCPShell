@@ -83,11 +83,24 @@ func TestRunnerSandboxExec_Run(t *testing.T) {
 	}
 
 	// Set environment variables for the test
-	os.Setenv("ALLOWED_FROM_ENV", "/tmp")
-	os.Setenv("USR_DIR", "/usr")
+	if err := os.Setenv("ALLOWED_FROM_ENV", "/tmp"); err != nil {
+		t.Fatalf("Failed to set environment variable: %v", err)
+	}
+	if err := os.Setenv("USR_DIR", "/usr"); err != nil {
+		t.Fatalf("Failed to set environment variable: %v", err)
+	}
+
 	// Ensure cleanup
-	defer os.Unsetenv("ALLOWED_FROM_ENV")
-	defer os.Unsetenv("USR_DIR")
+	defer func() {
+		if err := os.Unsetenv("ALLOWED_FROM_ENV"); err != nil {
+			t.Logf("Failed to unset environment variable: %v", err)
+		}
+	}()
+	defer func() {
+		if err := os.Unsetenv("USR_DIR"); err != nil {
+			t.Logf("Failed to unset environment variable: %v", err)
+		}
+	}()
 
 	// Use command_test.go's testLogger
 	logger := testLogger

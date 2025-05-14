@@ -109,7 +109,7 @@ func (h *CommandHandler) GetMCPHandler() func(ctx context.Context, request mcp.C
 		}
 
 		// Execute the command using the common implementation
-		output, err, _ := h.executeToolCommand(ctx, request.Params.Arguments, runnerOpts)
+		output, _, err := h.executeToolCommand(ctx, request.Params.Arguments, runnerOpts)
 		if err != nil {
 			return mcp.NewToolResultError(err.Error()), nil
 		}

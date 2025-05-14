@@ -19,9 +19,9 @@ import (
 //
 // Returns:
 //   - The command output as a string
-//   - An error if command execution fails
 //   - A slice of failed constraint messages
-func (h *CommandHandler) executeToolCommand(ctx context.Context, params map[string]interface{}, extraRunnerOpts map[string]interface{}) (string, error, []string) {
+//   - An error if command execution fails
+func (h *CommandHandler) executeToolCommand(ctx context.Context, params map[string]interface{}, extraRunnerOpts map[string]interface{}) (string, []string, error) {
 	// Log the tool execution
 	h.logger.Printf("Tool execution requested for '%s'", h.toolName)
 	h.logger.Printf("Arguments: %v", params)
@@ -33,7 +33,7 @@ func (h *CommandHandler) executeToolCommand(ctx context.Context, params map[stri
 		satisfied, failed, err := h.constraintsCompiled.Evaluate(params, h.params)
 		if err != nil {
 			h.logger.Printf("Error evaluating constraints: %v", err)
-			return "", fmt.Errorf("error evaluating constraints: %v", err), nil
+			return "", nil, fmt.Errorf("error evaluating constraints: %v", err)
 		}
 		if !satisfied {
 			h.logger.Printf("Constraints not satisfied, blocking execution")
@@ -51,7 +51,7 @@ func (h *CommandHandler) executeToolCommand(ctx context.Context, params map[stri
 				}
 			}
 
-			return "", fmt.Errorf(errorMsg), failedConstraints
+			return "", failedConstraints, fmt.Errorf("%s", errorMsg)
 		}
 		h.logger.Printf("All constraints satisfied")
 	}
@@ -62,7 +62,7 @@ func (h *CommandHandler) executeToolCommand(ctx context.Context, params map[stri
 	cmd, err := common.ProcessTemplate(h.cmd, params)
 	if err != nil {
 		h.logger.Printf("Error processing command template: %v", err)
-		return "", fmt.Errorf("error processing command template: %v", err), nil
+		return "", nil, fmt.Errorf("error processing command template: %v", err)
 	}
 
 	h.logger.Printf("Processed command: %s", cmd)
@@ -106,14 +106,14 @@ func (h *CommandHandler) executeToolCommand(ctx context.Context, params map[stri
 	runner, err := NewRunner(runnerType, runnerOptions, h.logger)
 	if err != nil {
 		h.logger.Printf("Error creating runner: %v", err)
-		return "", fmt.Errorf("error creating runner: %v", err), nil
+		return "", nil, fmt.Errorf("error creating runner: %v", err)
 	}
 
 	// Execute the command
 	commandOutput, err := runner.Run(ctx, h.shell, cmd, []string{}, env, params)
 	if err != nil {
 		h.logger.Printf("Error executing command: %v", err)
-		return "", err, nil
+		return "", nil, err
 	}
 
 	// Process the output
@@ -127,7 +127,7 @@ func (h *CommandHandler) executeToolCommand(ctx context.Context, params map[stri
 		prefix, err := common.ProcessTemplate(h.output.Prefix, params)
 		if err != nil {
 			h.logger.Printf("Error processing output prefix template: %v", err)
-			return "", fmt.Errorf("error processing output prefix template: %v", err), nil
+			return "", nil, fmt.Errorf("error processing output prefix template: %v", err)
 		}
 
 		// Combine prefix and command output
@@ -164,7 +164,7 @@ func (h *CommandHandler) ExecuteCommand(params map[string]interface{}) (string, 
 	}
 
 	// Use the common implementation
-	output, err, failedConstraints := h.executeToolCommand(context.Background(), params, runnerOpts)
+	output, failedConstraints, err := h.executeToolCommand(context.Background(), params, runnerOpts)
 
 	// If constraints failed, format the error message
 	if err != nil && len(failedConstraints) > 0 {
