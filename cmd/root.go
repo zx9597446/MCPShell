@@ -47,9 +47,4 @@ func init() {
 
 	// Add version flag to all commands
 	rootCmd.PersistentFlags().BoolP("version", "v", false, "Print version information")
-
-	// Add commands
-	rootCmd.AddCommand(serverCommand)
-	rootCmd.AddCommand(validateCommand)
-	rootCmd.AddCommand(exeCommand)
 }

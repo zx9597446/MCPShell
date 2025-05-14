@@ -82,6 +82,8 @@ available to AI applications via the MCP protocol.
 
 // init adds flags to the run command
 func init() {
+	rootCmd.AddCommand(serverCommand)
+
 	// Add flags for the run command
 	serverCommand.Flags().StringVarP(&configFile, "config", "c", "", "Path to the YAML configuration file or URL (required)")
 	serverCommand.Flags().StringVarP(&logFile, "logfile", "l", "", "Path to the log file (optional)")
