@@ -47,7 +47,7 @@ The MCP-CLI adapter uses the "stdio" transport type, which runs locally on your 
         "mcpshell": {
             "command": "go",
             "args": [
-                "run", "github.com/inercia/MCPShell@v0.0.9",
+                "run", "github.com/inercia/MCPShell@v0.0.10",
                 "server", "--config", "/absolute/path/to/mcp-cli.yaml"
             ]
         }
