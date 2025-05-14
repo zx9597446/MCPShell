@@ -7,10 +7,20 @@ TEST_NAME="test_exe_empty_file_command"
 CONFIG_FILE="$(dirname "$0")/test_exe_config.yaml"
 TEST_FILE="/tmp/mcpshell_empty_test_file_$(date +%s).txt"
 
+#####################################################################################
+# ANSI color codes
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+BLUE='\033[0;34m'
+RESET='\033[0m'
+
 # Print test header
-echo "=== Running test: $TEST_NAME ==="
-echo "Configuration file: $CONFIG_FILE"
-echo "Test file path: $TEST_FILE"
+echo -e "${BLUE}----------------------------------------${RESET}"
+echo -e "${BLUE}=== Running test: $TEST_NAME ===${RESET}"
+echo -e "${BLUE}----------------------------------------${RESET}"
+echo -e "${BLUE}Configuration file: $CONFIG_FILE${RESET}"
+echo -e "${BLUE}Test file path: $TEST_FILE${RESET}"
+echo -e "${BLUE}----------------------------------------${RESET}"
 
 # Make sure the test file doesn't exist yet
 if [ -f "$TEST_FILE" ]; then
@@ -28,28 +38,28 @@ RESULT=$?
 
 # Check the result
 if [ $RESULT -ne 0 ]; then
-    echo "ERROR: Command execution failed with exit code: $RESULT"
+    echo -e "${RED}ERROR: Command execution failed with exit code: $RESULT${RESET}"
     exit 1
 fi
 
 # Check if the file was created
 if [ ! -f "$TEST_FILE" ]; then
-    echo "ERROR: Test file was not created at: $TEST_FILE"
+    echo -e "${RED}ERROR: Test file was not created at: $TEST_FILE${RESET}"
     exit 1
 fi
 
 # Verify the file is empty
 FILE_SIZE=$(stat -f%z "$TEST_FILE")
 if [ "$FILE_SIZE" -ne 0 ]; then
-    echo "ERROR: Expected an empty file but file has size: $FILE_SIZE bytes"
+    echo -e "${RED}ERROR: Expected an empty file but file has size: $FILE_SIZE bytes${RESET}"
     exit 1
 fi
 
 # Cleanup
 rm -f "$TEST_FILE"
 if [ -f "$TEST_FILE" ]; then
-    echo "WARNING: Could not clean up test file at: $TEST_FILE"
+    echo -e "${RED}WARNING: Could not clean up test file at: $TEST_FILE${RESET}"
 fi
 
-echo "Test successful! The exe command correctly created the empty file."
-exit 0 
+echo -e "${GREEN}Test successful! The exe command correctly created the empty file.${RESET}"
+exit 0

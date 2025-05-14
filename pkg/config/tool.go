@@ -12,7 +12,7 @@ type Tool struct {
 	MCPTool mcp.Tool
 
 	// Config is the original tool configuration
-	Config ToolConfig
+	Config MCPToolConfig
 }
 
 // checkToolRequirements checks if all prerequisites for a tool are met.
@@ -51,7 +51,7 @@ func (t *Tool) checkToolRequirements() bool {
 //
 // Returns:
 //   - An mcp.Tool object ready to be registered with the MCP server
-func CreateMCPTool(config ToolConfig) mcp.Tool {
+func CreateMCPTool(config MCPToolConfig) mcp.Tool {
 	var options []mcp.ToolOption
 
 	// Add description

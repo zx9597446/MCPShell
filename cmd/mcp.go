@@ -20,8 +20,8 @@ var (
 	version = "1.0.0"
 )
 
-// serverCommand represents the run command which starts the MCP server
-var serverCommand = &cobra.Command{
+// mcpCommand represents the run command which starts the MCP server
+var mcpCommand = &cobra.Command{
 	Use:     "mcp",
 	Aliases: []string{"serve", "server", "run"},
 	Short:   "Run the MCP server for a MCP configuration file",
@@ -82,14 +82,14 @@ available to AI applications via the MCP protocol.
 
 // init adds flags to the run command
 func init() {
-	rootCmd.AddCommand(serverCommand)
+	rootCmd.AddCommand(mcpCommand)
 
 	// Add flags for the run command
-	serverCommand.Flags().StringVarP(&configFile, "config", "c", "", "Path to the YAML configuration file or URL (required)")
-	serverCommand.Flags().StringVarP(&logFile, "logfile", "l", "", "Path to the log file (optional)")
-	serverCommand.Flags().StringVarP(&logLevel, "log-level", "", "info", "Log level: none, error, info, debug")
-	serverCommand.Flags().StringVarP(&description, "description", "d", "", "Server description (optional)")
+	mcpCommand.Flags().StringVarP(&configFile, "config", "c", "", "Path to the YAML configuration file or URL (required)")
+	mcpCommand.Flags().StringVarP(&logFile, "logfile", "l", "", "Path to the log file (optional)")
+	mcpCommand.Flags().StringVarP(&logLevel, "log-level", "", "info", "Log level: none, error, info, debug")
+	mcpCommand.Flags().StringVarP(&description, "description", "d", "", "Server description (optional)")
 
 	// Mark required flags
-	_ = serverCommand.MarkFlagRequired("config")
+	_ = mcpCommand.MarkFlagRequired("config")
 }

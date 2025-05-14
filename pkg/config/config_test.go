@@ -9,17 +9,17 @@ func TestCheckToolPrerequisites(t *testing.T) {
 	// Create test cases
 	tests := []struct {
 		name         string
-		requirements ToolRequirements
+		requirements MCPToolRequirements
 		expected     bool
 	}{
 		{
 			name:         "No prerequisites",
-			requirements: ToolRequirements{},
+			requirements: MCPToolRequirements{},
 			expected:     true,
 		},
 		{
 			name: "Matching OS only",
-			requirements: ToolRequirements{
+			requirements: MCPToolRequirements{
 				OS:          runtime.GOOS,
 				Executables: nil,
 			},
@@ -27,7 +27,7 @@ func TestCheckToolPrerequisites(t *testing.T) {
 		},
 		{
 			name: "Non-matching OS",
-			requirements: ToolRequirements{
+			requirements: MCPToolRequirements{
 				OS:          "non-existent-os",
 				Executables: nil,
 			},
@@ -35,14 +35,14 @@ func TestCheckToolPrerequisites(t *testing.T) {
 		},
 		{
 			name: "Existing executable",
-			requirements: ToolRequirements{
+			requirements: MCPToolRequirements{
 				Executables: []string{"sh"}, // should exist on most systems
 			},
 			expected: true,
 		},
 		{
 			name: "Non-existent executable",
-			requirements: ToolRequirements{
+			requirements: MCPToolRequirements{
 				Executables: []string{"non-existent-executable-12345"},
 			},
 			expected: false,
@@ -53,7 +53,7 @@ func TestCheckToolPrerequisites(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			tool := Tool{
-				Config: ToolConfig{
+				Config: MCPToolConfig{
 					Requirements: tt.requirements,
 				},
 			}
@@ -69,26 +69,26 @@ func TestCreateTools_Prerequisites(t *testing.T) {
 	// Create a simple config with two tools, one with unmet prerequisites
 	cfg := &Config{
 		MCP: MCPConfig{
-			Tools: []ToolConfig{
+			Tools: []MCPToolConfig{
 				{
 					Name:        "tool1",
 					Description: "Tool with met prerequisites",
-					Requirements: ToolRequirements{
+					Requirements: MCPToolRequirements{
 						OS:          runtime.GOOS,
 						Executables: []string{"sh"}, // should exist on most systems
 					},
-					Run: RunConfig{
+					Run: MCPToolRunConfig{
 						Command: "echo 'Tool 1'",
 					},
 				},
 				{
 					Name:        "tool2",
 					Description: "Tool with unmet prerequisites",
-					Requirements: ToolRequirements{
+					Requirements: MCPToolRequirements{
 						OS:          "non-existent-os",
 						Executables: []string{"non-existent-executable-12345"},
 					},
-					Run: RunConfig{
+					Run: MCPToolRunConfig{
 						Command: "echo 'Tool 2'",
 					},
 				},

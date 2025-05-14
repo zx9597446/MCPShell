@@ -5,6 +5,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 # Test files to run
 TEST_FILES=(
+    "test_agent.sh"
     "test_exe.sh"
     "test_exe_empty_file.sh"
     "test_exe_constraints.sh"

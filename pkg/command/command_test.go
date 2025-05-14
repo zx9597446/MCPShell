@@ -171,8 +171,8 @@ func TestCommandHandler(t *testing.T) {
 				MCPTool: mcp.Tool{
 					Name: "test-tool",
 				},
-				Config: config.ToolConfig{
-					Run: config.RunConfig{
+				Config: config.MCPToolConfig{
+					Run: config.MCPToolRunConfig{
 						Command: tt.cmdTemplate,
 					},
 					Output:      tt.output,

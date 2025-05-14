@@ -94,7 +94,7 @@ will be reported.
 		}
 
 		// Find the requested tool in the configuration
-		var targetTool *config.ToolConfig
+		var targetTool *config.MCPToolConfig
 		for _, toolConfig := range cfg.MCP.Tools {
 			if toolConfig.Name == toolName {
 				targetTool = &toolConfig

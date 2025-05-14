@@ -1,0 +1,26 @@
+{
+  "id": "test_id",
+  "object": "chat.completion",
+  "created": 1698433638,
+  "model": "test-model",
+  "choices": [
+    {
+      "index": 0,
+      "message": {
+        "role": "assistant",
+        "content": null,
+        "tool_calls": [
+          {
+            "id": "call_abc123",
+            "type": "function",
+            "function": {
+              "name": "create_test_file",
+              "arguments": "{\"filename\":\"agent_test_output.txt\",\"content\":\"This is a test file created by the agent.\"}"
+            }
+          }
+        ]
+      },
+      "finish_reason": "tool_calls"
+    }
+  ]
+}

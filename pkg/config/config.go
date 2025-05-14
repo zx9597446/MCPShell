@@ -17,6 +17,9 @@ import (
 
 // Config represents the top-level configuration structure for the application.
 type Config struct {
+	// Prompts is a list of prompts that will be provided to clients
+	Prompts []Prompts `yaml:"prompts,omitempty"`
+
 	// MCP contains the configuration specific to the MCP server and tools
 	MCP MCPConfig `yaml:"mcp"`
 }
@@ -30,7 +33,16 @@ type MCPConfig struct {
 	Run MCPRunConfig `yaml:"run,omitempty"`
 
 	// Tools is a list of tool definitions that will be provided to clients
-	Tools []ToolConfig `yaml:"tools"`
+	Tools []MCPToolConfig `yaml:"tools"`
+}
+
+// Prompts is a list of prompts that could be provided to clients
+type Prompts struct {
+	// System is a list of system prompts
+	System []string `yaml:"system,omitempty"`
+
+	// User is a list of user prompts
+	User []string `yaml:"user,omitempty"`
 }
 
 // MCPRunConfig represents run-specific configuration options.
@@ -39,13 +51,13 @@ type MCPRunConfig struct {
 	Shell string `yaml:"shell,omitempty"`
 }
 
-// ToolConfig represents a single tool configuration.
-type ToolConfig struct {
+// MCPToolConfig represents a single tool configuration.
+type MCPToolConfig struct {
 	// Name is the unique identifier for the tool
 	Name string `yaml:"name"`
 
 	// Requirements is a list of tool names that must be executed before this tool
-	Requirements ToolRequirements `yaml:"requirements,omitempty"`
+	Requirements MCPToolRequirements `yaml:"requirements,omitempty"`
 
 	// Description explains what the tool does (shown to AI clients)
 	Description string `yaml:"description"`
@@ -57,17 +69,17 @@ type ToolConfig struct {
 	Constraints []string `yaml:"constraints,omitempty"`
 
 	// Run specifies how to execute the tool
-	Run RunConfig `yaml:"run"`
+	Run MCPToolRunConfig `yaml:"run"`
 
 	// Output specifies how to format the tool's output
 	Output common.OutputConfig `yaml:"output,omitempty"`
 }
 
-// ToolRequirements represents a prerequisite tool configuration.
+// MCPToolRequirements represents a prerequisite tool configuration.
 // If these prerequisites are not met, the tool will not even be shown as
 // available to the client.
 // This allows for tools to be conditionally shown based on the user's system.
-type ToolRequirements struct {
+type MCPToolRequirements struct {
 	// OS is the operating system that the prerequisite tool must be installed on
 	OS string `yaml:"os,omitempty"`
 
@@ -75,8 +87,8 @@ type ToolRequirements struct {
 	Executables []string `yaml:"executables"`
 }
 
-// RunConfig represents the run configuration for a tool.
-type RunConfig struct {
+// MCPToolRunConfig represents the run configuration for a tool.
+type MCPToolRunConfig struct {
 	// Runner is the type of runner to use for executing the command
 	Runner string `yaml:"runner,omitempty"`
 

@@ -8,6 +8,7 @@ require (
 	github.com/Masterminds/sprig/v3 v3.3.0
 	github.com/google/cel-go v0.25.0
 	github.com/mark3labs/mcp-go v0.26.0
+	github.com/sashabaranov/go-openai v1.40.0
 	github.com/spf13/cobra v1.9.1
 	gopkg.in/yaml.v3 v3.0.1
 )

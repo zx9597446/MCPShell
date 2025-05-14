@@ -59,7 +59,7 @@ func TestServer_findToolByName(t *testing.T) {
 	})
 
 	// Set up test tools
-	tools := []config.ToolConfig{
+	tools := []config.MCPToolConfig{
 		{Name: "tool1", Description: "Tool 1"},
 		{Name: "tool2", Description: "Tool 2"},
 		{Name: "tool3", Description: "Tool 3"},

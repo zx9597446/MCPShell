@@ -93,6 +93,19 @@ space problems in your hard disk.
 Configuration files use a YAML format defined [here](docs/configuration.md).
 See the [this directory](examples) for some examples.
 
+## Agent mode
+
+MCPShell can also be run in agent mode, providing direct connectivity between Large Language Models
+(LLMs) and your command-line tools without requiring a separate MCP client. In this mode,
+MCPShell connects to an OpenAI-compatible API (including local LLMs like Ollama), makes your
+tools available to the model, executes requested tool operations, and manages the conversation flow.
+This enables the creation of specialized AI assistants that can autonomously perform system tasks
+using the tools you define in your configuration. The agent mode supports both interactive
+conversations and one-shot executions, and allows you to define system and user prompts directly
+in your configuration files.
+
+For detailed information on using agent mode, see the [Agent Mode documentation](docs/usage-agent.md).
+
 ## Security Considerations
 
 So you will probably thing

@@ -1,0 +1,35 @@
+{
+  "messages": [
+    {
+      "role": "system",
+      "content": "You are a helpful assistant that can create files."
+    },
+    {
+      "role": "user",
+      "content": "Please create a file named agent_test_output.txt with the content: This is a test file created by the agent."
+    }
+  ],
+  "tools": [
+    {
+      "type": "function",
+      "function": {
+        "name": "create_test_file",
+        "description": "Create a test file with the given content",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "filename": {
+              "type": "string",
+              "description": "Name of the file to create"
+            },
+            "content": {
+              "type": "string",
+              "description": "Content to write to the file"
+            }
+          },
+          "required": ["filename", "content"]
+        }
+      }
+    }
+  ]
+}
