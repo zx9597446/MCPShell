@@ -40,7 +40,7 @@ To use MCPShell with Visual Studio Code, follow these steps:
          "type": "stdio",
          "command": "/absolute/path/to/mcpshell",
          "args": [
-           "server", "--config", "/absolute/path/to/mcp-cli.yaml"
+           "mcp", "--config", "/absolute/path/to/mcp-cli.yaml"
          ]
        }
      }
@@ -57,7 +57,7 @@ To use MCPShell with Visual Studio Code, follow these steps:
          "command": "go",
          "args": [
            "run", "github.com/inercia/MCPShell",
-           "server", "--config", "${workspaceFolder}/mcp-cli.yaml"
+           "mcp", "--config", "${workspaceFolder}/mcp-cli.yaml"
          ]
        }
      }
@@ -80,7 +80,7 @@ each with different tool configurations:
       "type": "stdio",
       "command": "/absolute/path/to/mcpshell",
       "args": [
-        "server",
+        "mcp",
         "--config", "${workspaceFolder}/examples/config.yaml",
         "--logfile", "${workspaceFolder}/debug.log"
       ]
@@ -89,7 +89,7 @@ each with different tool configurations:
       "type": "stdio",
       "command": "/absolute/path/to/mcpshell",
       "args": [
-        "server",
+        "mcp",
         "--config", "${workspaceFolder}/examples/kubectl-ro.yaml",
         "--logfile", "${workspaceFolder}/debug.kubernetes-ro.log"
       ],
@@ -120,7 +120,7 @@ If your tools require API keys or other sensitive information, you can use input
       "type": "stdio",
       "command": "/absolute/path/to/mcpshell",
       "args": [
-        "server", "--config", "${workspaceFolder}/mcp-cli.yaml"
+        "mcp", "--config", "${workspaceFolder}/mcp-cli.yaml"
       ],
       "env": {
         "API_KEY": "${input:api-key}"

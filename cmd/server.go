@@ -22,8 +22,8 @@ var (
 
 // serverCommand represents the run command which starts the MCP server
 var serverCommand = &cobra.Command{
-	Use:     "serve",
-	Aliases: []string{"run", "mcp"},
+	Use:     "mcp",
+	Aliases: []string{"serve", "server", "run"},
 	Short:   "Run the MCP server for a MCP configuration file",
 	Long: `
 Run an MCP server that provides tools to LLM applications.
