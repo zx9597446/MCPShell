@@ -166,7 +166,7 @@ func GetLogger() *Logger {
 		if err != nil {
 			// If we can't even create a basic logger, just return a minimal one
 			fmt.Fprintf(os.Stderr, "Error creating default logger: %v\n", err)
-			minimalLogger, _ := NewLogger("[MCP-CLI] ", "", LogLevelError, false)
+			minimalLogger, _ := NewLogger("[mcpshell] ", "", LogLevelError, false)
 			return minimalLogger
 		}
 		return logger

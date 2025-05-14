@@ -36,7 +36,7 @@ mcp:
         prefix: "<text to prepend to the output>"
 ```
 
-## MCP-CLI Configuration
+## MCPShell Configuration
 
 The top-level `mcp` section contains configuration for the MCP server:
 
