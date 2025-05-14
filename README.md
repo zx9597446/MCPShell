@@ -71,7 +71,7 @@ space problems in your hard disk.
            "mcp-cli-examples": {
                "command": "go",
                "args": [
-                  "run", "github.com/inercia/MCPShell@v0.0.11",
+                  "run", "github.com/inercia/MCPShell@v0.0.12",
                   "server", "--config", "/my/example.yaml", "--logfile", "/some/path/mcpshell/example.log"
                ]
            }
