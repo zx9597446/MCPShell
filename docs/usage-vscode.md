@@ -1,15 +1,15 @@
-# Using the MCP-CLI adapter in Visual Studio Code
+# Using the MCPShell in Visual Studio Code
 
-This guide explains how to set up and use the MCP-CLI adapter with Visual Studio Code.
+This guide explains how to set up and use the MCPShell with Visual Studio Code.
 
 ## Prerequisites
 
 - Visual Studio Code with GitHub Copilot
-- MCP-CLI adapter installed (built from source or downloaded binary)
+- MCPShell installed (built from source or downloaded binary)
 
 ## Setup Instructions
 
-To use MCP-CLI adapter with Visual Studio Code, follow these steps:
+To use MCPShell with Visual Studio Code, follow these steps:
 
 1. **Create your YAML configuration file** for the tools you want to expose (e.g., `mcp-cli.yaml`).
 
@@ -31,7 +31,7 @@ To use MCP-CLI adapter with Visual Studio Code, follow these steps:
            command: "curl -s 'https://wttr.in/{{ .location }}?format=3'"
    ```
 
-2. **Configure VS Code to use the MCP-CLI adapter** by creating a `.vscode/mcp.json` file in your workspace:
+2. **Configure VS Code to use the MCPShell** by creating a `.vscode/mcp.json` file in your workspace:
 
    ```json
    {
@@ -68,9 +68,9 @@ To use MCP-CLI adapter with Visual Studio Code, follow these steps:
 
 3. **Restart VS Code** or run the **MCP: List Servers** command from the Command Palette to start the server.
 
-## Using Multiple MCP-CLI Adapter Instances
+## Using Multiple MCPShell Instances
 
-You can configure multiple instances of the MCP-CLI adapter,
+You can configure multiple instances of the MCPShell,
 each with different tool configurations:
 
 ```json
@@ -134,7 +134,7 @@ VS Code will prompt for these values when the server starts for the first time a
 
 ## Using the Tools in Agent Mode
 
-After configuring the MCP-CLI adapter:
+After configuring the MCPShell:
 
 1. Open the **Chat** view (⌃⌘I on macOS, Ctrl+Alt+I on Windows/Linux)
 2. Select **Agent** mode from the dropdown
@@ -152,17 +152,17 @@ To manage your MCP servers:
 
 ## Troubleshooting
 
-If you're experiencing issues with the MCP-CLI adapter in VS Code:
+If you're experiencing issues with the MCPShell in VS Code:
 
 1. **Check for error indicators** in the Chat view. Select the error notification and then **Show Output** to view server logs.
 2. **Verify paths**: Ensure all file paths in your configuration are correct.
 3. **Environment variables**: Make sure any required environment variables are properly set.
-4. **Permissions**: Verify that the MCP-CLI adapter binary has execution permissions.
+4. **Permissions**: Verify that the MCPShell binary has execution permissions.
 5. **Connection type**: Ensure the server connection type (`type: "stdio"`) is correctly specified.
 
 ## Security Considerations
 
-When using MCP-CLI adapter with VS Code, be aware of the following security considerations:
+When using MCPShell with VS Code, be aware of the following security considerations:
 
 - The tools you configure have the same system access permissions as VS Code.
 - Be careful with tools that execute shell commands or access sensitive files.

@@ -1,12 +1,12 @@
-# Using the MCP-CLI adapter in Cursor
+# Using the MCPShell in Cursor
 
 ## What is MCP?
 
 The Model Context Protocol (MCP) is an open protocol that standardizes how applications provide context and tools to LLMs. It acts as a plugin system for Cursor, allowing you to extend the AI's capabilities by connecting it to various data sources and tools through standardized interfaces.
 
-The MCP-CLI adapter lets you expose command-line tools to Cursor's AI, enabling it to interact with your system, run commands, and process their output.
+The MCPShell lets you expose command-line tools to Cursor's AI, enabling it to interact with your system, run commands, and process their output.
 
-## Setting Up MCP-CLI Adapter
+## Setting Up MCPShell
 
 ### Step 1: Define your tools in YAML
 
@@ -37,7 +37,7 @@ Cursor supports two configuration locations:
 1. **Project-specific**: Create a `.cursor/mcp.json` file in your project directory
 2. **Global**: Create a `~/.cursor/mcp.json` file in your home directory
 
-The MCP-CLI adapter uses the "stdio" transport type, which runs locally on your machine.
+The MCPShell uses the "stdio" transport type, which runs locally on your machine.
 
 #### If you have the `go` command available
 
@@ -74,9 +74,9 @@ The MCP-CLI adapter uses the "stdio" transport type, which runs locally on your 
 
 After creating or modifying your MCP configuration, reflesh the Cursor client for the changes to take effect.
 
-## Using Multiple MCP-CLI Adapter Instances
+## Using Multiple MCPShell Instances
 
-You can configure multiple instances of the MCP-CLI adapter, each with different tool sets and configurations:
+You can configure multiple instances of the MCPShell, each with different tool sets and configurations:
 
 ```json
 {

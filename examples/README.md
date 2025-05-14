@@ -1,4 +1,4 @@
-# MCP-CLI Adapter examples
+# MCPShell examples
 
 This directory contains some examples of configurations for running
 different tools that can be used by your LLM.

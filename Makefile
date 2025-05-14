@@ -104,7 +104,7 @@ release:
 	echo ">>> Documentation version tags updated successfully"; \
 	echo ">>> Adding and committing documentation changes..."; \
 	git add -u ; \
-	git commit -m "chore: Update documentation version tags to $$TAG"; \
+	git commit -m "Release $$TAG"; \
 	echo ">>> Creating git tag..."; \
 	git tag -a "$$TAG" -m "Version $$TAG"; \
 	echo ">>> Tag '$$TAG' created successfully."; \
