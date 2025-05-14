@@ -20,15 +20,19 @@ var (
 	version = "1.0.0"
 )
 
-// runCommand represents the run command which starts the MCP server
-var runCommand = &cobra.Command{
-	Use:   "run",
-	Short: "Run an MCP server",
-	Long: `Run an MCP server that provides tools to LLM applications.
-This command starts a server that communicates using the Model Context Protocol (MCP).
+// serverCommand represents the run command which starts the MCP server
+var serverCommand = &cobra.Command{
+	Use:     "serve",
+	Aliases: []string{"run"},
+	Short:   "Run the MCP server for a MCP configuration file",
+	Long: `
+Run an MCP server that provides tools to LLM applications.
+This command starts a server that communicates using the Model Context Protocol (MCP)
+and expooses the tools defined in a MCP configuration file.
 
 The server loads tool definitions from a YAML configuration file and makes them
-available to AI applications via the MCP protocol.`,
+available to AI applications via the MCP protocol.
+`,
 	PreRunE: func(cmd *cobra.Command, args []string) error {
 		// Initialize logger
 		level := common.LogLevelFromString(logLevel)
@@ -79,11 +83,11 @@ available to AI applications via the MCP protocol.`,
 // init adds flags to the run command
 func init() {
 	// Add flags for the run command
-	runCommand.Flags().StringVarP(&configFile, "config", "c", "", "Path to the YAML configuration file or URL (required)")
-	runCommand.Flags().StringVarP(&logFile, "logfile", "l", "", "Path to the log file (optional)")
-	runCommand.Flags().StringVarP(&logLevel, "log-level", "", "info", "Log level: none, error, info, debug")
-	runCommand.Flags().StringVarP(&description, "description", "d", "", "Server description (optional)")
+	serverCommand.Flags().StringVarP(&configFile, "config", "c", "", "Path to the YAML configuration file or URL (required)")
+	serverCommand.Flags().StringVarP(&logFile, "logfile", "l", "", "Path to the log file (optional)")
+	serverCommand.Flags().StringVarP(&logLevel, "log-level", "", "info", "Log level: none, error, info, debug")
+	serverCommand.Flags().StringVarP(&description, "description", "d", "", "Server description (optional)")
 
 	// Mark required flags
-	_ = runCommand.MarkFlagRequired("config")
+	_ = serverCommand.MarkFlagRequired("config")
 }

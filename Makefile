@@ -1,4 +1,4 @@
-.PHONY: build clean test run lint lint-golangci format validate-examples docs-update-tags help release
+.PHONY: build clean test run lint lint-golangci format validate-examples docs-update-tags help release test-e2e
 
 # Binary name
 BINARY_NAME=mcpshell
@@ -29,6 +29,13 @@ test:
 	@echo ">>> Running tests..."
 	@go test -v ./...
 	@echo ">>> ... tests completed successfully"
+
+# Run the exe command tests
+test-e2e:
+	@echo ">>> Running exe command tests..."
+	@chmod +x tests/*.sh
+	@tests/run_tests.sh
+	@echo ">>> ... exe command tests completed"
 
 # Run the application
 run:
@@ -111,6 +118,7 @@ help:
 	@echo "  build         - Build the application"
 	@echo "  clean         - Remove build artifacts"
 	@echo "  test          - Run tests"
+	@echo "  test-e2e      - Run end-to-end tests"
 	@echo "  run           - Run the application"
 	@echo "  install       - Install the application"
 	@echo "  lint          - Run linting (alias for lint-golangci)"

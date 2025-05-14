@@ -136,7 +136,7 @@ func (c *Config) GetTools() []Tool {
 
 	for _, toolConfig := range c.MCP.Tools {
 		tool := Tool{
-			MCPTool: createMCPTool(toolConfig),
+			MCPTool: CreateMCPTool(toolConfig),
 			Config:  toolConfig,
 		}
 

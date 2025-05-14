@@ -47,6 +47,9 @@ jobs:
             ./mcpshell validate --config "$file" || exit 1
           done
           echo "All example configurations validated successfully"
+          
+      - name: Run end-to-end tests
+        run: make test-e2e
 
       - name: Run linters
         uses: golangci/golangci-lint-action@v3

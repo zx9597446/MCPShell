@@ -72,7 +72,7 @@ space problems in your hard disk.
                "command": "go",
                "args": [
                   "run", "github.com/inercia/MCPShell@v0.0.9",
-                  "run", "--config", "/my/example.yaml", "--logfile", "/some/path/mcpshell/example.log"
+                  "server", "--config", "/my/example.yaml", "--logfile", "/some/path/mcpshell/example.log"
                ]
            }
        }

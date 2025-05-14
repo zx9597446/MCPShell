@@ -48,7 +48,7 @@ The MCP-CLI adapter uses the "stdio" transport type, which runs locally on your 
             "command": "go",
             "args": [
                 "run", "github.com/inercia/MCPShell@v0.0.9",
-                "run", "--config", "/absolute/path/to/mcp-cli.yaml"
+                "server", "--config", "/absolute/path/to/mcp-cli.yaml"
             ]
         }
     }
@@ -63,7 +63,7 @@ The MCP-CLI adapter uses the "stdio" transport type, which runs locally on your 
         "mcpshell": {
             "command": "/absolute/path/to/mcpshell",
             "args": [
-                "run", "--config", "/absolute/path/to/mcp-cli.yaml"
+                "server", "--config", "/absolute/path/to/mcp-cli.yaml"
             ]
         }
     }
@@ -84,7 +84,7 @@ You can configure multiple instances of the MCP-CLI adapter, each with different
         "mcp-cli-examples": {
             "command": "/some/path/mcpshell/build/mcpshell",
             "args": [
-                "run",
+                "server",
                 "--config", "/some/path/mcpshell/examples/config.yaml",
                 "--logfile", "/some/path/mcpshell/debug.log"
             ],
@@ -94,7 +94,7 @@ You can configure multiple instances of the MCP-CLI adapter, each with different
         "mcp-cli-kubernetes-ro": {
             "command": "/some/path/mcpshell/build/mcpshell",
             "args": [
-                "run",
+                "server",
                 "--config", "/some/path/mcpshell/examples/kubectl-ro.yaml",
                 "--logfile", "/some/path/mcpshell/debug.kubernetes-ro.log"
             ],
@@ -120,7 +120,7 @@ You can provide authentication credentials and other sensitive information using
         "mcpshell": {
             "command": "/absolute/path/to/mcpshell",
             "args": [
-                "run", "--config", "/absolute/path/to/mcp-cli.yaml"
+                "server", "--config", "/absolute/path/to/mcp-cli.yaml"
             ],
             "env": {
                 "API_KEY": "your-api-key-here",

@@ -44,14 +44,14 @@ func (t *Tool) checkToolRequirements() bool {
 	return true
 }
 
-// createMCPTool creates an MCP tool from a tool configuration.
+// CreateMCPTool creates an MCP tool from a tool configuration.
 //
 // Parameters:
 //   - config: The tool configuration from which to create the MCP tool
 //
 // Returns:
 //   - An mcp.Tool object ready to be registered with the MCP server
-func createMCPTool(config ToolConfig) mcp.Tool {
+func CreateMCPTool(config ToolConfig) mcp.Tool {
 	var options []mcp.ToolOption
 
 	// Add description

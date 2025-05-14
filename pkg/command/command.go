@@ -10,7 +10,6 @@ import (
 	"fmt"
 	"log"
 	"os"
-	"strings"
 
 	"github.com/mark3labs/mcp-go/mcp"
 
@@ -103,118 +102,19 @@ func NewCommandHandler(tool config.Tool, params map[string]common.ParamConfig, s
 //   - A function that handles MCP tool calls
 func (h *CommandHandler) GetMCPHandler() func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	return func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		// Log the tool execution
-		h.logger.Printf("Tool execution requested for '%s'", h.toolName)
-		h.logger.Printf("Arguments: %v", request.Params.Arguments)
-
-		// Validate constraints before executing command
-		if h.constraintsCompiled != nil {
-			h.logger.Printf("Checking %d constraints", len(h.constraints))
-			satisfied, failedConstraints, err := h.constraintsCompiled.Evaluate(request.Params.Arguments, h.params)
-			if err != nil {
-				h.logger.Printf("Error evaluating constraints: %v", err)
-				return mcp.NewToolResultError(fmt.Sprintf("error evaluating constraints: %v", err)), nil
-			}
-			if !satisfied {
-				h.logger.Printf("Constraints not satisfied, blocking execution")
-				errorMsg := "command execution blocked by constraints"
-
-				// Add details about which constraints failed
-				if len(failedConstraints) > 0 {
-					errorMsg += ":\n"
-					for i, fc := range failedConstraints {
-						errorMsg += fmt.Sprintf("- Constraint %d: %s", i+1, fc)
-						if i < len(failedConstraints)-1 {
-							errorMsg += "\n"
-						}
-					}
-				}
-
-				return mcp.NewToolResultError(errorMsg), nil
-			}
-			h.logger.Printf("All constraints satisfied")
+		// Extract runner options if present
+		var runnerOpts map[string]interface{}
+		if opts, ok := request.Params.Arguments["options"].(map[string]interface{}); ok {
+			runnerOpts = opts
 		}
 
-		// Process the command template with the tool arguments
-		h.logger.Printf("Processing command template: %s", h.cmd)
-
-		cmd, err := common.ProcessTemplate(h.cmd, request.Params.Arguments)
+		// Execute the command using the common implementation
+		output, err, _ := h.executeToolCommand(ctx, request.Params.Arguments, runnerOpts)
 		if err != nil {
-			h.logger.Printf("Error processing command template: %v", err)
-			return mcp.NewToolResultError(fmt.Sprintf("error processing command template: %v", err)), nil
-		}
-
-		h.logger.Printf("Processed command: %s", cmd)
-
-		// Prepare environment variables
-		env := h.getEnvironmentVariables()
-
-		h.logger.Printf("Executing command: %s", cmd)
-
-		// Determine which runner to use based on the configuration
-		runnerType := RunnerTypeExec // default runner
-		if h.runnerType != "" {
-			h.logger.Printf("Using configured runner type: %s", h.runnerType)
-			switch h.runnerType {
-			case string(RunnerTypeExec):
-				runnerType = RunnerTypeExec
-			case string(RunnerTypeSandboxExec):
-				runnerType = RunnerTypeSandboxExec
-			default:
-				h.logger.Printf("Unknown runner type '%s', falling back to default runner", h.runnerType)
-			}
-		}
-
-		// Start with the configured runner options from the tool definition
-		runnerOptions := RunnerOptions{}
-		for k, v := range h.runnerOpts {
-			runnerOptions[k] = v
-		}
-
-		// Add or override with any options from the request parameters if present
-		if runnerOpts, ok := request.Params.Arguments["options"].(map[string]interface{}); ok {
-			h.logger.Printf("Found runner options in request parameters: %v", runnerOpts)
-			for k, v := range runnerOpts {
-				runnerOptions[k] = v
-			}
-		}
-
-		// Create the appropriate runner with options
-		runner, err := NewRunner(runnerType, runnerOptions, h.logger)
-		if err != nil {
-			h.logger.Printf("Error creating runner: %v", err)
-			return mcp.NewToolResultError(fmt.Sprintf("error creating runner: %v", err)), nil
-		}
-
-		// Execute the command
-		commandOutput, err := runner.Run(ctx, h.shell, cmd, []string{}, env, request.Params.Arguments)
-		if err != nil {
-			h.logger.Printf("Error executing command: %v", err)
 			return mcp.NewToolResultError(err.Error()), nil
 		}
 
-		// Process the output
-		finalOutput := commandOutput
-		h.logger.Printf("Command output: %s", finalOutput)
-
-		// Apply prefix if provided
-		if h.output.Prefix != "" {
-			h.logger.Printf("Applying output prefix template: %s", h.output.Prefix)
-
-			// Process the prefix template with the tool arguments
-			prefix, err := common.ProcessTemplate(h.output.Prefix, request.Params.Arguments)
-			if err != nil {
-				h.logger.Printf("Error processing output prefix template: %v", err)
-				return mcp.NewToolResultError(fmt.Sprintf("error processing output prefix template: %v", err)), nil
-			}
-
-			// Combine prefix and command output
-			finalOutput = strings.TrimSpace(prefix) + "\n\n" + finalOutput
-			h.logger.Printf("Final output with prefix: %s", finalOutput)
-		}
-
-		h.logger.Printf("Tool execution completed successfully")
-		return mcp.NewToolResultText(finalOutput), nil
+		return mcp.NewToolResultText(output), nil
 	}
 }
 
