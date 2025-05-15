@@ -50,7 +50,7 @@ func TestRunnerFirejailRun(t *testing.T) {
 	ctx := context.Background()
 
 	// Test simple echo command
-	output, err := runner.Run(ctx, "/bin/sh", "echo", []string{"hello world"}, nil, nil)
+	output, err := runner.Run(ctx, "/bin/sh", "echo hello world", nil, nil, false) // No need for tmpfile here
 	if err != nil {
 		t.Fatalf("Failed to run command: %v", err)
 	}
@@ -85,7 +85,7 @@ func TestRunnerFirejailNetworkRestriction(t *testing.T) {
 
 	// This might succeed or fail depending on network connectivity,
 	// but it should not be blocked by firejail
-	_, _ = runnerEnabled.Run(ctx, "/bin/sh", "ping", []string{"-c", "1", "127.0.0.1"}, nil, nil)
+	_, _ = runnerEnabled.Run(ctx, "/bin/sh", "ping -c 1 127.0.0.1", nil, nil, false) // No need for tmpfile here
 
 	// Test with networking disabled
 	networkDisabledOptions := RunnerOptions{
@@ -99,5 +99,5 @@ func TestRunnerFirejailNetworkRestriction(t *testing.T) {
 
 	// This should fail or timeout due to network restrictions
 	// Note: We're not asserting the exact behavior as it might vary based on firejail version
-	_, _ = runnerDisabled.Run(ctx, "/bin/sh", "ping", []string{"-c", "1", "127.0.0.1"}, nil, nil)
+	_, _ = runnerDisabled.Run(ctx, "/bin/sh", "ping -c 1 127.0.0.1", nil, nil, false) // No need for tmpfile here
 }

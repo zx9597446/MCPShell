@@ -210,6 +210,9 @@ mcp:
         format:
           type: string
           description: "Output format: 'full' (default), 'network', 'mounts', 'env', or 'config'"
+        jq_filter:
+          type: string
+          description: "JQ filter to apply to the output"
       constraints:
         - "container.matches('^[a-zA-Z0-9_.-]+$')"                      # Safe container name/ID chars
         - "container.size() <= 64"                                       # Max container ID length
@@ -241,21 +244,21 @@ mcp:
           case "$FORMAT" in
             "network")
               echo -e "\nNetwork Configuration:"
-              docker inspect --format '{{json .NetworkSettings}}' {{ .container }} | jq
+              docker inspect --format '{{json .NetworkSettings}}' {{ .container }} | jq '{{ .jq_filter }}'
               
               echo -e "\nNetwork Mode:"
               docker inspect --format '{{.HostConfig.NetworkMode}}' {{ .container }}
               
               echo -e "\nPorts:"
-              docker inspect --format '{{json .NetworkSettings.Ports}}' {{ .container }} | jq
+              docker inspect --format '{{json .NetworkSettings.Ports}}' {{ .container }} | jq '{{ .jq_filter }}'
               ;;
               
             "mounts")
               echo -e "\nVolumes and Mounts:"
-              docker inspect --format '{{json .Mounts}}' {{ .container }} | jq
+              docker inspect --format '{{json .Mounts}}' {{ .container }} | jq '{{ .jq_filter }}'
               
               echo -e "\nVolume Configuration:"
-              docker inspect --format '{{json .Config.Volumes}}' {{ .container }} | jq
+              docker inspect --format '{{json .Config.Volumes}}' {{ .container }} | jq '{{ .jq_filter }}'
               ;;
               
             "env")
@@ -265,12 +268,12 @@ mcp:
               
             "config")
               echo -e "\nContainer Configuration:"
-              docker inspect --format '{{json .Config}}' {{ .container }} | jq
+              docker inspect --format '{{json .Config}}' {{ .container }} | jq '{{ .jq_filter }}'
               ;;
               
             "full"|*)
               echo -e "\nFull Container Inspection (may be lengthy):"
-              docker inspect {{ .container }} | jq
+              docker inspect {{ .container }} | jq '{{ .jq_filter }}'
               ;;
           esac
       output:

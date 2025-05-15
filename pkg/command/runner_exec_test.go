@@ -74,7 +74,6 @@ func TestRunnerExec_Run(t *testing.T) {
 		name    string
 		shell   string
 		command string
-		args    []string
 		env     []string
 		params  map[string]interface{}
 		want    string
@@ -83,8 +82,7 @@ func TestRunnerExec_Run(t *testing.T) {
 		{
 			name:    "simple echo command",
 			shell:   "",
-			command: "echo",
-			args:    []string{"hello", "world"},
+			command: "echo hello world",
 			env:     nil,
 			params:  nil,
 			want:    "hello world",
@@ -93,21 +91,19 @@ func TestRunnerExec_Run(t *testing.T) {
 		{
 			name:    "command with special characters",
 			shell:   "",
-			command: "echo",
-			args:    []string{"hello", "world", "with", "special", "chars:", "$PATH", ">&", "!"},
+			command: "echo 'hello world with special chars: >& !'",
 			env:     nil,
 			params:  nil,
-			want:    "hello world with special chars: $PATH >& !",
+			want:    "hello world with special chars: >& !",
 			wantErr: false,
 		},
 		{
 			name:    "command with environment variable",
 			shell:   "",
-			command: "echo",
-			args:    []string{"$TEST_VAR"},
+			command: "echo $TEST_VAR",
 			env:     []string{"TEST_VAR=test_value"},
 			params:  nil,
-			want:    "$TEST_VAR",
+			want:    "test_value",
 			wantErr: false,
 		},
 	}
@@ -120,7 +116,7 @@ func TestRunnerExec_Run(t *testing.T) {
 				t.Fatalf("Failed to create RunnerExec: %v", err)
 			}
 
-			got, err := r.Run(context.Background(), tt.shell, tt.command, tt.args, tt.env, tt.params)
+			got, err := r.Run(context.Background(), tt.shell, tt.command, tt.env, tt.params, true)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("RunnerExec.Run() error = %v, wantErr %v", err, tt.wantErr)
 				return
@@ -149,10 +145,10 @@ func TestRunnerExec_RunWithEnvExpansion(t *testing.T) {
 	output, err := r.Run(
 		context.Background(),
 		"",
-		"/bin/sh",
-		[]string{"-c", "echo $TEST_VAR"},
+		"echo $TEST_VAR",
 		[]string{"TEST_VAR=test_value_expanded"},
 		nil,
+		false, // No tmpfile needed for this test
 	)
 
 	if err != nil {

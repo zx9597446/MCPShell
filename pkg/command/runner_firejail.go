@@ -5,9 +5,11 @@ import (
 	"context"
 	_ "embed"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log"
 	"os"
+	"os/exec"
 	"strings"
 	"text/template"
 
@@ -19,7 +21,6 @@ var firejailProfileTemplate string
 
 // RunnerFirejail implements the Runner interface using firejail on Linux
 type RunnerFirejail struct {
-	execRunner *RunnerExec
 	logger     *log.Logger
 	profileTpl *template.Template
 	options    RunnerFirejailOptions
@@ -60,11 +61,6 @@ func NewRunnerFirejail(options RunnerOptions, logger *log.Logger) (*RunnerFireja
 		return nil, err
 	}
 
-	execRunner, err := NewRunnerExec(options, logger)
-	if err != nil {
-		return nil, err
-	}
-
 	// Parse firejail-specific options
 	firejailOpts, err := NewRunnerFirejailOptions(options)
 	if err != nil {
@@ -73,7 +69,6 @@ func NewRunnerFirejail(options RunnerOptions, logger *log.Logger) (*RunnerFireja
 	}
 
 	return &RunnerFirejail{
-		execRunner: execRunner,
 		logger:     logger,
 		profileTpl: profileTpl,
 		options:    firejailOpts,
@@ -82,12 +77,14 @@ func NewRunnerFirejail(options RunnerOptions, logger *log.Logger) (*RunnerFireja
 
 // Run executes a command inside the firejail sandbox and returns the output
 // It implements the Runner interface
-func (r *RunnerFirejail) Run(ctx context.Context, shell string, command string, args []string, env []string, params map[string]interface{}) (string, error) {
+//
+// note: tmpfile is ignored for firejail because it's not supported
+func (r *RunnerFirejail) Run(ctx context.Context,
+	shell string, command string,
+	env []string, params map[string]interface{}, tmpfile bool,
+) (string, error) {
 	// Combine command and args
 	fullCmd := command
-	if len(args) > 0 {
-		fullCmd += " " + strings.Join(args, " ")
-	}
 
 	// Check if context is done
 	select {
@@ -146,10 +143,116 @@ func (r *RunnerFirejail) Run(ctx context.Context, shell string, command string, 
 		return "", fmt.Errorf("failed to sync profile file: %w", err)
 	}
 
+	// we always create a temporary file in the firejail environment
+	// because the command might be executed with a different shell
+	// and we need to ensure it's executable
+	tmpFile, err := os.CreateTemp("", "firejail-command-*.sh")
+	if err != nil {
+		r.logger.Printf("Failed to create temporary command file: %v", err)
+		return "", fmt.Errorf("failed to create temporary command file: %w", err)
+	}
+	defer os.Remove(tmpFile.Name())
+
+	// write the command to the temporary file
+	if _, err := tmpFile.WriteString(fullCmd); err != nil {
+		r.logger.Printf("Failed to write command to temporary file: %v", err)
+		return "", fmt.Errorf("failed to write command to temporary file: %w", err)
+	}
+
+	// make the temporary file executable
+	if err := os.Chmod(tmpFile.Name(), 0o700); err != nil {
+		r.logger.Printf("Failed to make temporary file executable: %v", err)
+		return "", fmt.Errorf("failed to make temporary file executable: %w", err)
+	}
+
 	// Create the firejail command using --profile flag for file-based profile
-	firejailCmd := fmt.Sprintf("firejail --profile=%s %s", profileFile.Name(), fullCmd)
+	firejailCmd := fmt.Sprintf("firejail --profile=%s %s", profileFile.Name(), tmpFile.Name())
 	r.logger.Printf("Created firejail command: %s", firejailCmd)
 
-	// Execute the command using the embedded RunnerExec
-	return r.execRunner.Run(ctx, shell, firejailCmd, []string{}, env, params)
+	// create a temporary file for the command
+	tmpScript, err := os.CreateTemp("", "sandbox-script-*.sh")
+	if err != nil {
+		r.logger.Printf("Failed to create temporary command file: %v", err)
+		return "", fmt.Errorf("failed to create temporary command file: %w", err)
+	}
+	// Ensure temporary file is deleted when this function exits
+	defer func() {
+		tmpScriptPath := tmpScript.Name()
+		if err := tmpScript.Close(); err != nil {
+			r.logger.Printf("Warning: failed to close profile file: %v", err)
+		}
+		if err := os.Remove(tmpScriptPath); err != nil {
+			r.logger.Printf("Warning: failed to remove temporary profile file: %v", err)
+		}
+	}()
+
+	// write the command to the temporary file
+	// we always create a temporary file in the sandboxed environment
+	if _, err := tmpScript.WriteString(fullCmd); err != nil {
+		r.logger.Printf("Failed to write command to temporary file: %v", err)
+		return "", fmt.Errorf("failed to write command to temporary file: %w", err)
+	}
+
+	// Flush data to ensure it's written to disk
+	if err := tmpScript.Sync(); err != nil {
+		r.logger.Printf("Failed to sync script file: %v", err)
+		return "", fmt.Errorf("failed to sync script file: %w", err)
+	}
+
+	// make the temporary file executable
+	if err := os.Chmod(tmpScript.Name(), 0o700); err != nil {
+		r.logger.Printf("Failed to make temporary file executable: %v", err)
+		return "", fmt.Errorf("failed to make temporary file executable: %w", err)
+	}
+
+	// Check if context is done
+	select {
+	case <-ctx.Done():
+		return "", ctx.Err()
+	default:
+		// Continue execution
+	}
+
+	// Execute the command directly without a temporary file
+	execCmd := exec.Command("firejail", "--profile="+profileFile.Name(), tmpFile.Name())
+	r.logger.Printf("Created command: %s", execCmd.String())
+
+	// Set environment variables if provided
+	if len(env) > 0 {
+		r.logger.Printf("Adding %d environment variables to command", len(env))
+		for _, e := range env {
+			r.logger.Printf("... adding environment variable: %s", e)
+		}
+		execCmd.Env = append(os.Environ(), env...)
+	}
+
+	// Capture output
+	var stdout, stderr bytes.Buffer
+	execCmd.Stdout = &stdout
+	execCmd.Stderr = &stderr
+
+	// Run the command
+	r.logger.Printf("Executing command")
+
+	if err := execCmd.Run(); err != nil {
+		// If there's error output, include it in the error
+		if stderr.Len() > 0 {
+			errMsg := strings.TrimSpace(stderr.String())
+			r.logger.Printf("Command failed with stderr: %s", errMsg)
+			return "", errors.New(errMsg)
+		}
+		r.logger.Printf("Command failed with error: %v", err)
+		return "", err
+	}
+
+	// Get the output
+	outputStr := strings.TrimSpace(stdout.String())
+
+	r.logger.Printf("Command executed successfully, output length: %d bytes", len(outputStr))
+	if stderr.Len() > 0 {
+		r.logger.Printf("Command generated stderr (but no error): %s", strings.TrimSpace(stderr.String()))
+	}
+
+	// Return the stdout output
+	return outputStr, nil
 }

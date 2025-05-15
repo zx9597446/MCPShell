@@ -5,9 +5,11 @@ import (
 	"context"
 	_ "embed"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log"
 	"os"
+	"os/exec"
 	"strings"
 	"text/template"
 
@@ -19,7 +21,6 @@ var sandboxProfileTemplate string
 
 // RunnerSandboxExec implements the Runner interface using macOS sandbox-exec
 type RunnerSandboxExec struct {
-	execRunner *RunnerExec
 	logger     *log.Logger
 	profileTpl *template.Template
 	options    RunnerSandboxExecOptions
@@ -60,11 +61,6 @@ func NewRunnerSandboxExec(options RunnerOptions, logger *log.Logger) (*RunnerSan
 		return nil, err
 	}
 
-	execRunner, err := NewRunnerExec(options, logger)
-	if err != nil {
-		return nil, err
-	}
-
 	// Parse sandbox-specific options
 	sandboxOpts, err := NewRunnerSandboxExecOptions(options)
 	if err != nil {
@@ -73,7 +69,6 @@ func NewRunnerSandboxExec(options RunnerOptions, logger *log.Logger) (*RunnerSan
 	}
 
 	return &RunnerSandboxExec{
-		execRunner: execRunner,
 		logger:     logger,
 		profileTpl: profileTpl,
 		options:    sandboxOpts,
@@ -82,12 +77,11 @@ func NewRunnerSandboxExec(options RunnerOptions, logger *log.Logger) (*RunnerSan
 
 // Run executes a command inside the macOS sandbox and returns the output
 // It implements the Runner interface
-func (r *RunnerSandboxExec) Run(ctx context.Context, shell string, command string, args []string, env []string, params map[string]interface{}) (string, error) {
+//
+// note: tmpfile is ignored for sandbox because it's not supported
+func (r *RunnerSandboxExec) Run(ctx context.Context, shell string, command string, env []string, params map[string]interface{}, tmpfile bool) (string, error) {
 	// Combine command and args
 	fullCmd := command
-	if len(args) > 0 {
-		fullCmd += " " + strings.Join(args, " ")
-	}
 
 	// Check if context is done
 	select {
@@ -146,10 +140,90 @@ func (r *RunnerSandboxExec) Run(ctx context.Context, shell string, command strin
 		return "", fmt.Errorf("failed to sync profile file: %w", err)
 	}
 
-	// Create the sandboxed command using -f flag for file-based profile
-	sandboxCmd := fmt.Sprintf("sandbox-exec -f %s %s", profileFile.Name(), fullCmd)
-	r.logger.Printf("Created sandboxed command: %s", sandboxCmd)
+	// create a temporary file for the command
+	tmpScript, err := os.CreateTemp("", "sandbox-script-*.sh")
+	if err != nil {
+		r.logger.Printf("Failed to create temporary command file: %v", err)
+		return "", fmt.Errorf("failed to create temporary command file: %w", err)
+	}
+	// Ensure temporary file is deleted when this function exits
+	defer func() {
+		tmpScriptPath := tmpScript.Name()
+		if err := tmpScript.Close(); err != nil {
+			r.logger.Printf("Warning: failed to close profile file: %v", err)
+		}
+		if err := os.Remove(tmpScriptPath); err != nil {
+			r.logger.Printf("Warning: failed to remove temporary profile file: %v", err)
+		}
+	}()
 
-	// Execute the command using the embedded RunnerExec
-	return r.execRunner.Run(ctx, shell, sandboxCmd, []string{}, env, params)
+	// write the command to the temporary file
+	// we always create a temporary file in the sandboxed environment
+	if _, err := tmpScript.WriteString(fullCmd); err != nil {
+		r.logger.Printf("Failed to write command to temporary file: %v", err)
+		return "", fmt.Errorf("failed to write command to temporary file: %w", err)
+	}
+
+	// Flush data to ensure it's written to disk
+	if err := tmpScript.Sync(); err != nil {
+		r.logger.Printf("Failed to sync script file: %v", err)
+		return "", fmt.Errorf("failed to sync script file: %w", err)
+	}
+
+	// make the temporary file executable
+	if err := os.Chmod(tmpScript.Name(), 0o700); err != nil {
+		r.logger.Printf("Failed to make temporary file executable: %v", err)
+		return "", fmt.Errorf("failed to make temporary file executable: %w", err)
+	}
+
+	// Check if context is done
+	select {
+	case <-ctx.Done():
+		return "", ctx.Err()
+	default:
+		// Continue execution
+	}
+
+	// Execute the command directly without a temporary file
+	execCmd := exec.Command("sandbox-exec", "-f", profileFile.Name(), tmpScript.Name())
+	r.logger.Printf("Created command: %s", execCmd.String())
+
+	// Set environment variables if provided
+	if len(env) > 0 {
+		r.logger.Printf("Adding %d environment variables to command", len(env))
+		for _, e := range env {
+			r.logger.Printf("... adding environment variable: %s", e)
+		}
+		execCmd.Env = append(os.Environ(), env...)
+	}
+
+	// Capture output
+	var stdout, stderr bytes.Buffer
+	execCmd.Stdout = &stdout
+	execCmd.Stderr = &stderr
+
+	// Run the command
+	r.logger.Printf("Executing command")
+
+	if err := execCmd.Run(); err != nil {
+		// If there's error output, include it in the error
+		if stderr.Len() > 0 {
+			errMsg := strings.TrimSpace(stderr.String())
+			r.logger.Printf("Command failed with stderr: %s", errMsg)
+			return "", errors.New(errMsg)
+		}
+		r.logger.Printf("Command failed with error: %v", err)
+		return "", err
+	}
+
+	// Get the output
+	outputStr := strings.TrimSpace(stdout.String())
+
+	r.logger.Printf("Command executed successfully, output length: %d bytes", len(outputStr))
+	if stderr.Len() > 0 {
+		r.logger.Printf("Command generated stderr (but no error): %s", strings.TrimSpace(stderr.String()))
+	}
+
+	// Return the stdout output
+	return outputStr, nil
 }

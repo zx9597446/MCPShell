@@ -313,11 +313,11 @@ func (a *Agent) Run(ctx context.Context, userInput chan string, agentOutput chan
 		if a.config.Once {
 			a.logger.Info("One-shot mode enabled, ending after first interaction")
 			agentOutput <- "One-shot mode: Completed."
-			
+
 			// Since we skipped creating the stdin reader goroutine in cmd/agent.go,
 			// we need to close the userInput channel here in one-shot mode
 			close(userInput)
-			
+
 			return nil
 		}
 

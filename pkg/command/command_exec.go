@@ -57,7 +57,7 @@ func (h *CommandHandler) executeToolCommand(ctx context.Context, params map[stri
 	}
 
 	// Process the command template with the tool arguments
-	h.logger.Printf("Processing command template:\n%s", h.cmd)
+	// h.logger.Printf("Processing command template:\n%s", h.cmd)
 
 	cmd, err := common.ProcessTemplate(h.cmd, params)
 	if err != nil {
@@ -65,12 +65,15 @@ func (h *CommandHandler) executeToolCommand(ctx context.Context, params map[stri
 		return "", nil, fmt.Errorf("error processing command template: %v", err)
 	}
 
-	h.logger.Printf("Processed command: %s", cmd)
+	// h.logger.Printf("Processed command: %s", cmd)
 
 	// Prepare environment variables
 	env := h.getEnvironmentVariables()
 
-	h.logger.Printf("Executing command: %s", cmd)
+	h.logger.Printf("Executing command:")
+	h.logger.Printf("------------------------------------------------------")
+	h.logger.Printf("\n%s\n", cmd)
+	h.logger.Printf("------------------------------------------------------")
 
 	// Determine which runner to use based on the configuration
 	runnerType := RunnerTypeExec // default runner
@@ -110,7 +113,7 @@ func (h *CommandHandler) executeToolCommand(ctx context.Context, params map[stri
 	}
 
 	// Execute the command
-	commandOutput, err := runner.Run(ctx, h.shell, cmd, []string{}, env, params)
+	commandOutput, err := runner.Run(ctx, h.shell, cmd, env, params, true)
 	if err != nil {
 		h.logger.Printf("Error executing command: %v", err)
 		return "", nil, err

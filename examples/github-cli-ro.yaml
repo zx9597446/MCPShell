@@ -31,11 +31,11 @@ mcp:
         env:
           - GITHUB_TOKEN
         command: |
-          if [ -n "{{ .jq_filter }}" ]; then
-            gh repo view "{{ .repo }}" --json name,description,homepageUrl,url,defaultBranchRef,isPrivate,forkCount,stargazerCount,owner | jq '{{ .jq_filter }}'
-          else
-            gh repo view "{{ .repo }}"
-          fi
+          {{ if .jq_filter }}
+          gh repo view "{{ .repo }}" --json name,description,homepageUrl,url,defaultBranchRef,isPrivate,forkCount,stargazerCount,owner | jq '{{ .jq_filter }}'
+          {{ else }}
+          gh repo view "{{ .repo }}"
+          {{ end }}
       output:
         prefix: "Repository information for {{ .repo }}:"
 
@@ -78,21 +78,11 @@ mcp:
           - GITHUB_TOKEN
         command: |
           ARGS=""
-          if [ -n "{{ .state }}" ]; then
-            ARGS="$ARGS --state {{ .state }}"
-          fi
-          if [ {{ .limit }} -gt 0 ]; then
-            ARGS="$ARGS --limit {{ .limit }}"
-          fi
-          if [ -n "{{ .label }}" ]; then
-            ARGS="$ARGS --label {{ .label }}"
-          fi
-          if [ -n "{{ .author }}" ]; then
-            ARGS="$ARGS --author {{ .author }}"
-          fi
-          if [ -n "{{ .assignee }}" ]; then
-            ARGS="$ARGS --assignee {{ .assignee }}"
-          fi
+          ARGS="$ARGS {{ if .state }}--state {{ .state }}{{ end }}"
+          ARGS="$ARGS {{ if .limit }}--limit {{ .limit }}{{ end }}"
+          ARGS="$ARGS {{ if .label }}--label {{ .label }}{{ end }}"
+          ARGS="$ARGS {{ if .author }}--author {{ .author }}{{ end }}"
+          ARGS="$ARGS {{ if .assignee }}--assignee {{ .assignee }}{{ end }}"
           
           gh issue list --repo "{{ .repo }}" $ARGS
       output:
@@ -125,9 +115,7 @@ mcp:
           - GITHUB_TOKEN
         command: |
           ARGS=""
-          if [ "{{ .comments }}" = "true" ]; then
-            ARGS="$ARGS --comments"
-          fi
+          ARGS="$ARGS {{ if .comments }}--comments{{ end }}"
           
           gh issue view {{ .issue_number }} --repo "{{ .repo }}" $ARGS
       output:
@@ -180,24 +168,12 @@ mcp:
           - GITHUB_TOKEN
         command: |
           ARGS=""
-          if [ -n "{{ .state }}" ]; then
-            ARGS="$ARGS --state {{ .state }}"
-          fi
-          if [ {{ .limit }} -gt 0 ]; then
-            ARGS="$ARGS --limit {{ .limit }}"
-          fi
-          if [ -n "{{ .label }}" ]; then
-            ARGS="$ARGS --label {{ .label }}"
-          fi
-          if [ -n "{{ .author }}" ]; then
-            ARGS="$ARGS --author {{ .author }}"
-          fi
-          if [ -n "{{ .assignee }}" ]; then
-            ARGS="$ARGS --assignee {{ .assignee }}"
-          fi
-          if [ -n "{{ .base }}" ]; then
-            ARGS="$ARGS --base {{ .base }}"
-          fi
+          ARGS="$ARGS {{ if .state }}--state {{ .state }}{{ end }}"
+          ARGS="$ARGS {{ if .limit }}--limit {{ .limit }}{{ end }}"
+          ARGS="$ARGS {{ if .label }}--label {{ .label }}{{ end }}"
+          ARGS="$ARGS {{ if .author }}--author {{ .author }}{{ end }}"
+          ARGS="$ARGS {{ if .assignee }}--assignee {{ .assignee }}{{ end }}"
+          ARGS="$ARGS {{ if .base }}--base {{ .base }}{{ end }}"
           
           gh pr list --repo "{{ .repo }}" $ARGS
       output:
@@ -330,15 +306,9 @@ mcp:
           - GITHUB_TOKEN
         command: |
           ARGS=""
-          if [ {{ .limit }} -gt 0 ]; then
-            ARGS="$ARGS --limit {{ .limit }}"
-          fi
-          if [ -n "{{ .visibility }}" ]; then
-            ARGS="$ARGS --visibility {{ .visibility }}"
-          fi
-          if [ -n "{{ .language }}" ]; then
-            ARGS="$ARGS --language {{ .language }}"
-          fi
+          ARGS="$ARGS {{ if .limit }}--limit {{ .limit }}{{ end }}"
+          ARGS="$ARGS {{ if .visibility }}--visibility {{ .visibility }}{{ end }}"
+          ARGS="$ARGS {{ if .language }}--language {{ .language }}{{ end }}"
           
           gh repo list {{ .owner }} $ARGS
       output:
@@ -419,18 +389,10 @@ mcp:
           - GITHUB_TOKEN
         command: |
           ARGS=""
-          if [ {{ .limit }} -gt 0 ]; then
-            ARGS="$ARGS --limit {{ .limit }}"
-          fi
-          if [ -n "{{ .sort }}" ]; then
-            ARGS="$ARGS --sort {{ .sort }}"
-          fi
-          if [ -n "{{ .order }}" ]; then
-            ARGS="$ARGS --order {{ .order }}"
-          fi
-          if [ "{{ .web }}" = "true" ]; then
-            ARGS="$ARGS --web"
-          fi
+          ARGS="$ARGS {{ if .limit }}--limit {{ .limit }}{{ end }}"
+          ARGS="$ARGS {{ if .sort }}--sort {{ .sort }}{{ end }}"
+          ARGS="$ARGS {{ if .order }}--order {{ .order }}{{ end }}"
+          ARGS="$ARGS {{ if .web }}--web{{ end }}"
           
           gh search issues "{{ .query }}" $ARGS
       output:
@@ -462,18 +424,10 @@ mcp:
           - GITHUB_TOKEN
         command: |
           ARGS=""
-          if [ {{ .limit }} -gt 0 ]; then
-            ARGS="$ARGS --limit {{ .limit }}"
-          fi
-          if [ -n "{{ .visibility }}" ]; then
-            ARGS="$ARGS --visibility {{ .visibility }}"
-          fi
+          ARGS="$ARGS {{ if .limit }}--limit {{ .limit }}{{ end }}"
+          ARGS="$ARGS {{ if .visibility }}--visibility {{ .visibility }}{{ end }}"
           
-          if [ -n "{{ .username }}" ]; then
-            gh gist list --user {{ .username }} $ARGS
-          else
-            gh gist list $ARGS
-          fi
+          gh gist list {{ if .username }}--user {{ .username }}{{ end }} $ARGS
       output:
         prefix: "{{ if .username }}Gists for user {{ .username }}{{ else }}Your gists{{ end }}:"
 
@@ -564,18 +518,10 @@ mcp:
           - GITHUB_TOKEN
         command: |
           ARGS=""
-          if [ -n "{{ .workflow }}" ]; then
-            ARGS="$ARGS --workflow {{ .workflow }}"
-          fi
-          if [ -n "{{ .status }}" ]; then
-            ARGS="$ARGS --status {{ .status }}"
-          fi
-          if [ {{ .limit }} -gt 0 ]; then
-            ARGS="$ARGS --limit {{ .limit }}"
-          fi
-          if [ -n "{{ .branch }}" ]; then
-            ARGS="$ARGS --branch {{ .branch }}"
-          fi
+          ARGS="$ARGS {{ if .workflow }}--workflow {{ .workflow }}{{ end }}"
+          ARGS="$ARGS {{ if .status }}--status {{ .status }}{{ end }}"
+          ARGS="$ARGS {{ if .limit }}--limit {{ .limit }}{{ end }}"
+          ARGS="$ARGS {{ if .branch }}--branch {{ .branch }}{{ end }}"
           
           gh run list --repo "{{ .repo }}" $ARGS
       output:

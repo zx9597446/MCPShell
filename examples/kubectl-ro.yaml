@@ -358,9 +358,9 @@ mcp:
           # nmap -sT -p $localport localhost    # This would show that the port is open
 
           {{ if .filter_jq }}
-          curl $CURL_ARGS "http://localhost:$localport{{ .path }}" | jq "{{ .filter_jq }}"
+          curl $CURL_ARGS "http://localhost:$localport{{ .path }}" | jq '{{ .filter_jq }}'
           {{ else if .filter_grep }}
-          curl $CURL_ARGS "http://localhost:$localport{{ .path }}" | grep "{{ .filter_grep }}"
+          curl $CURL_ARGS "http://localhost:$localport{{ .path }}" | grep '{{ .filter_grep }}'
           {{ else }}
           curl $CURL_ARGS "http://localhost:$localport{{ .path }}"
           {{ end }}
@@ -480,9 +480,9 @@ mcp:
           # nmap -sT -p $localport localhost    # This would show that the port is open
 
           {{ if .filter_jq }}
-          curl $CURL_ARGS "http://localhost:$localport{{ .path }}" | jq "{{ .filter_jq }}"
+          curl $CURL_ARGS "http://localhost:$localport{{ .path }}" | jq '{{ .filter_jq }}'
           {{ else if .filter_grep }}
-          curl $CURL_ARGS "http://localhost:$localport{{ .path }}" | grep "{{ .filter_grep }}"
+          curl $CURL_ARGS "http://localhost:$localport{{ .path }}" | grep '{{ .filter_grep }}'
           {{ else }}
           curl $CURL_ARGS "http://localhost:$localport{{ .path }}"
           {{ end }}

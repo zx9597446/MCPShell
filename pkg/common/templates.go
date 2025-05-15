@@ -2,8 +2,8 @@ package common
 
 import (
 	"bytes"
-	"html/template"
 	"strings"
+	"text/template"
 
 	"github.com/Masterminds/sprig/v3"
 )
