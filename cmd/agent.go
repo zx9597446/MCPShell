@@ -3,17 +3,16 @@ package root
 import (
 	"bufio"
 	"context"
-	"encoding/json"
 	"fmt"
 	"os"
-	"strings"
+	"os/signal"
+	"sync"
+	"syscall"
 
-	"github.com/sashabaranov/go-openai"
 	"github.com/spf13/cobra"
 
+	"github.com/inercia/MCPShell/pkg/agent"
 	"github.com/inercia/MCPShell/pkg/common"
-	"github.com/inercia/MCPShell/pkg/config"
-	"github.com/inercia/MCPShell/pkg/server"
 )
 
 // Command-line flags for agent
@@ -86,251 +85,107 @@ and the agent will try to debug the issue with the given tools.
 		return nil
 	},
 	RunE: func(cmd *cobra.Command, args []string) error {
-		// Get the logger
 		logger := common.GetLogger()
 
-		// Setup panic handler
-		defer common.RecoverPanic()
+		agentConfig := agent.AgentConfig{
+			ConfigFile:   agentConfigFile,
+			Model:        agentModel,
+			SystemPrompt: agentSystemPrompt,
+			UserPrompt:   agentUserPrompt,
+			OpenAIApiKey: agentOpenAIApiKey,
+			OpenAIApiURL: agentOpenAIApiURL,
+			Once:         agentOnce,
+			Version:      version,
+		}
 
-		// Load the configuration file (local or remote)
-		localConfigPath, cleanup, err := config.ResolveConfigPath(agentConfigFile, logger)
+		a := agent.New(agentConfig, logger)
+
+		if err := a.Validate(); err != nil {
+			return fmt.Errorf("agent validation failed: %w", err)
+		}
+
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
+
+		// Handle Ctrl+C (SIGINT) and SIGTERM to gracefully shut down
+		sigChan := make(chan os.Signal, 1)
+		signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
+		go func() {
+			<-sigChan
+			logger.Info("Received interrupt signal, cancelling agent context...")
+			cancel()
+		}()
+
+		userInputChan := make(chan string)
+		agentOutputChan := make(chan string)
+
+		var wg sync.WaitGroup
+
+		// Goroutine to read from stdin and send to userInputChan
+		if !agentOnce {
+			wg.Add(1)
+			go func() {
+				defer wg.Done()
+				defer close(userInputChan)
+				scanner := bufio.NewScanner(os.Stdin)
+				for scanner.Scan() {
+					select {
+					case userInputChan <- scanner.Text():
+					case <-ctx.Done():
+						logger.Info("Context cancelled, stopping stdin reader.")
+						return
+					}
+				}
+				if err := scanner.Err(); err != nil {
+					logger.Error("Error reading from stdin: %v", err)
+				}
+				logger.Info("Stdin scanner finished.")
+			}()
+		} else {
+			// In one-shot mode, we'll close the channel when Run completes
+			logger.Info("One-shot mode, skipping stdin reader.")
+		}
+
+		// Goroutine to read from agentOutputChan and print to stdout
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			for {
+				select {
+				case output, ok := <-agentOutputChan:
+					if !ok {
+						logger.Info("Agent output channel closed, stdout writer finishing.")
+						return
+					}
+					fmt.Print(output)
+				case <-ctx.Done():
+					logger.Info("Context cancelled, stopping stdout writer.")
+					for output := range agentOutputChan {
+						fmt.Print(output)
+					}
+					return
+				}
+			}
+		}()
+
+		err := a.Run(ctx, userInputChan, agentOutputChan)
+
+		cancel()
+
+		logger.Info("Waiting for I/O goroutines to finish...")
+		wg.Wait()
+		logger.Info("All goroutines finished.")
+
 		if err != nil {
-			logger.Error("Failed to load configuration: %v", err)
-			return fmt.Errorf("failed to load configuration: %w", err)
-		}
-
-		// Ensure temporary files are cleaned up
-		defer cleanup()
-
-		// Load configuration to access prompts
-		cfg, err := config.NewConfigFromFile(localConfigPath)
-		if err != nil {
-			logger.Error("Failed to parse configuration: %v", err)
-			return fmt.Errorf("failed to parse configuration: %w", err)
-		}
-
-		// Initialize MCP server to get tools
-		logger.Info("Initializing MCP server")
-		srv := server.New(server.Config{
-			ConfigFile: localConfigPath,
-			Logger:     logger,
-			Version:    version,
-		})
-
-		// Create the server instance (but don't start it)
-		if err := srv.CreateServer(); err != nil {
-			logger.Error("Failed to create MCP server: %v", err)
-			return fmt.Errorf("failed to create MCP server: %w", err)
-		}
-
-		// Initialize OpenAI client
-		openaiConfig := openai.DefaultConfig(agentOpenAIApiKey)
-		if agentOpenAIApiURL != "" {
-			openaiConfig.BaseURL = agentOpenAIApiURL
-		}
-		client := openai.NewClientWithConfig(openaiConfig)
-		logger.Info("Initialized OpenAI client with model: %s", agentModel)
-
-		// Convert MCP tools to OpenAI tools
-		openaiTools, err := srv.GetOpenAITools()
-		if err != nil {
-			logger.Error("Failed to convert MCP tools to OpenAI format: %v", err)
-			return fmt.Errorf("failed to convert MCP tools to OpenAI format: %w", err)
-		}
-		logger.Info("Retrieved %d tools from MCP server", len(openaiTools))
-
-		// Add termination instructions to the system prompt
-		systemPrompt := agentSystemPrompt
-		if systemPrompt == "" && len(cfg.Prompts) > 0 {
-			// Use system prompts from config if available
-			var systemPrompts []string
-			for _, prompt := range cfg.Prompts {
-				systemPrompts = append(systemPrompts, prompt.System...)
+			if err == context.Canceled || err == context.DeadlineExceeded {
+				logger.Info("Agent run was cancelled: %v", err)
+				return nil
 			}
-			if len(systemPrompts) > 0 {
-				systemPrompt = strings.Join(systemPrompts, "\n\n")
-				logger.Info("Using system prompt from config file")
-			}
+			logger.Error("Agent execution failed: %v", err)
+			return fmt.Errorf("agent execution failed: %w", err)
 		}
 
-		if systemPrompt == "" {
-			systemPrompt = "You are a helpful assistant."
-		}
-
-		if !strings.Contains(systemPrompt, "terminate the conversation") {
-			systemPrompt += "\n\nWhen you have completed your task, please type 'TERMINATE' to end the conversation."
-		}
-
-		// Start the conversation
-		messages := []openai.ChatCompletionMessage{
-			{
-				Role:    openai.ChatMessageRoleSystem,
-				Content: systemPrompt,
-			},
-		}
-
-		// Add user prompt if provided or from config
-		if agentUserPrompt != "" {
-			messages = append(messages, openai.ChatCompletionMessage{
-				Role:    openai.ChatMessageRoleUser,
-				Content: agentUserPrompt,
-			})
-		} else if len(cfg.Prompts) > 0 {
-			// Add user prompts from config
-			for _, promptSet := range cfg.Prompts {
-				for _, userPrompt := range promptSet.User {
-					if userPrompt != "" {
-						messages = append(messages, openai.ChatCompletionMessage{
-							Role:    openai.ChatMessageRoleUser,
-							Content: userPrompt,
-						})
-						logger.Info("Added user prompt from config file")
-					}
-				}
-			}
-		}
-
-		// Main interaction loop
-		scanner := bufio.NewScanner(os.Stdin)
-		ctx := context.Background()
-
-		for {
-			// Create the chat completion request
-			req := openai.ChatCompletionRequest{
-				Model:    agentModel,
-				Messages: messages,
-				Tools:    openaiTools,
-			}
-
-			// Get response from the model
-			resp, err := client.CreateChatCompletion(ctx, req)
-			if err != nil {
-				logger.Error("Error getting LLM response: %v", err)
-				return fmt.Errorf("error getting LLM response: %w", err)
-			}
-
-			// Check for tool calls
-			if len(resp.Choices) > 0 && len(resp.Choices[0].Message.ToolCalls) > 0 {
-				// Process tool calls
-				assistantMsg := resp.Choices[0].Message
-
-				// Add the assistant message with tool calls
-				messages = append(messages, assistantMsg)
-
-				// Print the assistant message if it has content
-				if assistantMsg.Content != "" {
-					fmt.Printf("Assistant: %s\n", assistantMsg.Content)
-				}
-
-				// Process each tool call
-				for _, call := range assistantMsg.ToolCalls {
-					logger.Info("Processing tool call: %s", call.Function.Name)
-
-					// Log the raw arguments for debugging
-					logger.Debug("Raw tool arguments: %s", call.Function.Arguments)
-
-					// Parse the arguments
-					var args map[string]interface{}
-					if err := json.Unmarshal([]byte(call.Function.Arguments), &args); err != nil {
-						logger.Error("Failed to parse tool arguments: %v", err)
-						toolResultMsg := openai.ChatCompletionMessage{
-							Role:       openai.ChatMessageRoleTool,
-							Content:    fmt.Sprintf("Error: Failed to parse arguments - %v", err),
-							ToolCallID: call.ID,
-						}
-						messages = append(messages, toolResultMsg)
-						fmt.Printf("Tool %s error: Failed to parse arguments\n", call.Function.Name)
-						continue
-					}
-
-					// Log the parsed arguments
-					argsJSON, _ := json.MarshalIndent(args, "", "  ")
-					logger.Debug("Parsed tool arguments: %s", string(argsJSON))
-
-					// Verify required arguments are present and not empty
-					if args["filename"] == nil || args["filename"] == "" {
-						logger.Error("Missing or empty 'filename' argument")
-						toolResultMsg := openai.ChatCompletionMessage{
-							Role:       openai.ChatMessageRoleTool,
-							Content:    "Error: Missing or empty 'filename' argument",
-							ToolCallID: call.ID,
-						}
-						messages = append(messages, toolResultMsg)
-						fmt.Printf("Tool %s error: Missing or empty 'filename' argument\n", call.Function.Name)
-						continue
-					}
-
-					// Ensure string values for all arguments
-					for key, value := range args {
-						if strValue, ok := value.(string); ok {
-							if strValue == "" {
-								logger.Info("Empty string value for argument: %s", key)
-							}
-						} else {
-							// Try to convert to string if needed
-							args[key] = fmt.Sprintf("%v", value)
-							logger.Info("Converted non-string value for argument: %s = %v -> %s", key, value, args[key])
-						}
-					}
-
-					// Execute the tool
-					toolResult, err := srv.ExecuteTool(ctx, call.Function.Name, args)
-					if err != nil {
-						logger.Error("Failed to execute tool '%s': %v", call.Function.Name, err)
-						toolResultMsg := openai.ChatCompletionMessage{
-							Role:       openai.ChatMessageRoleTool,
-							Content:    fmt.Sprintf("Error: %v", err),
-							ToolCallID: call.ID,
-						}
-						messages = append(messages, toolResultMsg)
-						fmt.Printf("Tool %s error: %v\n", call.Function.Name, err)
-						continue
-					}
-
-					// Add the result
-					toolResultMsg := openai.ChatCompletionMessage{
-						Role:       openai.ChatMessageRoleTool,
-						Content:    toolResult,
-						ToolCallID: call.ID,
-					}
-					messages = append(messages, toolResultMsg)
-					fmt.Printf("Tool %s result: %s\n", call.Function.Name, toolResult)
-				}
-			} else if len(resp.Choices) > 0 {
-				// No tool calls, just print the message
-				assistantMessage := resp.Choices[0].Message
-				messages = append(messages, assistantMessage)
-
-				// Print the assistant response
-				fmt.Printf("Assistant: %s\n", assistantMessage.Content)
-
-				// Check for termination
-				if strings.Contains(strings.ToUpper(assistantMessage.Content), "TERMINATE") {
-					logger.Info("LLM requested termination, ending the conversation")
-					fmt.Println("Conversation terminated.")
-					return nil
-				}
-
-				// Exit if in one-shot mode
-				if agentOnce {
-					logger.Info("One-shot mode enabled, ending conversation after receiving response")
-					return nil
-				}
-
-				// Get user input
-				fmt.Print("\nYou: ")
-				if !scanner.Scan() {
-					break
-				}
-
-				userInput := scanner.Text()
-				messages = append(messages, openai.ChatCompletionMessage{
-					Role:    openai.ChatMessageRoleUser,
-					Content: userInput,
-				})
-			}
-		}
-
+		logger.Info("Agent finished successfully.")
 		return nil
 	},
 }
