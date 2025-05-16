@@ -206,9 +206,7 @@ mcp:
           - GITHUB_TOKEN
         command: |
           ARGS=""
-          if [ "{{ .comments }}" = "true" ]; then
-            ARGS="$ARGS --comments"
-          fi
+          ARGS="$ARGS {{ if .comments }}--comments{{ end }}"
           
           gh pr view {{ .pr_number }} --repo "{{ .repo }}" $ARGS
       output:
@@ -237,9 +235,7 @@ mcp:
           - GITHUB_TOKEN
         command: |
           ARGS=""
-          if [ {{ .limit }} -gt 0 ]; then
-            ARGS="$ARGS --limit {{ .limit }}"
-          fi
+          ARGS="$ARGS {{ if .limit }}--limit {{ .limit }}{{ end }}"
           
           gh release list --repo "{{ .repo }}" $ARGS
       output:
@@ -342,15 +338,9 @@ mcp:
       run:
         command: |
           ARGS=""
-          if [ {{ .limit }} -gt 0 ]; then
-            ARGS="$ARGS --limit {{ .limit }}"
-          fi
-          if [ -n "{{ .sort }}" ]; then
-            ARGS="$ARGS --sort {{ .sort }}"
-          fi
-          if [ -n "{{ .order }}" ]; then
-            ARGS="$ARGS --order {{ .order }}"
-          fi
+          ARGS="$ARGS {{ if .limit }}--limit {{ .limit }}{{ end }}"
+          ARGS="$ARGS {{ if .sort }}--sort {{ .sort }}{{ end }}"
+          ARGS="$ARGS {{ if .order }}--order {{ .order }}{{ end }}"
           
           gh search repos "{{ .query }}" $ARGS
       output:

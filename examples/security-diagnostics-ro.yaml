@@ -50,6 +50,15 @@ mcp:
           
           echo -e "\nCurrent Logins:"
           who
+        runners:
+          - name: exec
+            requirements:
+              os: darwin
+              executables: [id, dscl, who, last]
+          - name: exec
+            requirements:
+              os: linux
+              executables: [id, getent, who, last]
       output:
         prefix: "System Security Overview:"
 
@@ -109,6 +118,15 @@ mcp:
               echo "iptables not available or not in PATH"
             fi
           fi
+        runners:
+          - name: exec
+            requirements:
+              os: darwin
+              executables: [netstat, defaults]
+          - name: exec
+            requirements:
+              os: linux
+              executables: [ss]
       output:
         prefix: "Network Security Check:"
 
@@ -181,6 +199,15 @@ mcp:
               echo -e "\nPath not found: $path"
             fi
           done
+        runners:
+          - name: exec
+            requirements:
+              os: darwin
+              executables: [ls]
+          - name: exec
+            requirements:
+              os: linux
+              executables: [ls]
       output:
         prefix: "File Permissions Analysis:"
 

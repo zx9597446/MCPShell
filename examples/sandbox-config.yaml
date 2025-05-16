@@ -2,7 +2,7 @@
 # Configuration for MCPShell with sandbox runner examples
 #
 # This configuration demonstrates how to use different runners for command execution,
-# including the macOS sandbox-exec runner for enhanced security.
+# including the macOS sandbox-exec runner and Linux firejail for enhanced security.
 
 mcp:
   tools:
@@ -17,7 +17,7 @@ mcp:
       run:
         command: echo "Hello, {{.name}}!"
 
-    # Example 2: Command using sandbox-exec runner with full permissions
+    # Example 2: Command using sandboxed runners
     - name: secure_echo
       description: Echo text in a sandboxed environment
       params:
@@ -26,8 +26,16 @@ mcp:
           type: string
           required: true
       run:
-        runner: sandbox-exec
         command: 'echo "Sandboxed echo: {{.text}}"'
+        runners:
+          - name: sandbox-exec
+            requirements:
+              os: darwin
+              executables: [sandbox-exec]
+          - name: firejail
+            requirements:
+              os: linux
+              executables: [firejail]
 
     # Example 3: Command execution in sandbox with restricted networking
     - name: network_check
@@ -38,10 +46,20 @@ mcp:
           type: string
           required: true
       run:
-        runner: sandbox-exec
         command: 'curl --max-time 5 {{.url}}'
-        options:
-          allow_networking: false
+        runners:
+          - name: sandbox-exec
+            requirements:
+              os: darwin
+              executables: [sandbox-exec, curl]
+            options:
+              allow_networking: false
+          - name: firejail
+            requirements:
+              os: linux
+              executables: [firejail, curl]
+            options:
+              allow_networking: false
       constraints:
         - 'true'
 
@@ -56,13 +74,26 @@ mcp:
       constraints:
         - 'directory.matches("^/tmp|^/var/tmp")'
       run:
-        runner: sandbox-exec
         command: 'ls -la {{.directory}}'
-        options:
-          allow_user_folders: false
-          allow_folders:
-            - "/tmp"
-            - "/var/tmp"
+        runners:
+          - name: sandbox-exec
+            requirements:
+              os: darwin
+              executables: [sandbox-exec]
+            options:
+              allow_user_folders: false
+              allow_read_folders:
+                - "/tmp"
+                - "/var/tmp"
+          - name: firejail
+            requirements:
+              os: linux
+              executables: [firejail]
+            options:
+              allow_user_folders: false
+              allow_read_folders:
+                - "/tmp" 
+                - "/var/tmp"
 
     # Example 5: Custom sandbox profile with specific permissions
     - name: custom_sandbox
@@ -73,15 +104,32 @@ mcp:
           type: string
           required: true
       run:
-        runner: sandbox-exec
         command: '{{.command}}'
-        options:
-          allow_networking: false
-          allow_user_folders: false
-          custom_profile: |
-            (version 1)
-            (allow default)
-            (deny network*)
-            (allow file-read* (regex "^/tmp"))
+        runners:
+          - name: sandbox-exec
+            requirements:
+              os: darwin
+              executables: [sandbox-exec]
+            options:
+              allow_networking: false
+              allow_user_folders: false
+              custom_profile: |
+                (version 1)
+                (allow default)
+                (deny network*)
+                (allow file-read* (regex "^/tmp"))
+          - name: firejail
+            requirements:
+              os: linux
+              executables: [firejail]
+            options:
+              allow_networking: false
+              allow_user_folders: false
+              custom_profile: |
+                # Firejail equivalent profile
+                net none
+                noroot
+                whitelist /tmp
+                read-only /tmp
       constraints:
         - 'command.matches("^ls|^pwd|^echo")'

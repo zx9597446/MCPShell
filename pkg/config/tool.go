@@ -13,35 +13,99 @@ type Tool struct {
 
 	// Config is the original tool configuration
 	Config MCPToolConfig
+
+	// SelectedRunner is the runner that will be used to execute the tool command
+	// This is set during validation when a suitable runner is found
+	SelectedRunner *MCPToolRunner
 }
 
-// checkToolRequirements checks if all prerequisites for a tool are met.
-// If no prerequisites are specified, it returns true.
-// If any prerequisites are specified, all of them must be satisfied.
-//
-// Parameters:
-//   - prerequisites: A slice of ToolPrerequisites to check
+// checkToolRequirements checks if the tool has at least one runner that meets
+// its prerequisites.
 //
 // Returns:
-//   - true if all prerequisites are met or if there are no prerequisites,
-//     false otherwise
+//   - true if a suitable runner is found, false otherwise
 func (t *Tool) checkToolRequirements() bool {
-	prerequisites := t.Config.Requirements
+	// With the removal of deprecated fields, we now only support
+	// the runners mechanism
+	return t.findSuitableRunner()
+}
 
-	// Check if any of the prerequisite sets are met
-	// Check if OS matches (if specified)
-	if !common.CheckOSMatches(prerequisites.OS) {
-		return false
-	}
-
-	// Check if all required executables exist
-	for _, execName := range prerequisites.Executables {
-		if !common.CheckExecutableExists(execName) {
-			return false
+// findSuitableRunner checks all defined runners and selects the first one
+// that meets its requirements.
+//
+// Returns:
+//   - true if a suitable runner was found, false otherwise
+func (t *Tool) findSuitableRunner() bool {
+	// If no runners are defined, use a default "exec" runner with no requirements
+	if len(t.Config.Run.Runners) == 0 {
+		defaultRunner := MCPToolRunner{
+			Name: "exec",
 		}
+		t.SelectedRunner = &defaultRunner
+		return true
 	}
 
-	return true
+	// Check each defined runner
+	for i, runner := range t.Config.Run.Runners {
+		// Skip runners with invalid or empty names
+		if runner.Name == "" {
+			continue
+		}
+
+		// Check if OS matches (if specified)
+		if runner.Requirements.OS != "" && !common.CheckOSMatches(runner.Requirements.OS) {
+			continue
+		}
+
+		// Check if all required executables exist
+		allExecutablesExist := true
+		for _, execName := range runner.Requirements.Executables {
+			if !common.CheckExecutableExists(execName) {
+				allExecutablesExist = false
+				break
+			}
+		}
+
+		if !allExecutablesExist {
+			continue
+		}
+
+		// Found a valid runner - store a reference to it
+		t.SelectedRunner = &t.Config.Run.Runners[i]
+		return true
+	}
+
+	// No suitable runner found
+	return false
+}
+
+// GetEffectiveCommand returns the command template that should be used.
+// Since the command is now always defined at the MCPToolRunConfig level,
+// we simply return it directly.
+func (t *Tool) GetEffectiveCommand() string {
+	return t.Config.Run.Command
+}
+
+// GetEffectiveRunner returns the runner type that should be used.
+func (t *Tool) GetEffectiveRunner() string {
+	// Return the selected runner's name if we have one
+	if t.SelectedRunner != nil && t.SelectedRunner.Name != "" {
+		return t.SelectedRunner.Name
+	}
+
+	// Default to "exec" if no runner is selected
+	return "exec"
+}
+
+// GetEffectiveOptions returns the runner options from the selected runner.
+func (t *Tool) GetEffectiveOptions() map[string]interface{} {
+	// Return the selected runner's options if we have them
+	if t.SelectedRunner != nil && t.SelectedRunner.Options != nil {
+		return t.SelectedRunner.Options
+	}
+
+	// Default to empty options if no runner is selected
+	return nil
 }
 
 // CreateMCPTool creates an MCP tool from a tool configuration.

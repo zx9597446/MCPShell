@@ -14,8 +14,6 @@ mcp:
 
     - name: "linux_only_tool"
       description: "Tool that only works on Linux"
-      requirements:
-        os: "linux"
       params:
         random_string:
           type: string
@@ -23,11 +21,13 @@ mcp:
           required: true
       run:
         command: "echo 'This tool only works on Linux'"
+        runners:
+          - name: exec
+            requirements:
+              os: "linux"
 
     - name: "macos_only_tool"
       description: "Tool that only works on macOS"
-      requirements:
-        os: "darwin"
       params:
         random_string:
           type: string
@@ -35,11 +35,13 @@ mcp:
           required: true
       run:
         command: "echo 'This tool only works on macOS'"
+        runners:
+          - name: exec
+            requirements:
+              os: "darwin"
 
     - name: "windows_only_tool"
       description: "Tool that only works on Windows"
-      requirements:
-        os: "windows"
       params:
         random_string:
           type: string
@@ -47,11 +49,13 @@ mcp:
           required: true
       run:
         command: "echo 'This tool only works on Windows'"
+        runners:
+          - name: exec
+            requirements:
+              os: "windows"
 
     - name: "python_required_tool"
       description: "Tool that requires Python to be installed"
-      requirements:
-        executables: ["python3"]
       params:
         script:
           type: string
@@ -62,3 +66,7 @@ mcp:
         - "!script.contains('import os')"  # Prevent os module usage
       run:
         command: "python3 -c \"{{ .script }}\""
+        runners:
+          - name: exec
+            requirements:
+              executables: ["python3"]

@@ -40,17 +40,8 @@ mcp:
           - HOME
           - AWS_CONFIG_FILE
         command: |
-          {{ if .output_format }}
-          FORMAT_PARAM="--output {{ .output_format }}"
-          {{ else }}
-          FORMAT_PARAM="--output table"
-          {{ end }}
-          
-          {{ if .profile }}
-          PROFILE_PARAM="--profile {{ .profile }}"
-          {{ else }}
-          PROFILE_PARAM=""
-          {{ end }}
+          FORMAT_PARAM="{{ if .output_format }}--output {{ .output_format }}{{ else }}--output table{{ end }}"
+          PROFILE_PARAM="{{ if .profile }}--profile {{ .profile }}{{ end }}"
           
           # Fix environment variable names and handling
           if [ -z "$AWS_SHARED_CREDENTIALS_FILE" ]; then
@@ -113,22 +104,9 @@ mcp:
           - HOME
           - AWS_CONFIG_FILE
         command: |
-          {{ if .output_format }}
-          FORMAT_PARAM="--output {{ .output_format }}"
-          {{ else }}
-          FORMAT_PARAM="--output table"
-          {{ end }}
-          
-          FILTER=""
-          {{ if .vpc_id }}
-          FILTER="--filters Name=vpc-id,Values={{ .vpc_id }}"
-          {{ end }}
-          
-          {{ if .profile }}
-          PROFILE_PARAM="--profile {{ .profile }}"
-          {{ else }}
-          PROFILE_PARAM=""
-          {{ end }}
+          FORMAT_PARAM="{{ if .output_format }}--output {{ .output_format }}{{ else }}--output table{{ end }}"
+          PROFILE_PARAM="{{ if .profile }}--profile {{ .profile }}{{ end }}"
+          FILTER="{{ if .vpc_id }}--filters Name=vpc-id,Values={{ .vpc_id }}{{ end }}"
           
           # Fix environment variable names and handling
           if [ -z "$AWS_SHARED_CREDENTIALS_FILE" ]; then
@@ -175,22 +153,9 @@ mcp:
           - HOME
           - AWS_CONFIG_FILE
         command: |
-          {{ if .output_format }}
-          FORMAT_PARAM="--output {{ .output_format }}"
-          {{ else }}
-          FORMAT_PARAM="--output table"
-          {{ end }}
-          
-          FILTER=""
-          {{ if .vpc_id }}
-          FILTER="--filters Name=vpc-id,Values={{ .vpc_id }}"
-          {{ end }}
-          
-          {{ if .profile }}
-          PROFILE_PARAM="--profile {{ .profile }}"
-          {{ else }}
-          PROFILE_PARAM=""
-          {{ end }}
+          FORMAT_PARAM="{{ if .output_format }}--output {{ .output_format }}{{ else }}--output table{{ end }}"
+          PROFILE_PARAM="{{ if .profile }}--profile {{ .profile }}{{ end }}"
+          FILTER="{{ if .vpc_id }}--filters Name=vpc-id,Values={{ .vpc_id }}{{ end }}"
           
           # Fix environment variable names and handling
           if [ -z "$AWS_SHARED_CREDENTIALS_FILE" ]; then
@@ -238,17 +203,8 @@ mcp:
           - HOME
           - AWS_CONFIG_FILE
         command: |
-          {{ if .output_format }}
-          FORMAT_PARAM="--output {{ .output_format }}"
-          {{ else }}
-          FORMAT_PARAM="--output table"
-          {{ end }}
-          
-          {{ if .profile }}
-          PROFILE_PARAM="--profile {{ .profile }}"
-          {{ else }}
-          PROFILE_PARAM=""
-          {{ end }}
+          FORMAT_PARAM="{{ if .output_format }}--output {{ .output_format }}{{ else }}--output table{{ end }}"
+          PROFILE_PARAM="{{ if .profile }}--profile {{ .profile }}{{ end }}"
           
           # Fix environment variable names and handling
           if [ -z "$AWS_SHARED_CREDENTIALS_FILE" ]; then
@@ -295,23 +251,10 @@ mcp:
           - HOME
           - AWS_CONFIG_FILE
         command: |
-          {{ if .output_format }}
-          FORMAT_PARAM="--output {{ .output_format }}"
-          {{ else }}
-          FORMAT_PARAM="--output table"
-          {{ end }}
-          
-          FILTER=""
-          {{ if .vpc_id }}
-          FILTER="--filters Name=vpc-id,Values={{ .vpc_id }}"
-          {{ end }}
-          
-          {{ if .profile }}
-          PROFILE_PARAM="--profile {{ .profile }}"
-          {{ else }}
-          PROFILE_PARAM=""
-          {{ end }}
-          
+          FORMAT_PARAM="{{ if .output_format }}--output {{ .output_format }}{{ else }}--output table{{ end }}"
+          PROFILE_PARAM="{{ if .profile }}--profile {{ .profile }}{{ end }}"
+          FILTER="{{ if .vpc_id }}--filters Name=vpc-id,Values={{ .vpc_id }}{{ end }}"
+                    
           # Fix environment variable names and handling
           if [ -z "$AWS_SHARED_CREDENTIALS_FILE" ]; then
             export AWS_SHARED_CREDENTIALS_FILE="$HOME/.aws/credentials"
@@ -357,23 +300,10 @@ mcp:
           - HOME
           - AWS_CONFIG_FILE
         command: |
-          {{ if .output_format }}
-          FORMAT_PARAM="--output {{ .output_format }}"
-          {{ else }}
-          FORMAT_PARAM="--output table"
-          {{ end }}
-          
-          FILTER=""
-          {{ if .vpc_id }}
-          FILTER="--filters Name=vpc-id,Values={{ .vpc_id }}"
-          {{ end }}
-          
-          {{ if .profile }}
-          PROFILE_PARAM="--profile {{ .profile }}"
-          {{ else }}
-          PROFILE_PARAM=""
-          {{ end }}
-          
+          FORMAT_PARAM="{{ if .output_format }}--output {{ .output_format }}{{ else }}--output table{{ end }}"
+          PROFILE_PARAM="{{ if .profile }}--profile {{ .profile }}{{ end }}"
+          FILTER="{{ if .vpc_id }}--filters Name=vpc-id,Values={{ .vpc_id }}{{ end }}"
+
           # Fix environment variable names and handling
           if [ -z "$AWS_SHARED_CREDENTIALS_FILE" ]; then
             export AWS_SHARED_CREDENTIALS_FILE="$HOME/.aws/credentials"
@@ -423,32 +353,16 @@ mcp:
           - HOME
           - AWS_CONFIG_FILE
         command: |
-          {{ if .output_format }}
-          FORMAT_PARAM="--output {{ .output_format }}"
-          {{ else }}
-          FORMAT_PARAM="--output table"
-          {{ end }}
+          FORMAT_PARAM="{{ if .output_format }}--output {{ .output_format }}{{ else }}--output table{{ end }}"
+          PROFILE_PARAM="{{ if .profile }}--profile {{ .profile }}{{ end }}"
           
+          # Build filters dynamically
           FILTERS=""
-          {{ if .vpc_id }}
-          FILTERS="$FILTERS Name=vpc-id,Values={{ .vpc_id }}"
-          {{ end }}
+          {{ if .vpc_id }}FILTERS="$FILTERS Name=vpc-id,Values={{ .vpc_id }}"{{ end }}
+          {{ if .subnet_id }}FILTERS="$FILTERS Name=subnet-id,Values={{ .subnet_id }}"{{ end }}
           
-          {{ if .subnet_id }}
-          FILTERS="$FILTERS Name=subnet-id,Values={{ .subnet_id }}"
-          {{ end }}
-          
-          FILTER_PARAM=""
-          {{ if .filters }}
-          FILTER_PARAM="--filters $FILTERS"
-          {{ end }}
-          
-          {{ if .profile }}
-          PROFILE_PARAM="--profile {{ .profile }}"
-          {{ else }}
-          PROFILE_PARAM=""
-          {{ end }}
-          
+          FILTER_PARAM="{{ if or .vpc_id .subnet_id }}--filters $FILTERS{{ end }}"
+                    
           # Fix environment variable names and handling
           if [ -z "$AWS_SHARED_CREDENTIALS_FILE" ]; then
             export AWS_SHARED_CREDENTIALS_FILE="$HOME/.aws/credentials"
@@ -490,17 +404,8 @@ mcp:
           - HOME
           - AWS_CONFIG_FILE
         command: |
-          {{ if .output_format }}
-          FORMAT_PARAM="--output {{ .output_format }}"
-          {{ else }}
-          FORMAT_PARAM="--output table"
-          {{ end }}
-          
-          {{ if .profile }}
-          PROFILE_PARAM="--profile {{ .profile }}"
-          {{ else }}
-          PROFILE_PARAM=""
-          {{ end }}
+          FORMAT_PARAM="{{ if .output_format }}--output {{ .output_format }}{{ else }}--output table{{ end }}"          
+          PROFILE_PARAM="{{ if .profile }}--profile {{ .profile }}{{ end }}"
           
           # Fix environment variable names and handling
           if [ -z "$AWS_SHARED_CREDENTIALS_FILE" ]; then
@@ -547,17 +452,8 @@ mcp:
           - HOME
           - AWS_CONFIG_FILE
         command: |
-          {{ if .output_format }}
-          FORMAT_PARAM="--output {{ .output_format }}"
-          {{ else }}
-          FORMAT_PARAM="--output table"
-          {{ end }}
-          
-          {{ if .profile }}
-          PROFILE_PARAM="--profile {{ .profile }}"
-          {{ else }}
-          PROFILE_PARAM=""
-          {{ end }}
+          FORMAT_PARAM="{{ if .output_format }}--output {{ .output_format }}{{ else }}--output table{{ end }}"          
+          PROFILE_PARAM="{{ if .profile }}--profile {{ .profile }}{{ end }}"
           
           # Fix environment variable names and handling
           if [ -z "$AWS_SHARED_CREDENTIALS_FILE" ]; then
@@ -600,17 +496,8 @@ mcp:
           - HOME
           - AWS_CONFIG_FILE
         command: |
-          {{ if .output_format }}
-          FORMAT_PARAM="--output {{ .output_format }}"
-          {{ else }}
-          FORMAT_PARAM="--output table"
-          {{ end }}
-          
-          {{ if .profile }}
-          PROFILE_PARAM="--profile {{ .profile }}"
-          {{ else }}
-          PROFILE_PARAM=""
-          {{ end }}
+          FORMAT_PARAM="{{ if .output_format }}--output {{ .output_format }}{{ else }}--output table{{ end }}"          
+          PROFILE_PARAM="{{ if .profile }}--profile {{ .profile }}{{ end }}"
           
           # Fix environment variable names and handling
           if [ -z "$AWS_SHARED_CREDENTIALS_FILE" ]; then
@@ -657,22 +544,9 @@ mcp:
           - HOME
           - AWS_CONFIG_FILE
         command: |
-          {{ if .output_format }}
-          FORMAT_PARAM="--output {{ .output_format }}"
-          {{ else }}
-          FORMAT_PARAM="--output table"
-          {{ end }}
-          
-          FILTER=""
-          {{ if .vpc_id }}
-          FILTER="--filter Name=resource-id,Values={{ .vpc_id }}"
-          {{ end }}
-          
-          {{ if .profile }}
-          PROFILE_PARAM="--profile {{ .profile }}"
-          {{ else }}
-          PROFILE_PARAM=""
-          {{ end }}
+          FORMAT_PARAM="{{ if .output_format }}--output {{ .output_format }}{{ else }}--output table{{ end }}"
+          PROFILE_PARAM="{{ if .profile }}--profile {{ .profile }}{{ end }}"
+          FILTER="{{ if .vpc_id }}--filter Name=resource-id,Values={{ .vpc_id }}{{ end }}"
           
           # Fix environment variable names and handling
           if [ -z "$AWS_SHARED_CREDENTIALS_FILE" ]; then
@@ -719,29 +593,10 @@ mcp:
           - HOME
           - AWS_CONFIG_FILE
         command: |
-          FORMAT_PARAM=""
-          {{ if .output_format }}
-          FORMAT_PARAM="--output {{ .output_format }}"
-          {{ else }}
-          FORMAT_PARAM="--output table"
-          {{ end }}
-          
-          FILTERS=""
-          {{ if .vpc_id }}
-          FILTERS="$FILTERS Name=requester-vpc-info.vpc-id,Values={{ .vpc_id }} Name=accepter-vpc-info.vpc-id,Values={{ .vpc_id }}"
-          {{ end }}
-          
-          FILTER_PARAM=""
-          {{ if .filters }}
-          FILTER_PARAM="--filters $FILTERS"
-          {{ end }}
-          
-          {{ if .profile }}
-          PROFILE_PARAM="--profile {{ .profile }}"
-          {{ else }}
-          PROFILE_PARAM=""
-          {{ end }}
-          
+          FORMAT_PARAM="{{ if .output_format }}--output {{ .output_format }}{{ else }}--output table{{ end }}"
+          PROFILE_PARAM="{{ if .profile }}--profile {{ .profile }}{{ end }}"
+          FILTER_PARAM="{{ if .vpc_id }}--filters Name=requester-vpc-info.vpc-id,Values={{ .vpc_id }} Name=accepter-vpc-info.vpc-id,Values={{ .vpc_id }}{{ end }}"
+                    
           # Fix environment variable names and handling
           if [ -z "$AWS_SHARED_CREDENTIALS_FILE" ]; then
             export AWS_SHARED_CREDENTIALS_FILE="$HOME/.aws/credentials"
@@ -783,17 +638,8 @@ mcp:
           - HOME
           - AWS_CONFIG_FILE
         command: |
-          {{ if .output_format }}
-          FORMAT_PARAM="--output {{ .output_format }}"
-          {{ else }}
-          FORMAT_PARAM="--output table"
-          {{ end }}
-          
-          {{ if .profile }}
-          PROFILE_PARAM="--profile {{ .profile }}"
-          {{ else }}
-          PROFILE_PARAM=""
-          {{ end }}
+          FORMAT_PARAM="{{ if .output_format }}--output {{ .output_format }}{{ else }}--output table{{ end }}"
+          PROFILE_PARAM="{{ if .profile }}--profile {{ .profile }}{{ end }}"
           
           # Fix environment variable names and handling
           if [ -z "$AWS_SHARED_CREDENTIALS_FILE" ]; then

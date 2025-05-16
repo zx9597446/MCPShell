@@ -38,18 +38,6 @@ mcp:
         - "labels == '' || labels.size() <= 100"                   # Reasonable label length
         - "output_format == '' || output_format == 'wide' || output_format == 'json' || output_format == 'yaml'"  # Valid formats
       run:
-        runner: sandbox-exec
-        options:
-          allow_networking: true
-          allow_user_folders: false
-          allow_read_folders:
-            - "/usr/bin"
-            - "/bin"
-            - "/etc"
-            - "{{ env \"HOME\" }}/.kube"
-            - "{{ env \"KUBECONFIG\" }}"
-        env:
-          - KUBECONFIG
         command: |
           CONTEXT_PARAM="{{ if .context }}--context={{ .context }}{{ end }}"
           NAMESPACE_PARAM="{{ if .ns }}-n {{ .ns }}{{ end }}"
@@ -57,6 +45,37 @@ mcp:
           FORMAT_PARAM="{{ if .output_format }}-o {{ .output_format }}{{ end }}"
           
           kubectl $CONTEXT_PARAM get {{ .resource }} $NAMESPACE_PARAM $LABEL_PARAM $FORMAT_PARAM
+        env:
+          - KUBECONFIG
+        runners:
+          - name: sandbox-exec
+            requirements:
+              os: darwin
+              executables: [sandbox-exec]
+            options:
+              allow_networking: true
+              allow_user_folders: false
+              allow_read_folders:
+                - "/usr/bin"
+                - "/bin"
+                - "/etc"
+                - "{{ env \"HOME\" }}/.kube"
+                - "{{ env \"KUBECONFIG\" }}"
+          - name: firejail
+            requirements:
+              os: linux
+              executables: [firejail]
+            options:
+              allow_networking: true
+              allow_user_folders: false
+              allow_read_folders:
+                - "/usr/bin"
+                - "/bin"
+                - "/etc"
+                - "{{ env \"HOME\" }}/.kube"
+                - "{{ env \"KUBECONFIG\" }}"
+          - name: exec
+            requirements: {}
       output:
         prefix: |
           Kubernetes {{ .resource }} list:
@@ -89,24 +108,43 @@ mcp:
         - "ns == '' || (ns.size() <= 63 && ns.matches('^[a-z0-9]([-a-z0-9]*[a-z0-9])?$'))"  # Valid k8s namespace
         - "context == '' || context.size() <= 253"                 # Valid context name
       run:
-        runner: sandbox-exec
-        options:
-          allow_networking: true
-          allow_user_folders: false
-          allow_read_folders:
-            - "/usr/bin"
-            - "/bin"
-            - "/etc"
-            - "{{ env \"HOME\" }}/.kube"
-            - "{{ env \"KUBECONFIG\" }}"
-        env:
-          - KUBECONFIG
         command: |
           CONTEXT_PARAM="{{ if .context }}--context={{ .context }}{{ end }}"
           NAMESPACE_PARAM="{{ if .ns }}-n {{ .ns }}{{ end }}"          
           NAME_PARAM="{{ .name }}"
           
           kubectl $CONTEXT_PARAM describe {{ .resource }} $NAME_PARAM $NAMESPACE_PARAM
+        env:
+          - KUBECONFIG
+        runners:
+          - name: sandbox-exec
+            requirements:
+              os: darwin
+              executables: [sandbox-exec]
+            options:
+              allow_networking: true
+              allow_user_folders: false
+              allow_read_folders:
+                - "/usr/bin"
+                - "/bin"
+                - "/etc"
+                - "{{ env \"HOME\" }}/.kube"
+                - "{{ env \"KUBECONFIG\" }}"
+          - name: firejail
+            requirements:
+              os: linux
+              executables: [firejail]
+            options:
+              allow_networking: true
+              allow_user_folders: false
+              allow_read_folders:
+                - "/usr/bin"
+                - "/bin"
+                - "/etc"
+                - "{{ env \"HOME\" }}/.kube"
+                - "{{ env \"KUBECONFIG\" }}"
+          - name: exec
+            requirements: {}
       output:
         prefix: |
           Details for {{ .resource }}{{ if .name }} "{{ .name }}"{{ end }}:
@@ -153,18 +191,6 @@ mcp:
         - "since == '' || since.matches('^[0-9]+(s|m|h|d)$')"      # Valid duration format
         - "grep == '' || (grep.size() <= 100 && !grep.contains(';'))"  # Safe grep pattern
       run:
-        runner: sandbox-exec
-        options:
-          allow_networking: true
-          allow_user_folders: false
-          allow_read_folders:
-            - "/usr/bin"
-            - "/bin"
-            - "/etc"
-            - "{{ env \"HOME\" }}/.kube"
-            - "{{ env \"KUBECONFIG\" }}"
-        env:
-          - KUBECONFIG
         command: |
           CONTEXT_PARAM="{{ if .context }}--context={{ .context }}{{ end }}"
           NAMESPACE_PARAM="{{ if .ns }}-n {{ .ns }}{{ end }}"
@@ -183,6 +209,37 @@ mcp:
           else
             $CMD
           fi
+        env:
+          - KUBECONFIG
+        runners:
+          - name: sandbox-exec
+            requirements:
+              os: darwin
+              executables: [sandbox-exec]
+            options:
+              allow_networking: true
+              allow_user_folders: false
+              allow_read_folders:
+                - "/usr/bin"
+                - "/bin"
+                - "/etc"
+                - "{{ env \"HOME\" }}/.kube"
+                - "{{ env \"KUBECONFIG\" }}"
+          - name: firejail
+            requirements:
+              os: linux
+              executables: [firejail]
+            options:
+              allow_networking: true
+              allow_user_folders: false
+              allow_read_folders:
+                - "/usr/bin"
+                - "/bin"
+                - "/etc"
+                - "{{ env \"HOME\" }}/.kube"
+                - "{{ env \"KUBECONFIG\" }}"
+          - name: exec
+            requirements: {}
       output:
         prefix: |
           Logs for pod {{ .pod }}{{ if .container }} (container: {{ .container }}){{ end }}{{ if .grep }} (filtered for: '{{ .grep }}'){{ end }}:
@@ -196,22 +253,41 @@ mcp:
           type: string
           description: "Kubernetes context to use (optional, uses current context if not specified)"
       run:
-        runner: sandbox-exec
-        options:
-          allow_networking: true
-          allow_user_folders: false
-          allow_read_folders:
-            - "/usr/bin"
-            - "/bin"
-            - "/etc"
-            - "{{ env \"HOME\" }}/.kube"
-            - "{{ env \"KUBECONFIG\" }}"
-        env:
-          - KUBECONFIG
         command: |
           CONTEXT_PARAM="{{ if .context }}--context={{ .context }}{{ end }}"
           
           kubectl $CONTEXT_PARAM config get-contexts
+        env:
+          - KUBECONFIG
+        runners:
+          - name: sandbox-exec
+            requirements:
+              os: darwin
+              executables: [sandbox-exec]
+            options:
+              allow_networking: true
+              allow_user_folders: false
+              allow_read_folders:
+                - "/usr/bin"
+                - "/bin"
+                - "/etc"
+                - "{{ env \"HOME\" }}/.kube"
+                - "{{ env \"KUBECONFIG\" }}"
+          - name: firejail
+            requirements:
+              os: linux
+              executables: [firejail]
+            options:
+              allow_networking: true
+              allow_user_folders: false
+              allow_read_folders:
+                - "/usr/bin"
+                - "/bin"
+                - "/etc"
+                - "{{ env \"HOME\" }}/.kube"
+                - "{{ env \"KUBECONFIG\" }}"
+          - name: exec
+            requirements: {}
       output:
         prefix: |
           Available Kubernetes contexts for user {{ env "USER" }}:
@@ -225,22 +301,41 @@ mcp:
           type: string
           description: "Kubernetes context to use (optional, uses current context if not specified)"
       run:
-        runner: sandbox-exec
-        options:
-          allow_networking: true
-          allow_user_folders: false
-          allow_read_folders:
-            - "/usr/bin"
-            - "/bin"
-            - "/etc"
-            - "{{ env \"HOME\" }}/.kube"
-            - "{{ env \"KUBECONFIG\" }}"
-        env:
-          - KUBECONFIG
         command: |
           CONTEXT_PARAM="{{ if .context }}--context={{ .context }}{{ end }}"
           
           kubectl $CONTEXT_PARAM config current-context
+        env:
+          - KUBECONFIG
+        runners:
+          - name: sandbox-exec
+            requirements:
+              os: darwin
+              executables: [sandbox-exec]
+            options:
+              allow_networking: true
+              allow_user_folders: false
+              allow_read_folders:
+                - "/usr/bin"
+                - "/bin"
+                - "/etc"
+                - "{{ env \"HOME\" }}/.kube"
+                - "{{ env \"KUBECONFIG\" }}"
+          - name: firejail
+            requirements:
+              os: linux
+              executables: [firejail]
+            options:
+              allow_networking: true
+              allow_user_folders: false
+              allow_read_folders:
+                - "/usr/bin"
+                - "/bin"
+                - "/etc"
+                - "{{ env \"HOME\" }}/.kube"
+                - "{{ env \"KUBECONFIG\" }}"
+          - name: exec
+            requirements: {}
       output:
         prefix: |
           Current Kubernetes context:
@@ -254,22 +349,41 @@ mcp:
           type: string
           description: "Kubernetes context to use (optional, uses current context if not specified)"
       run:
-        runner: sandbox-exec
-        options:
-          allow_networking: true
-          allow_user_folders: false
-          allow_read_folders:
-            - "/usr/bin"
-            - "/bin"
-            - "/etc"
-            - "{{ env \"HOME\" }}/.kube"
-            - "{{ env \"KUBECONFIG\" }}"
-        env:
-          - KUBECONFIG
         command: |
           CONTEXT_PARAM="{{ if .context }}--context={{ .context }}{{ end }}"
           
           kubectl $CONTEXT_PARAM get namespaces
+        env:
+          - KUBECONFIG
+        runners:
+          - name: sandbox-exec
+            requirements:
+              os: darwin
+              executables: [sandbox-exec]
+            options:
+              allow_networking: true
+              allow_user_folders: false
+              allow_read_folders:
+                - "/usr/bin"
+                - "/bin"
+                - "/etc"
+                - "{{ env \"HOME\" }}/.kube"
+                - "{{ env \"KUBECONFIG\" }}"
+          - name: firejail
+            requirements:
+              os: linux
+              executables: [firejail]
+            options:
+              allow_networking: true
+              allow_user_folders: false
+              allow_read_folders:
+                - "/usr/bin"
+                - "/bin"
+                - "/etc"
+                - "{{ env \"HOME\" }}/.kube"
+                - "{{ env \"KUBECONFIG\" }}"
+          - name: exec
+            requirements: {}
       output:
         prefix: |
           Available Kubernetes namespaces:
@@ -277,7 +391,6 @@ mcp:
     - name: "kubectl_portforward_curl"
       description: "Create a port forward to a Pod:Port and run curl to that target"
       requirements:
-        os: darwin
         executables: 
           - "kubectl"
           - "nc"
@@ -322,18 +435,6 @@ mcp:
         - "path.size() > 0"                                        # Path must not be empty
         - "path.matches('^/[^ ]+$')"                               # Path must start with a '/' and contain no spaces
       run:
-        runner: sandbox-exec
-        options:
-          allow_networking: true
-          allow_user_folders: false
-          allow_read_folders:
-            - "/usr/bin"
-            - "/bin"
-            - "/etc"
-            - "{{ env \"HOME\" }}/.kube"
-            - "{{ env \"KUBECONFIG\" }}"
-        env:
-          - KUBECONFIG
         command: |
 
           CONTEXT_PARAM="{{ if .context }}--context={{ .context }}{{ end }}"
@@ -366,6 +467,40 @@ mcp:
           {{ end }}
 
           # the 'trap ... EXIT' above will take care of kill $pid
+        env:
+          - KUBECONFIG
+        runners:
+          - name: sandbox-exec
+            requirements:
+              os: darwin
+              executables: [sandbox-exec]
+            options:
+              allow_networking: true
+              allow_user_folders: false
+              allow_read_folders:
+                - "/usr/bin"
+                - "/bin"
+                - "/etc"
+                - "{{ env \"HOME\" }}/.kube"
+                - "{{ env \"KUBECONFIG\" }}"
+          - name: firejail
+            requirements:
+              os: linux
+              executables: [firejail]
+            options:
+              allow_networking: true
+              allow_user_folders: false
+              allow_read_folders:
+                - "/usr/bin"
+                - "/bin"
+                - "/etc"
+                - "{{ env \"HOME\" }}/.kube"
+                - "{{ env \"KUBECONFIG\" }}"
+          - name: exec
+            requirements: {}
+      output:
+        prefix: |
+          Port forwarding to pod {{ .pod }}:{{ .pod_port }}:
 
     - name: "kubectl_envoy"
       description: |
@@ -399,7 +534,6 @@ mcp:
         for more information about these Envoy paths and the information they provide.
 
       requirements:
-        os: darwin
         executables: 
           - "kubectl"
           - "nc"
@@ -444,18 +578,6 @@ mcp:
         - "path.size() > 0"                                        # Path must not be empty
         - "path.matches('^/[^ ]+$')"                               # Path must start with a '/' and contain no spaces
       run:
-        runner: sandbox-exec
-        options:
-          allow_networking: true
-          allow_user_folders: false
-          allow_read_folders:
-            - "/usr/bin"
-            - "/bin"
-            - "/etc"
-            - "{{ env \"HOME\" }}/.kube"
-            - "{{ env \"KUBECONFIG\" }}"
-        env:
-          - KUBECONFIG
         command: |
 
           CONTEXT_PARAM="{{ if .context }}--context={{ .context }}{{ end }}"
@@ -488,3 +610,37 @@ mcp:
           {{ end }}
 
           # the 'trap ... EXIT' above will take care of kill $pid
+        env:
+          - KUBECONFIG
+        runners:
+          - name: sandbox-exec
+            requirements:
+              os: darwin
+              executables: [sandbox-exec]
+            options:
+              allow_networking: true
+              allow_user_folders: false
+              allow_read_folders:
+                - "/usr/bin"
+                - "/bin"
+                - "/etc"
+                - "{{ env \"HOME\" }}/.kube"
+                - "{{ env \"KUBECONFIG\" }}"
+          - name: firejail
+            requirements:
+              os: linux
+              executables: [firejail]
+            options:
+              allow_networking: true
+              allow_user_folders: false
+              allow_read_folders:
+                - "/usr/bin"
+                - "/bin"
+                - "/etc"
+                - "{{ env \"HOME\" }}/.kube"
+                - "{{ env \"KUBECONFIG\" }}"
+          - name: exec
+            requirements: {}
+      output:
+        prefix: |
+          Envoy configuration from pod {{ .pod }}:{{ .pod_port }}{{ .path }}:

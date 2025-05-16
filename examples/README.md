@@ -43,7 +43,7 @@ Please take a look at the examples found in
 https://github.com/inercia/MCPShell/tree/main/examples.
 They are YAML files that define groups of tools that can be used by an LLM.
 The configuration format is defined in
-https://github.com/inercia/MCPShell/blob/main/docs/configuration.md
+https://github.com/inercia/MCPShell/blob/main/docs/config.md
 Please create a new configuration file for running [YOUR COMMAND].
 Add constraints in order to make the command execution safe,
 checking paramters and so on.

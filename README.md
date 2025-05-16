@@ -16,9 +16,11 @@ It provides a secure bridge between LLMs and operating system commands.
 - **Configuration-based tool definitions**: Define tools in YAML with parameters,
   constraints, and output formatting.
 - **Security through constraints**: Validate tool parameters using CEL expressions
-  before execution, as well as optional **sanboxed environments** for running commands.
+  before execution, as well as optional [**sanboxed environments**](docs/config-runners.md)
+  for running commands.
 - **Robust error handling**: Graceful recovery from panics with detailed logging.
-- **Simple integration**: Works with any LLM supporting the MCP protocol.
+- **Simple integration**: Works with any LLM client supporting the MCP protocol
+  (ie, Cursor, VSCode, Witsy...)
 
 ## Quick Start
 
@@ -90,7 +92,7 @@ space problems in your hard disk.
 
 ## Configuration
 
-Configuration files use a YAML format defined [here](docs/configuration.md).
+Configuration files use a YAML format defined [here](docs/config.md).
 See the [this directory](examples) for some examples.
 
 ## Agent mode

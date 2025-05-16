@@ -69,10 +69,18 @@ func NewCommandHandler(tool config.Tool, params map[string]common.ParamConfig, s
 		logger.Printf("Successfully compiled constraints for tool '%s'", tool.MCPTool.Name)
 	}
 
+	// Get the effective command, runner type, and options from the tool
+	effectiveCommand := tool.GetEffectiveCommand()
+	effectiveRunnerType := tool.GetEffectiveRunner()
+	effectiveOptions := tool.GetEffectiveOptions()
+
+	logger.Printf("Using command: %s", effectiveCommand)
+	logger.Printf("Using runner type: %s", effectiveRunnerType)
+
 	// Convert the runner options to RunnerOptions
 	runnerOpts := RunnerOptions{}
-	if tool.Config.Run.Options != nil {
-		for k, v := range tool.Config.Run.Options {
+	if effectiveOptions != nil {
+		for k, v := range effectiveOptions {
 			runnerOpts[k] = v
 		}
 		logger.Printf("Runner options for tool '%s': %v", tool.MCPTool.Name, runnerOpts)
@@ -80,7 +88,7 @@ func NewCommandHandler(tool config.Tool, params map[string]common.ParamConfig, s
 
 	// Create and return the handler
 	return &CommandHandler{
-		cmd:                 tool.Config.Run.Command,
+		cmd:                 effectiveCommand,
 		output:              tool.Config.Output,
 		constraints:         tool.Config.Constraints,
 		params:              params,
@@ -88,7 +96,7 @@ func NewCommandHandler(tool config.Tool, params map[string]common.ParamConfig, s
 		envVars:             tool.Config.Run.Env,
 		shell:               shell,
 		toolName:            tool.MCPTool.Name,
-		runnerType:          tool.Config.Run.Runner,
+		runnerType:          effectiveRunnerType,
 		runnerOpts:          runnerOpts,
 		logger:              logger,
 	}, nil

@@ -56,9 +56,6 @@ type MCPToolConfig struct {
 	// Name is the unique identifier for the tool
 	Name string `yaml:"name"`
 
-	// Requirements is a list of tool names that must be executed before this tool
-	Requirements MCPToolRequirements `yaml:"requirements,omitempty"`
-
 	// Description explains what the tool does (shown to AI clients)
 	Description string `yaml:"description"`
 
@@ -87,19 +84,28 @@ type MCPToolRequirements struct {
 	Executables []string `yaml:"executables"`
 }
 
+// MCPToolRunner represents a specific execution environment for a tool.
+type MCPToolRunner struct {
+	// Name is the identifier for this runner (e.g., "osx", "linux")
+	Name string `yaml:"name"`
+
+	// Requirements are the prerequisites for this runner to be used
+	Requirements MCPToolRequirements `yaml:"requirements,omitempty"`
+
+	// Options for the runner
+	Options map[string]interface{} `yaml:"options,omitempty"`
+}
+
 // MCPToolRunConfig represents the run configuration for a tool.
 type MCPToolRunConfig struct {
-	// Runner is the type of runner to use for executing the command
-	Runner string `yaml:"runner,omitempty"`
-
 	// Command is a template for the shell command to execute
 	Command string `yaml:"command"`
 
 	// Env is a list of environment variable names to pass from the parent process
 	Env []string `yaml:"env,omitempty"`
 
-	// Options for the runner
-	Options map[string]interface{} `yaml:"options,omitempty"`
+	// Runners is a list of possible runner configurations
+	Runners []MCPToolRunner `yaml:"runners,omitempty"`
 }
 
 ////////////////////////////////////////////////////////////////////////////////////

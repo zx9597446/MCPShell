@@ -8,44 +8,80 @@ import (
 func TestCheckToolPrerequisites(t *testing.T) {
 	// Create test cases
 	tests := []struct {
-		name         string
-		requirements MCPToolRequirements
-		expected     bool
+		name     string
+		runners  []MCPToolRunner
+		expected bool
 	}{
 		{
-			name:         "No prerequisites",
-			requirements: MCPToolRequirements{},
-			expected:     true,
+			name:     "No runners (default exec runner)",
+			runners:  nil,
+			expected: true,
 		},
 		{
-			name: "Matching OS only",
-			requirements: MCPToolRequirements{
-				OS:          runtime.GOOS,
-				Executables: nil,
+			name: "One runner with matching OS",
+			runners: []MCPToolRunner{
+				{
+					Name: "compatible-runner",
+					Requirements: MCPToolRequirements{
+						OS: runtime.GOOS,
+					},
+				},
 			},
 			expected: true,
 		},
 		{
-			name: "Non-matching OS",
-			requirements: MCPToolRequirements{
-				OS:          "non-existent-os",
-				Executables: nil,
+			name: "One runner with non-matching OS",
+			runners: []MCPToolRunner{
+				{
+					Name: "incompatible-runner",
+					Requirements: MCPToolRequirements{
+						OS: "non-existent-os",
+					},
+				},
 			},
 			expected: false,
 		},
 		{
-			name: "Existing executable",
-			requirements: MCPToolRequirements{
-				Executables: []string{"sh"}, // should exist on most systems
+			name: "One runner with existing executable",
+			runners: []MCPToolRunner{
+				{
+					Name: "compatible-runner",
+					Requirements: MCPToolRequirements{
+						Executables: []string{"sh"}, // should exist on most systems
+					},
+				},
 			},
 			expected: true,
 		},
 		{
-			name: "Non-existent executable",
-			requirements: MCPToolRequirements{
-				Executables: []string{"non-existent-executable-12345"},
+			name: "One runner with non-existent executable",
+			runners: []MCPToolRunner{
+				{
+					Name: "incompatible-runner",
+					Requirements: MCPToolRequirements{
+						Executables: []string{"non-existent-executable-12345"},
+					},
+				},
 			},
 			expected: false,
+		},
+		{
+			name: "Multiple runners with one compatible",
+			runners: []MCPToolRunner{
+				{
+					Name: "incompatible-runner",
+					Requirements: MCPToolRequirements{
+						OS: "non-existent-os",
+					},
+				},
+				{
+					Name: "compatible-runner",
+					Requirements: MCPToolRequirements{
+						OS: runtime.GOOS,
+					},
+				},
+			},
+			expected: true,
 		},
 	}
 
@@ -54,12 +90,14 @@ func TestCheckToolPrerequisites(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			tool := Tool{
 				Config: MCPToolConfig{
-					Requirements: tt.requirements,
+					Run: MCPToolRunConfig{
+						Runners: tt.runners,
+					},
 				},
 			}
 			result := tool.checkToolRequirements()
 			if result != tt.expected {
-				t.Errorf("checkToolPrerequisites() = %v, expected %v", result, tt.expected)
+				t.Errorf("checkToolRequirements() = %v, expected %v", result, tt.expected)
 			}
 		})
 	}
@@ -73,23 +111,33 @@ func TestCreateTools_Prerequisites(t *testing.T) {
 				{
 					Name:        "tool1",
 					Description: "Tool with met prerequisites",
-					Requirements: MCPToolRequirements{
-						OS:          runtime.GOOS,
-						Executables: []string{"sh"}, // should exist on most systems
-					},
 					Run: MCPToolRunConfig{
 						Command: "echo 'Tool 1'",
+						Runners: []MCPToolRunner{
+							{
+								Name: "compatible-runner",
+								Requirements: MCPToolRequirements{
+									OS:          runtime.GOOS,
+									Executables: []string{"sh"}, // should exist on most systems
+								},
+							},
+						},
 					},
 				},
 				{
 					Name:        "tool2",
 					Description: "Tool with unmet prerequisites",
-					Requirements: MCPToolRequirements{
-						OS:          "non-existent-os",
-						Executables: []string{"non-existent-executable-12345"},
-					},
 					Run: MCPToolRunConfig{
 						Command: "echo 'Tool 2'",
+						Runners: []MCPToolRunner{
+							{
+								Name: "incompatible-runner",
+								Requirements: MCPToolRequirements{
+									OS:          "non-existent-os",
+									Executables: []string{"non-existent-executable-12345"},
+								},
+							},
+						},
 					},
 				},
 			},
