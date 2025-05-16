@@ -24,6 +24,9 @@ type ParamConfig struct {
 
 	// Required indicates whether the parameter must be provided
 	Required bool `yaml:"required,omitempty"`
+
+	// Default specifies a default value to use when the parameter is not provided
+	Default interface{} `yaml:"default,omitempty"`
 }
 
 // LoggingConfig defines configuration options for application logging.

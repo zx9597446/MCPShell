@@ -136,6 +136,14 @@ will be reported.
 			params[paramName] = typedValue
 		}
 
+		// Apply default values for parameters that aren't provided but have defaults
+		for paramName, paramConfig := range targetTool.Params {
+			if _, exists := params[paramName]; !exists && paramConfig.Default != nil {
+				logger.Info("Using default value for parameter '%s': %v", paramName, paramConfig.Default)
+				params[paramName] = paramConfig.Default
+			}
+		}
+
 		// Check required parameters
 		for paramName, paramConfig := range targetTool.Params {
 			if paramConfig.Required {

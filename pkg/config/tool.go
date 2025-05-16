@@ -129,25 +129,47 @@ func CreateMCPTool(config MCPToolConfig) mcp.Tool {
 			paramType = "string"
 		}
 
+		// Create options for the parameter
+		var paramOptions []mcp.PropertyOption
+
+		// Add description
+		paramOptions = append(paramOptions, mcp.Description(param.Description))
+
+		// Add required option if needed
+		if param.Required {
+			paramOptions = append(paramOptions, mcp.Required())
+		}
+
+		// Add default value if specified
+		if param.Default != nil {
+			switch paramType {
+			case "string":
+				if strVal, ok := param.Default.(string); ok {
+					paramOptions = append(paramOptions, mcp.DefaultString(strVal))
+				}
+			case "number", "integer":
+				if numVal, ok := param.Default.(float64); ok {
+					paramOptions = append(paramOptions, mcp.DefaultNumber(numVal))
+				} else if intVal, ok := param.Default.(int64); ok {
+					paramOptions = append(paramOptions, mcp.DefaultNumber(float64(intVal)))
+				} else if intVal, ok := param.Default.(int); ok {
+					paramOptions = append(paramOptions, mcp.DefaultNumber(float64(intVal)))
+				}
+			case "boolean":
+				if boolVal, ok := param.Default.(bool); ok {
+					paramOptions = append(paramOptions, mcp.DefaultBool(boolVal))
+				}
+			}
+		}
+
+		// Create parameter with the appropriate type
 		switch paramType {
 		case "string":
-			if param.Required {
-				options = append(options, mcp.WithString(name, mcp.Required(), mcp.Description(param.Description)))
-			} else {
-				options = append(options, mcp.WithString(name, mcp.Description(param.Description)))
-			}
+			options = append(options, mcp.WithString(name, paramOptions...))
 		case "number", "integer":
-			if param.Required {
-				options = append(options, mcp.WithNumber(name, mcp.Required(), mcp.Description(param.Description)))
-			} else {
-				options = append(options, mcp.WithNumber(name, mcp.Description(param.Description)))
-			}
+			options = append(options, mcp.WithNumber(name, paramOptions...))
 		case "boolean":
-			if param.Required {
-				options = append(options, mcp.WithBoolean(name, mcp.Required(), mcp.Description(param.Description)))
-			} else {
-				options = append(options, mcp.WithBoolean(name, mcp.Description(param.Description)))
-			}
+			options = append(options, mcp.WithBoolean(name, paramOptions...))
 		}
 	}
 

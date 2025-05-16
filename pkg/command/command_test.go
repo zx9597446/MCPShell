@@ -4,6 +4,7 @@ import (
 	"context"
 	"io"
 	"log"
+	"os"
 	"strings"
 	"testing"
 
@@ -249,6 +250,119 @@ func TestCommandHandler(t *testing.T) {
 				if result.IsError {
 					t.Errorf("CommandHandler.GetMCPHandler() returned a result with IsError=true when not expected")
 					return
+				}
+			}
+		})
+	}
+}
+
+// TestCommandHandlerDefaults tests that default values are applied correctly
+func TestCommandHandlerDefaults(t *testing.T) {
+	logger := log.New(os.Stdout, "", log.LstdFlags)
+
+	// Create a command handler with parameters that have default values
+	params := map[string]common.ParamConfig{
+		"name": {
+			Type:        "string",
+			Description: "A name parameter",
+			Default:     "default-name",
+		},
+		"count": {
+			Type:        "number",
+			Description: "A numeric parameter",
+			Default:     42.5,
+		},
+		"enabled": {
+			Type:        "boolean",
+			Description: "A boolean parameter",
+			Default:     true,
+		},
+		"required_param": {
+			Type:        "string",
+			Description: "A required parameter",
+			Required:    true,
+		},
+	}
+
+	// Create a simple command that echoes the parameters
+	echoCmd := `echo "name={{.name}} count={{.count}} enabled={{.enabled}} required={{.required_param}}"`
+
+	tool := config.Tool{
+		MCPTool: mcp.Tool{
+			Name: "test-tool",
+		},
+		Config: config.MCPToolConfig{
+			Name:        "test-tool",
+			Description: "Test tool",
+			Run: config.MCPToolRunConfig{
+				Command: echoCmd,
+			},
+		},
+	}
+
+	handler, err := NewCommandHandler(tool, params, "sh", logger)
+	if err != nil {
+		t.Fatalf("Failed to create command handler: %v", err)
+	}
+
+	tests := []struct {
+		name           string
+		args           map[string]interface{}
+		shouldSucceed  bool
+		expectedOutput string
+	}{
+		{
+			name:          "missing required parameter",
+			args:          map[string]interface{}{},
+			shouldSucceed: false,
+		},
+		{
+			name: "all default values applied",
+			args: map[string]interface{}{
+				"required_param": "provided-required-value",
+			},
+			shouldSucceed:  true,
+			expectedOutput: "name=default-name count=42.5 enabled=true required=provided-required-value",
+		},
+		{
+			name: "provided values not overridden by defaults",
+			args: map[string]interface{}{
+				"name":           "provided-name",
+				"count":          100,
+				"enabled":        false,
+				"required_param": "provided-required-value",
+			},
+			shouldSucceed:  true,
+			expectedOutput: "name=provided-name count=100 enabled=false required=provided-required-value",
+		},
+		{
+			name: "some defaults applied, some provided",
+			args: map[string]interface{}{
+				"name":           "provided-name",
+				"required_param": "provided-required-value",
+			},
+			shouldSucceed:  true,
+			expectedOutput: "name=provided-name count=42.5 enabled=true required=provided-required-value",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			output, err := handler.ExecuteCommand(tt.args)
+
+			if tt.shouldSucceed && err != nil {
+				t.Errorf("Expected success but got error: %v", err)
+			}
+
+			if !tt.shouldSucceed && err == nil {
+				t.Error("Expected error but got success")
+			}
+
+			if tt.shouldSucceed {
+				// Check if output contains expected strings
+				trimmedOutput := strings.TrimSpace(output)
+				if !strings.Contains(trimmedOutput, tt.expectedOutput) {
+					t.Errorf("Expected output containing '%s', got '%s'", tt.expectedOutput, trimmedOutput)
 				}
 			}
 		})

@@ -19,6 +19,7 @@ mcp:
           type: <string|number|boolean>
           description: "<parameter description>"
           required: <true|false>
+          default: <value>
       constraints:
         - "<constraint expression>"
       run:
@@ -66,8 +67,13 @@ Each tool is defined with the following properties:
 Each parameter has the following properties:
 
 - `type`: The parameter type (string, number, or boolean). Optional, defaults to "string" if not specified.
-- `description`: A description of the parameter
+- `description`: A description of the parameter. Be verbose on this description,
+  as it will be used by the LLM for knowing how to pass this information to the tool.
 - `required`: Whether the parameter is required (default: false)
+- `default`: A default value to use when the parameter is not provided by the LLM.
+  The value must match the parameter type (string, number, or boolean).
+
+Default values provide fallback values for optional parameters when they aren't specified by the LLM or command line. This allows tools to have sensible defaults while still allowing explicit values to be provided when needed. Default values are applied before constraint evaluation.
 
 ### Constraints
 

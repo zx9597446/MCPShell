@@ -26,6 +26,24 @@ func (h *CommandHandler) executeToolCommand(ctx context.Context, params map[stri
 	h.logger.Printf("Tool execution requested for '%s'", h.toolName)
 	h.logger.Printf("Arguments: %v", params)
 
+	// Apply default values for parameters that aren't provided but have defaults
+	for paramName, paramConfig := range h.params {
+		if _, exists := params[paramName]; !exists && paramConfig.Default != nil {
+			h.logger.Printf("Using default value for parameter '%s': %v", paramName, paramConfig.Default)
+			params[paramName] = paramConfig.Default
+		}
+	}
+
+	// Check for required parameters that weren't provided and don't have defaults
+	for paramName, paramConfig := range h.params {
+		if paramConfig.Required {
+			if _, exists := params[paramName]; !exists {
+				h.logger.Printf("Required parameter missing: %s", paramName)
+				return "", nil, fmt.Errorf("required parameter missing: %s", paramName)
+			}
+		}
+	}
+
 	// Validate constraints before executing command
 	var failedConstraints []string
 	if h.constraintsCompiled != nil {
