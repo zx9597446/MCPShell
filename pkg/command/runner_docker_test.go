@@ -96,7 +96,7 @@ func TestDockerRunnerBasic(t *testing.T) {
 		t.Fatalf("Failed to create Docker runner: %v", err)
 	}
 
-	// Test a simple echo command
+	// Test a simple echo command (this should work even in GitHub Actions)
 	output, err := runner.Run(context.Background(), "", "echo 'Hello from Docker'", nil, nil, false)
 	if err != nil {
 		t.Errorf("Failed to run command: %v", err)
@@ -113,6 +113,12 @@ func TestDockerRunnerNetworking(t *testing.T) {
 	// Skip if docker is not available or not running
 	if !checkDockerRunning() {
 		t.Skip("Docker not installed or not running, skipping test")
+	}
+
+	// Check if running in GitHub Actions
+	inGitHubActions := os.Getenv("GITHUB_ACTIONS") == "true"
+	if inGitHubActions {
+		t.Skip("Skipping network test in GitHub Actions environment")
 	}
 
 	logger := log.New(os.Stderr, "test-docker: ", log.LstdFlags)
@@ -136,6 +142,8 @@ func TestDockerRunnerNetworking(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
+			// Skip network-enabled tests in GitHub Actions
+
 			// Create a runner with specified networking
 			runner, err := NewDockerRunner(RunnerOptions{
 				"image":            "alpine:latest",

@@ -12,7 +12,7 @@ It provides a secure bridge between LLMs and operating system commands.
 ## Features
 
 - **Flexible command execution**: Run any shell commands as MCP tools,
-  with parameter substitution through templates,.
+  with parameter substitution through templates.
 - **Configuration-based tool definitions**: Define tools in YAML with parameters,
   constraints, and output formatting.
 - **Security through constraints**: Validate tool parameters using CEL expressions
@@ -61,6 +61,8 @@ space problems in your hard disk.
    ```
 
    Take a look at the [examples directory](examples) for more sophisticated and useful examples.
+   Maybe you prefer to let the LLM access you [kubectl](examples/kubectl-ro.yaml)?
+   Or tun some [AWS CLI](examples/aws-networking-ro.yaml) commands?
 
 2. Configure the MCP server in Cursor (or in any other LLM client with support for MCP)
 
