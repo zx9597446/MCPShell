@@ -47,7 +47,7 @@ The MCPShell uses the "stdio" transport type, which runs locally on your machine
         "mcpshell": {
             "command": "go",
             "args": [
-                "run", "github.com/inercia/MCPShell@v0.1.0",
+                "run", "github.com/inercia/MCPShell@v0.1.1",
                 "mcp", "--config", "/absolute/path/to/mcp-cli.yaml"
             ]
         }
