@@ -1,7 +1,8 @@
 #!/bin/bash
 
-# Set script directory for relative paths
+# Source common utilities
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "$SCRIPT_DIR/common.sh"
 
 # Test files to run
 TEST_FILES=(
@@ -9,13 +10,8 @@ TEST_FILES=(
     "test_exe.sh"
     "test_exe_empty_file.sh"
     "test_exe_constraints.sh"
+    "test_runner_docker.sh"
 )
-
-# Colors for output
-GREEN='\033[0;32m'
-RED='\033[0;31m'
-YELLOW='\033[0;33m'
-NC='\033[0m' # No Color
 
 echo "==================================="
 echo "MCPShell E2E Tests"
@@ -28,10 +24,12 @@ chmod +x "$SCRIPT_DIR"/*.sh
 PASSED=0
 FAILED=0
 
+export E2E_LOG_FILE="$SCRIPT_DIR/e2e_output.log"
+
 # Run each test
 for test_file in "${TEST_FILES[@]}"; do
-    echo -e "\n${YELLOW}Running test: $test_file${NC}"
-    echo "-----------------------------------"
+    echo
+    warning "Running test: $test_file"
     
     # Execute the test script
     "$SCRIPT_DIR/$test_file"
@@ -39,27 +37,26 @@ for test_file in "${TEST_FILES[@]}"; do
     
     # Check test result
     if [ $RESULT -eq 0 ]; then
-        echo -e "${GREEN}✓ Test passed: $test_file${NC}"
+        success "Test passed: $test_file"
         ((PASSED++))
     else
-        echo -e "${RED}✗ Test failed: $test_file with exit code $RESULT${NC}"
+        failure "Test failed: $test_file with exit code $RESULT"
         ((FAILED++))
     fi
     
-    echo "-----------------------------------"
+    separator
 done
 
 # Print summary
-echo -e "\n==================================="
+echo
+echo "==================================="
 echo "Test Summary:"
-echo -e "${GREEN}Tests passed: $PASSED${NC}"
-echo -e "${RED}Tests failed: $FAILED${NC}"
+success "Tests passed: $PASSED"
+[ $FAILED -eq 0 ] || failure "Tests failed: $FAILED"
 echo "Total tests: $((PASSED + FAILED))"
 echo "==================================="
 
 # Return non-zero exit code if any tests failed
-if [ $FAILED -gt 0 ]; then
-    exit 1
-fi
+[ $FAILED -eq 0 ] || exit 1
 
 exit 0 

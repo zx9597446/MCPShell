@@ -24,12 +24,13 @@ var exeCommand = &cobra.Command{
 	Use:   "exe",
 	Short: "Execute a MCP tool",
 	Long: `
-Execution of a MCP tool.
+Direct execution of a MCP tool.
 
-This command will execute a MCP tool. Sometimes it is difficult to debug
-the execution of a MCP tool. This command will help you to debug the tool
-by executing it with the given parameters, following the whole process
-of constraint evaluation, tool selection and tool execution.
+This command will just execute a MCP tool, with the given parameters.
+Sometimes it is difficult to debug the execution of a MCP tool.
+This command will help you to debug the tool by executing it with
+the given parameters, following the whole process of constraint
+evaluation, tool selection and tool execution.
 
 For example, you can run:
 

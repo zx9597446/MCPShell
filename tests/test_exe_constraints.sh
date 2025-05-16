@@ -2,64 +2,52 @@
 # Test script for the mcpshell exe command
 # Tests that constraint violations are properly enforced
 
-# Set up
+# Source common utilities
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "$SCRIPT_DIR/common.sh"
+
+# Test configuration
+CONFIG_FILE="$SCRIPT_DIR/test_exe_config.yaml"
 TEST_NAME="test_exe_constraints"
-CONFIG_FILE="$(dirname "$0")/test_exe_config.yaml"
-INVALID_PATH="/etc/invalid_test_file.txt"  # Not in /tmp, should violate constraint
 
 #####################################################################################
+# Start the test
 
-# ANSI color codes
-RED='\033[0;31m'
-GREEN='\033[0;32m'
-BLUE='\033[0;34m'
-RESET='\033[0m'
+testcase "$TEST_NAME"
 
-# Print test header
-echo -e "${BLUE}----------------------------------------${RESET}"
-echo -e "${BLUE}=== Running test: $TEST_NAME ===${RESET}"
-echo -e "${BLUE}----------------------------------------${RESET}"
-echo -e "${BLUE}Configuration file: $CONFIG_FILE${RESET}"
-echo -e "${BLUE}Invalid path (expected to fail): $INVALID_PATH${RESET}"
-echo -e "${BLUE}----------------------------------------${RESET}"
+info_blue "Configuration file: $CONFIG_FILE"
 
-# Build the exe command with a path that violates the constraint
-EXE_CMD="go run main.go exe -c $CONFIG_FILE create_file filepath=$INVALID_PATH"
-echo "Executing: $EXE_CMD"
+# Make sure we have the CLI binary
+check_cli_exists
 
-# Run the command - this should fail due to constraint violation
-eval "$EXE_CMD"
+# Test a path that would fail constraint checks
+INVALID_PATH="/etc/invalid_test_file.txt"
+info "Invalid path (expected to fail): $INVALID_PATH"
+separator
+
+# Command to test with invalid path
+CMD="$CLI_BIN exe -c $CONFIG_FILE create_file filepath=$INVALID_PATH"
+
+info "Executing: $CMD"
+OUTPUT=$(eval "$CMD" 2>&1)
 RESULT=$?
+[ -n "$E2E_LOG_FILE" ] && echo -e "\n$TEST_NAME:\n\n$OUTPUT" >> "$E2E_LOG_FILE"
 
-# Check the result - we EXPECT this to fail
-if [ $RESULT -eq 0 ]; then
-    echo "ERROR: Command execution succeeded, but should have failed due to constraint violation"
-    # Check if the file was actually created (it shouldn't have been)
-    if [ -f "$INVALID_PATH" ]; then
-        echo -e "${RED}CRITICAL ERROR: File was created at $INVALID_PATH despite constraint violation!${RESET}"
-        # We don't attempt to delete this file as it would be in a system directory
-        echo -e "${RED}Please manually remove this file if you have appropriate permissions.${RESET}"
-        exit 2
-    fi
-    exit 1
-fi
+# This should fail, so we expect a non-zero exit code
+[ $RESULT -ne 0 ] || fail "Command unexpectedly succeeded with invalid path!" "$OUTPUT"
 
-echo "Command failed as expected. Testing constraint violation for path containing injection character."
+success "Command failed as expected. Testing constraint violation for path containing injection character."
 
-# Try another constraint violation - injection character
+# Test path with shell injection attempt
 INJECTION_PATH="/tmp/test;rm -rf /"
-EXE_CMD="go run main.go exe -c $CONFIG_FILE create_file filepath=\"$INJECTION_PATH\""
-echo "Executing: $EXE_CMD"
+CMD="$CLI_BIN exe -c $CONFIG_FILE create_file filepath=\"$INJECTION_PATH\""
 
-# Run the command - this should fail due to constraint violation
-eval "$EXE_CMD"
+info "Executing: $CMD"
+OUTPUT=$(eval "$CMD" 2>&1)
 RESULT=$?
 
-# Check the result - we EXPECT this to fail
-if [ $RESULT -eq 0 ]; then
-    echo -e "${RED}ERROR: Command execution succeeded, but should have failed due to constraint violation${RESET}"
-    exit 1
-fi
+# This should fail too
+[ $RESULT -ne 0 ] || fail "Command unexpectedly succeeded with injection character!" "$OUTPUT"
 
-echo -e "${GREEN}Test successful! The exe command correctly enforced constraints.${RESET}"
+success "Test successful! The exe command correctly enforced constraints."
 exit 0 

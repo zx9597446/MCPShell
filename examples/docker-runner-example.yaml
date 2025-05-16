@@ -105,6 +105,50 @@ mcp:
         prefix: |
           File analysis ({{ .operation }}) for {{ .filepath }}:
 
+    - name: "docker_with_dependencies"
+      description: "Run a command in a container after installing required packages"
+      params:
+        command:
+          type: string
+          description: "Command to execute"
+          required: true
+      constraints:
+        - "command.size() > 0"
+        - "command.size() <= 500"
+        - "!command.contains('sudo')"
+        - "!command.contains('apt')"
+        - "!command.contains('&')"
+        - "!command.contains(';')"
+        - "!command.contains('|')"
+        - "!command.contains('>')"
+      run:
+        command: |
+          {{ .command }}
+        runners:
+          - name: docker
+            requirements:
+              executables: [docker]
+            options:
+              image: "debian:bullseye-slim"
+              prepare_command: |
+                # Update package lists
+                apt-get update -y
+                
+                # Install commonly needed tools
+                apt-get install -y --no-install-recommends \
+                  curl \
+                  wget \
+                  jq \
+                  ca-certificates
+                
+                # Clean up to reduce image size
+                apt-get clean
+                rm -rf /var/lib/apt/lists/*
+              allow_networking: true
+      output:
+        prefix: |
+          Command output with pre-installed dependencies:
+
     - name: "cross_platform_command"
       description: "Execute a command with the appropriate runner for the platform"
       params:

@@ -197,9 +197,12 @@ The run configuration defines how the tool executes:
 
 - `command`: A shell command to execute (required)
 - `env`: A list of environment variable names to pass from the parent process to the command (optional)
+  - Environment variablees can be just names (ie, `KUBECONFIG`),
+    assignments (ie, `KUBECONFIG=/some/path`) or event templated
+    assignments (ie, `KUBECONFIG={{ .kubeconfig }}`).
 - `runners`: An array of runner configurations that will be used to execute the command (optional)
 
-Commands can include parameter values using Go template syntax with `{{ .param_name }}`.
+Commands can use the Go template syntax, including the presence of parameters like `{{ .param_name }}`.
 
 Example specifying environment variables to pass through:
 
@@ -208,6 +211,7 @@ run:
   env:
     - KUBECONFIG     # Pass the KUBECONFIG environment variable to the command
     - HOME           # Pass the HOME environment variable to the command
+    - TESTS=false    # Pass some env variables wwith some values
   command: |
     kubectl get {{ .resource }}
 ```

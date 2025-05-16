@@ -573,7 +573,7 @@ func (s *Server) ExecuteTool(ctx context.Context, toolName string, args map[stri
 								// Simple variable substitution for ${variable} format
 								for argName, argValue := range args {
 									if strValue, ok := argValue.(string); ok {
-										template = strings.Replace(template, "${"+argName+"}", strValue, -1)
+										template = strings.ReplaceAll(template, "${"+argName+"}", strValue)
 									}
 								}
 								resultText = template

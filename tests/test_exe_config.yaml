@@ -27,7 +27,7 @@ mcp:
           if [ -n "{{ .content }}" ]; then
             echo "{{ .content }}" > {{ .filepath }}
           else
-            touch {{ .filepath }}
+            echo "Default content for an empty file." > {{ .filepath }}
           fi
           echo "File created at: {{ .filepath }}"
       output:

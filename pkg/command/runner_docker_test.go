@@ -5,6 +5,7 @@ import (
 	"log"
 	"os"
 	"os/exec"
+	"strings"
 	"testing"
 	"time"
 
@@ -22,9 +23,8 @@ func checkDockerRunning() bool {
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
 
-	cmd := exec.CommandContext(ctx, "docker", "ps", "--format", "{{.ID}}", "--no-trunc", "--limit", "1")
+	cmd := exec.CommandContext(ctx, "docker", "stats", "--no-stream")
 	err := cmd.Run()
-
 	return err == nil
 }
 
@@ -157,5 +157,83 @@ func TestDockerRunnerNetworking(t *testing.T) {
 				t.Errorf("Expected network ping to fail but it succeeded")
 			}
 		})
+	}
+}
+
+func TestDockerRunnerEnvironmentVariables(t *testing.T) {
+	// Skip if docker is not available or not running
+	if !checkDockerRunning() {
+		t.Skip("Docker not installed or not running, skipping test")
+	}
+
+	logger := log.New(os.Stderr, "test-docker: ", log.LstdFlags)
+
+	// Create a runner with alpine image
+	runner, err := NewDockerRunner(RunnerOptions{
+		"image": "alpine:latest",
+	}, logger)
+
+	if err != nil {
+		t.Fatalf("Failed to create Docker runner: %v", err)
+	}
+
+	// Define environment variables to pass to the container
+	env := []string{
+		"TEST_VAR1=test_value1",
+		"TEST_VAR2=test_value2",
+		"TEST_VAR3=value_with_underscores",
+	}
+
+	// Run a command that echoes the environment variables
+	output, err := runner.Run(context.Background(), "", "echo $TEST_VAR1,$TEST_VAR2,$TEST_VAR3", env, nil, false)
+	if err != nil {
+		t.Errorf("Failed to run command with environment variables: %v", err)
+	}
+
+	// Check the output contains the environment variable values
+	expected := "test_value1,test_value2,value_with_underscores"
+	if output != expected {
+		t.Errorf("Environment variables not correctly passed. Expected %q, got %q", expected, output)
+	}
+
+	// Test with a mix of shell variables and environment variables
+	output, err = runner.Run(context.Background(), "sh", "echo $TEST_VAR1 and $TEST_VAR2", env, nil, false)
+	if err != nil {
+		t.Errorf("Failed to run command with mixed variables: %v", err)
+	}
+
+	// Check that at least the environment variables are included in the output
+	if !strings.Contains(output, "test_value1") || !strings.Contains(output, "test_value2") {
+		t.Errorf("Environment variables not found in output with shell variables: %q", output)
+	}
+}
+
+func TestDockerRunnerPrepareCommand(t *testing.T) {
+	// Skip if docker is not available or not running
+	if !checkDockerRunning() {
+		t.Skip("Docker not installed or not running, skipping test")
+	}
+
+	logger := log.New(os.Stderr, "test-docker: ", log.LstdFlags)
+
+	// Create a runner with alpine image and prepare command to install grep
+	runner, err := NewDockerRunner(RunnerOptions{
+		"image":           "alpine:latest",
+		"prepare_command": "apk add --no-cache grep",
+	}, logger)
+
+	if err != nil {
+		t.Fatalf("Failed to create Docker runner: %v", err)
+	}
+
+	// Run grep command that should only work if the prepare_command executed properly
+	output, err := runner.Run(context.Background(), "", "grep --version | head -n 1", nil, nil, false)
+	if err != nil {
+		t.Errorf("Failed to run command that requires prepare_command: %v", err)
+	}
+
+	// Check the output contains grep version information
+	if !strings.Contains(output, "grep") {
+		t.Errorf("Expected output to contain grep version information, got: %q", output)
 	}
 }

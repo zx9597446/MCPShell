@@ -4,7 +4,6 @@ package command
 import (
 	"context"
 	"fmt"
-	"io/ioutil"
 	"log"
 	"os"
 	"os/exec"
@@ -40,6 +39,9 @@ type DockerRunnerOptions struct {
 
 	// Working directory inside the container
 	WorkDir string `json:"workdir"`
+
+	// PrepareCommand is a command to run before the main command
+	PrepareCommand string `json:"prepare_command"`
 }
 
 // parseDockerOptions extracts Docker-specific options from generic runner options.
@@ -86,6 +88,11 @@ func parseDockerOptions(genericOpts RunnerOptions) (DockerRunnerOptions, error) 
 		opts.WorkDir = workDir
 	}
 
+	// Parse prepare command option
+	if prepareCommand, ok := genericOpts["prepare_command"].(string); ok {
+		opts.PrepareCommand = prepareCommand
+	}
+
 	return opts, nil
 }
 
@@ -108,7 +115,7 @@ func NewDockerRunner(options RunnerOptions, logger *log.Logger) (*DockerRunner, 
 	// Check if Docker daemon is running
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
-	cmd := exec.CommandContext(ctx, "docker", "ps", "--format", "{{.ID}}", "--no-trunc", "--limit", "1")
+	cmd := exec.CommandContext(ctx, "docker", "stats", "--no-stream")
 	if err := cmd.Run(); err != nil {
 		return nil, fmt.Errorf("docker daemon is not running: %w", err)
 	}
@@ -126,7 +133,13 @@ func (r *DockerRunner) Run(ctx context.Context, shell string, cmd string, env []
 	if err != nil {
 		return "", fmt.Errorf("failed to create script file: %w", err)
 	}
-	defer os.Remove(scriptFile)
+
+	// Use a named function for deferred cleanup to handle the error
+	defer func() {
+		if err := os.Remove(scriptFile); err != nil {
+			r.logger.Printf("Warning: failed to remove temporary script file %s: %v", scriptFile, err)
+		}
+	}()
 
 	r.logger.Printf("Created temporary script file: %s", scriptFile)
 
@@ -155,34 +168,66 @@ func (r *DockerRunner) Run(ctx context.Context, shell string, cmd string, env []
 
 // createScriptFile writes the command to a temporary script file.
 func (r *DockerRunner) createScriptFile(shell string, cmd string, env []string) (string, error) {
-	tmpDir := os.TempDir()
-	scriptFile := filepath.Join(tmpDir, fmt.Sprintf("mcpshell-docker-%d.sh", os.Getpid()))
+	// Create a temporary file with a specific pattern
+	tmpFile, err := os.CreateTemp("", "mcpshell-docker-*.sh")
+	if err != nil {
+		return "", fmt.Errorf("failed to create temporary script file: %w", err)
+	}
+
+	// Get the name for later usage
+	scriptPath := tmpFile.Name()
 
 	// Prepare script content
-	content := "#!/bin/sh\n\n"
+	var content strings.Builder
+	content.WriteString("#!/bin/sh\n\n")
 
 	// Add environment variables
 	for _, e := range env {
 		parts := strings.SplitN(e, "=", 2)
 		if len(parts) == 2 {
-			content += fmt.Sprintf("export %s=%s\n", parts[0], parts[1])
+			fmt.Fprintf(&content, "export %s=%s\n", parts[0], parts[1])
 		}
 	}
 
-	// Add the command
-	content += "\n# Command to execute\n"
+	// Add preparation command if specified
+	if r.opts.PrepareCommand != "" {
+		content.WriteString("\n# Preparation commands\n")
+		content.WriteString(r.opts.PrepareCommand)
+		content.WriteString("\n\n")
+		r.logger.Printf("Added preparation command to script: %s", r.opts.PrepareCommand)
+	}
+
+	// Add the main command
+	content.WriteString("# Main command to execute\n")
 	if shell != "" {
-		content += fmt.Sprintf("exec %s -c %q\n", shell, cmd)
+		fmt.Fprintf(&content, "exec %s -c %q\n", shell, cmd)
 	} else {
-		content += fmt.Sprintf("exec sh -c %q\n", cmd)
+		fmt.Fprintf(&content, "exec sh -c %q\n", cmd)
 	}
 
-	// Write the script
-	if err := ioutil.WriteFile(scriptFile, []byte(content), 0755); err != nil {
-		return "", err
+	// Write the content to the file
+	if _, err := tmpFile.WriteString(content.String()); err != nil {
+		// Close and remove the file in case of an error
+		_ = tmpFile.Close()       // Ignore close error, we already have a write error
+		_ = os.Remove(scriptPath) // Best effort cleanup
+		return "", fmt.Errorf("failed to write to temporary script file: %w", err)
 	}
 
-	return scriptFile, nil
+	// Make the file executable (chmod +x)
+	if err := os.Chmod(scriptPath, 0755); err != nil {
+		_ = tmpFile.Close()       // Ignore close error, we already have a chmod error
+		_ = os.Remove(scriptPath) // Best effort cleanup
+		return "", fmt.Errorf("failed to make script file executable: %w", err)
+	}
+
+	// Close the file
+	if err := tmpFile.Close(); err != nil {
+		_ = os.Remove(scriptPath) // Best effort cleanup
+		return "", fmt.Errorf("failed to close temporary script file: %w", err)
+	}
+
+	r.logger.Printf("Created temporary script file at: %s", scriptPath)
+	return scriptPath, nil
 }
 
 // buildDockerCommand constructs the docker run command.

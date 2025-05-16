@@ -68,12 +68,10 @@ func (h *CommandHandler) executeToolCommand(ctx context.Context, params map[stri
 	// h.logger.Printf("Processed command: %s", cmd)
 
 	// Prepare environment variables
-	env := h.getEnvironmentVariables()
+	env := h.getEnvironmentVariables(params)
 
 	h.logger.Printf("Executing command:")
-	h.logger.Printf("------------------------------------------------------")
-	h.logger.Printf("\n%s\n", cmd)
-	h.logger.Printf("------------------------------------------------------")
+	h.logger.Printf("\n------------------------------------------------------\n%s\n------------------------------------------------------\n", cmd)
 
 	// Determine which runner to use based on the configuration
 	runnerType := RunnerTypeExec // default runner

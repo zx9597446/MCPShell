@@ -1,0 +1,55 @@
+mcp:
+  description: "Docker runner test configuration"
+  run:
+    shell: bash
+  tools:
+    - name: "docker_hello"
+      description: "Simple hello world command running in Alpine container"
+      run:
+        command: |
+          echo "Hello from Docker container"
+        runners:
+          - name: docker
+            requirements:
+              executables: [docker]
+            options:
+              image: "alpine:latest"
+      output:
+        format: string
+    
+    - name: "docker_with_env"
+      description: "Echo environment variables in a container"
+      params:
+        message:
+          type: string
+          description: "Message to echo"
+          required: true
+      run:
+        command: |
+          echo "Message: ${TEST_MESSAGE}"
+        env:
+          - TEST_MESSAGE={{ .message }}
+        runners:
+          - name: docker
+            requirements:
+              executables: [docker]
+            options:
+              image: "alpine:latest"
+      output:
+        format: string
+
+    - name: "docker_with_prepare"
+      description: "Run a command with preparation"
+      run:
+        command: |
+          grep --version
+        runners:
+          - name: docker
+            requirements:
+              executables: [docker]
+            options:
+              image: "alpine:latest"
+              prepare_command: |
+                apk add --no-cache grep
+      output:
+        format: string 

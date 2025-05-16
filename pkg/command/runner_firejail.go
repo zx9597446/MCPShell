@@ -151,7 +151,11 @@ func (r *RunnerFirejail) Run(ctx context.Context,
 		r.logger.Printf("Failed to create temporary command file: %v", err)
 		return "", fmt.Errorf("failed to create temporary command file: %w", err)
 	}
-	defer os.Remove(tmpFile.Name())
+	defer func() {
+		if err := os.Remove(tmpFile.Name()); err != nil {
+			r.logger.Printf("Warning: failed to remove temporary command file: %v", err)
+		}
+	}()
 
 	// write the command to the temporary file
 	if _, err := tmpFile.WriteString(fullCmd); err != nil {

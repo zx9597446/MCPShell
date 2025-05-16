@@ -204,6 +204,10 @@ runners:
       user: "1000:1000"                 # Optional: User to run as in container
       workdir: "/app"                   # Optional: Working directory in container
       docker_run_opts: "--cpus 1 --memory 512m"  # Optional: Additional docker run options
+      prepare_command: |
+        # Commands to run before the main command
+        apt-get update
+        apt-get install -y python3
 ```
 
 #### Requirements
@@ -221,6 +225,7 @@ Available options:
 - `user`: Specify the user to run as within the container (format: "uid" or "uid:gid")
 - `workdir`: Set the working directory inside the container
 - `docker_run_opts`: String of additional options to pass to the `docker run` command
+- `prepare_command`: Commands to run before the main command (e.g., for installing packages or setting up the environment)
 
 #### Security Benefits
 
@@ -275,6 +280,33 @@ runners:
         - "/tmp:/tmp"
       workdir: "/data"
 ```
+
+##### Container With Package Installation
+
+```yaml
+runners:
+  - name: docker
+    requirements:
+      executables: [docker]
+    options:
+      image: "debian:bullseye-slim"
+      prepare_command: |
+        # Update package lists
+        apt-get update -y
+        
+        # Install required packages
+        apt-get install -y --no-install-recommends \
+          curl \
+          jq \
+          ca-certificates
+        
+        # Clean up to reduce container size
+        apt-get clean
+        rm -rf /var/lib/apt/lists/*
+      allow_networking: true
+```
+
+The `prepare_command` is executed before the main command and can be used to install dependencies, configure the environment, or perform any setup tasks needed for the command to run successfully. This is especially useful for lightweight base images where you need to install additional tools.
 
 ## Cross-Platform Example
 

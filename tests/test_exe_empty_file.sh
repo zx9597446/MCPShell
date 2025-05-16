@@ -2,64 +2,60 @@
 # Test script for the mcpshell exe command
 # Tests the creation of an empty file using the create_file tool
 
-# Set up
+# Source common utilities
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "$SCRIPT_DIR/common.sh"
+
+# Test configuration
+CONFIG_FILE="$SCRIPT_DIR/test_exe_config.yaml"
 TEST_NAME="test_exe_empty_file_command"
-CONFIG_FILE="$(dirname "$0")/test_exe_config.yaml"
-TEST_FILE="/tmp/mcpshell_empty_test_file_$(date +%s).txt"
 
 #####################################################################################
-# ANSI color codes
-RED='\033[0;31m'
-GREEN='\033[0;32m'
-BLUE='\033[0;34m'
-RESET='\033[0m'
+# Start the test
 
-# Print test header
-echo -e "${BLUE}----------------------------------------${RESET}"
-echo -e "${BLUE}=== Running test: $TEST_NAME ===${RESET}"
-echo -e "${BLUE}----------------------------------------${RESET}"
-echo -e "${BLUE}Configuration file: $CONFIG_FILE${RESET}"
-echo -e "${BLUE}Test file path: $TEST_FILE${RESET}"
-echo -e "${BLUE}----------------------------------------${RESET}"
+testcase "$TEST_NAME"
 
-# Make sure the test file doesn't exist yet
-if [ -f "$TEST_FILE" ]; then
-    echo "ERROR: Test file already exists at: $TEST_FILE"
-    exit 1
-fi
+info_blue "Configuration file: $CONFIG_FILE"
 
-# Build the exe command (only passing the filepath parameter)
-EXE_CMD="go run main.go exe -c $CONFIG_FILE create_file filepath=$TEST_FILE"
-echo "Executing: $EXE_CMD"
+# Generate a random test file path
+TEST_FILE=$(random_tmpfile "mcpshell_empty_test_file")
+info_blue "Test file path: $TEST_FILE"
+separator
 
-# Run the command
-eval "$EXE_CMD"
+# Make sure we have the CLI binary
+check_cli_exists
+
+# Command to test
+CMD="$CLI_BIN exe -c $CONFIG_FILE create_file filepath=$TEST_FILE"
+OUTPUT=$(eval "$CMD" 2>&1)
 RESULT=$?
+[ -n "$E2E_LOG_FILE" ] && echo -e "\n$TEST_NAME:\n\n$OUTPUT" >> "$E2E_LOG_FILE"
 
-# Check the result
-if [ $RESULT -ne 0 ]; then
-    echo -e "${RED}ERROR: Command execution failed with exit code: $RESULT${RESET}"
+[ $RESULT -eq 0 ] || {
+    failure "Command execution failed with exit code: $RESULT"
+    echo "$OUTPUT"
     exit 1
-fi
+}
 
-# Check if the file was created
-if [ ! -f "$TEST_FILE" ]; then
-    echo -e "${RED}ERROR: Test file was not created at: $TEST_FILE${RESET}"
+# Verify the file was created
+[ -f "$TEST_FILE" ] || fail "Test file was not created at $TEST_FILE"
+
+# Verify the content of the file
+CONTENT=$(cat "$TEST_FILE")
+DEFAULT_CONTENT="Default content for an empty file."
+
+[ "$CONTENT" = "$DEFAULT_CONTENT" ] || {
+    failure "File content does not match expected default content"
+    info_blue "Expected: $DEFAULT_CONTENT"
+    info_blue "Actual:   $CONTENT"
+    cleanup_file "$TEST_FILE"
     exit 1
-fi
+}
 
-# Verify the file is empty
-FILE_SIZE=$(stat -f%z "$TEST_FILE")
-if [ "$FILE_SIZE" -ne 0 ]; then
-    echo -e "${RED}ERROR: Expected an empty file but file has size: $FILE_SIZE bytes${RESET}"
-    exit 1
-fi
+success "Empty file test passed, default content was used"
+info "Content: $CONTENT"
 
-# Cleanup
-rm -f "$TEST_FILE"
-if [ -f "$TEST_FILE" ]; then
-    echo -e "${RED}WARNING: Could not clean up test file at: $TEST_FILE${RESET}"
-fi
+# Clean up
+cleanup_file "$TEST_FILE"
 
-echo -e "${GREEN}Test successful! The exe command correctly created the empty file.${RESET}"
 exit 0

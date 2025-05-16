@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"strings"
 
 	"github.com/mark3labs/mcp-go/mcp"
 
@@ -126,19 +127,34 @@ func (h *CommandHandler) GetMCPHandler() func(ctx context.Context, request mcp.C
 	}
 }
 
-// getEnvironmentVariables gets values for specified environment variables from parent process
-// and returns them in KEY=VALUE format for the command
-func (h *CommandHandler) getEnvironmentVariables() []string {
+// getEnvironmentVariables gets the environment variables for the process.
+//
+// * for single env variables (ie, ENV_VAR), it obtains the value from the parent process
+// * for assignments (ie, ENV_VAR=value), it uses the value directly
+// * for templated assignments (ie, EBV_VAR={{ .param }}), it processes the template with the given params
+//
+// It returns all the env vars as a list of KEY=VALUE.
+func (h *CommandHandler) getEnvironmentVariables(params map[string]interface{}) []string {
 	if len(h.envVars) == 0 {
 		return nil
 	}
 
 	envVars := make([]string, 0, len(h.envVars))
 	for _, name := range h.envVars {
-		if value, exists := os.LookupEnv(name); exists {
-			envVars = append(envVars, name+"="+value)
+		comps := strings.Split(name, "=")
+		if len(comps) == 1 {
+			if value, exists := os.LookupEnv(name); exists {
+				envVars = append(envVars, name+"="+value)
+			} else {
+				envVars = append(envVars, name+"=")
+			}
 		} else {
-			envVars = append(envVars, name+"=")
+			p, err := common.ProcessTemplate(comps[1], params)
+			if err != nil {
+				envVars = append(envVars, name)
+			} else {
+				envVars = append(envVars, comps[0]+"="+p)
+			}
 		}
 	}
 
