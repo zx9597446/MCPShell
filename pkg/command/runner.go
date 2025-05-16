@@ -13,6 +13,7 @@ const (
 	RunnerTypeExec        RunnerType = "exec"
 	RunnerTypeSandboxExec RunnerType = "sandbox-exec"
 	RunnerTypeFirejail    RunnerType = "firejail"
+	RunnerTypeDocker      RunnerType = "docker"
 )
 
 // RunnerOptions is a map of options for the runner
@@ -37,6 +38,8 @@ func NewRunner(runnerType RunnerType, options RunnerOptions, logger *log.Logger)
 		return NewRunnerSandboxExec(options, logger)
 	case RunnerTypeFirejail:
 		return NewRunnerFirejail(options, logger)
+	case RunnerTypeDocker:
+		return NewDockerRunner(options, logger)
 	}
 
 	return nil, fmt.Errorf("unknown runner type: %s", runnerType)

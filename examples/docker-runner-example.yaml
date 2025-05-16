@@ -1,0 +1,150 @@
+mcp:
+  description: |
+    Example configuration showing how to use the Docker runner to execute
+    commands inside containers, providing better isolation and security.
+  run:
+    shell: bash
+  tools:
+    - name: "docker_echo"
+      description: "Simple echo command running in an Alpine container"
+      params:
+        message:
+          type: string
+          description: "Message to echo"
+          required: true
+      constraints:
+        - "message.size() > 0"
+        - "message.size() <= 100"
+      run:
+        command: |
+          echo {{ .message }}
+        runners:
+          - name: docker
+            requirements:
+              executables: [docker]
+            options:
+              image: "alpine:latest"
+      output:
+        prefix: |
+          Docker echo output:
+
+    - name: "docker_python"
+      description: "Run a Python script inside a Python container"
+      params:
+        code:
+          type: string
+          description: "Python code to execute"
+          required: true
+      constraints:
+        - "code.size() > 0"
+        - "code.size() <= 1000"
+        - "!code.contains('import os')"
+        - "!code.contains('import subprocess')"
+        - "!code.contains('__import__')"
+      run:
+        command: |
+          python3 -c "{{ .code }}"
+        runners:
+          - name: docker
+            requirements:
+              executables: [docker]
+            options:
+              image: "python:3.9-slim"
+              allow_networking: false
+              docker_run_opts: "--cpus 0.5 --memory 256m"
+      output:
+        prefix: |
+          Python output:
+
+    - name: "docker_file_analyzer"
+      description: "Analyze a file using tools in an Ubuntu container"
+      params:
+        filepath:
+          type: string
+          description: "Path to the file to analyze"
+          required: true
+        operation:
+          type: string
+          description: "Operation to perform (head, tail, wc, grep)"
+          required: true
+        pattern:
+          type: string
+          description: "Pattern for grep operation"
+      constraints:
+        - "filepath.size() > 0"
+        - "filepath.startsWith('/')"
+        - "!filepath.contains('..')"
+        - "['head', 'tail', 'wc', 'grep'].exists(op, op == operation)"
+        - "operation != 'grep' || (pattern.size() > 0)"
+        - "!filepath.contains('&')"
+        - "!filepath.contains(';')"
+        - "!filepath.contains('|')"
+        - "!filepath.contains('>')"
+      run:
+        command: |
+          if [ "{{ .operation }}" = "grep" ]; then
+            grep -n "{{ .pattern }}" {{ .filepath }}
+          elif [ "{{ .operation }}" = "head" ]; then
+            head -n 20 {{ .filepath }}
+          elif [ "{{ .operation }}" = "tail" ]; then
+            tail -n 20 {{ .filepath }}
+          elif [ "{{ .operation }}" = "wc" ]; then
+            wc {{ .filepath }}
+          fi
+        runners:
+          - name: docker
+            requirements:
+              executables: [docker]
+            options:
+              image: "ubuntu:latest"
+              mounts:
+                - "{{ .filepath }}:{{ .filepath }}:ro"
+              allow_networking: false
+              user: "nobody"
+      output:
+        prefix: |
+          File analysis ({{ .operation }}) for {{ .filepath }}:
+
+    - name: "cross_platform_command"
+      description: "Execute a command with the appropriate runner for the platform"
+      params:
+        command:
+          type: string
+          description: "Command to execute"
+          required: true
+      constraints:
+        - "command.size() > 0"
+        - "command.size() <= 200"
+        - "!command.contains(';')"
+        - "!command.contains('&')"
+        - "!command.contains('|')"
+        - "!command.contains('>')"
+      run:
+        command: |
+          {{ .command }}
+        runners:
+          - name: sandbox-exec
+            requirements:
+              os: darwin
+              executables: [sandbox-exec]
+            options:
+              allow_networking: true
+              allow_user_folders: false
+          - name: firejail
+            requirements:
+              os: linux
+              executables: [firejail]
+            options:
+              allow_networking: true
+              allow_user_folders: false
+          - name: docker
+            requirements:
+              executables: [docker]
+            options:
+              image: "alpine:latest"
+              allow_networking: true
+          - name: exec
+            requirements: {}
+      output:
+        prefix: |
+          Command output: 

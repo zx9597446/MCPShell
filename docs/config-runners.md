@@ -186,6 +186,96 @@ runners:
         noroot
 ```
 
+### Docker Runner
+
+The Docker runner executes commands inside Docker containers, providing strong isolation from the host system. This runner creates a temporary script file containing your command, then mounts it into a Docker container and executes it.
+
+```yaml
+runners:
+  - name: docker
+    requirements:
+      executables: [docker]
+    options:
+      image: "alpine:latest"            # Required: Docker image to use
+      allow_networking: true            # Optional: Allow network access (default: true)
+      mounts:                           # Optional: Additional volumes to mount
+        - "/data:/data:ro"              # Format: "host-path:container-path[:options]"
+        - "/config:/etc/myapp:ro"
+      user: "1000:1000"                 # Optional: User to run as in container
+      workdir: "/app"                   # Optional: Working directory in container
+      docker_run_opts: "--cpus 1 --memory 512m"  # Optional: Additional docker run options
+```
+
+#### Requirements
+
+- Docker installed and available in PATH
+- Appropriate permissions to run Docker containers (typically membership in the `docker` group or root)
+
+#### Docker Configuration Options
+
+Available options:
+
+- `image`: (Required) The Docker image to use for running the command (e.g., "alpine:latest", "ubuntu:22.04")
+- `allow_networking`: When set to `false`, disables all network access for the container using `--network none`
+- `mounts`: A list of additional volumes to mount in the format "host-path:container-path[:options]"
+- `user`: Specify the user to run as within the container (format: "uid" or "uid:gid")
+- `workdir`: Set the working directory inside the container
+- `docker_run_opts`: String of additional options to pass to the `docker run` command
+
+#### Security Benefits
+
+The Docker runner provides several security advantages:
+
+1. **Complete process isolation**: Processes inside the container are isolated from the host
+2. **Configurable resource limits**: Can limit CPU, memory, and other resources
+3. **Control over capabilities**: Docker restricts Linux capabilities by default
+4. **Filesystem isolation**: Only mounted volumes are accessible
+5. **Network isolation**: Can completely disable network access
+6. **User namespace separation**: Can run as non-root inside the container
+
+#### Examples
+
+##### Basic Alpine Container
+
+```yaml
+runners:
+  - name: docker
+    requirements:
+      executables: [docker]
+    options:
+      image: "alpine:latest"
+```
+
+##### Limited Resources Python Container
+
+```yaml
+runners:
+  - name: docker
+    requirements:
+      executables: [docker]
+    options:
+      image: "python:3.9-slim"
+      docker_run_opts: "--cpus 0.5 --memory 256m --read-only"
+      allow_networking: false
+      workdir: "/app"
+      user: "nobody"
+```
+
+##### Data Analysis Container With Volume Mounts
+
+```yaml
+runners:
+  - name: docker
+    requirements:
+      executables: [docker]
+    options:
+      image: "jupyter/datascience-notebook:latest"
+      mounts:
+        - "{{ .datadir }}:/data:ro"
+        - "/tmp:/tmp"
+      workdir: "/data"
+```
+
 ## Cross-Platform Example
 
 Here's a complete example of a tool that uses different runners based on the platform:
