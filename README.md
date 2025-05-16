@@ -116,9 +116,10 @@ _"this AI has helped me finding all those big files. What if I create another to
 
 - Limit the scope of these tools to **read-only actions**, do not give the LLM the power to change things.
 - Use **constraints** to limit command execution to safe parameters
-- Consider using a **_restricted shell_** or creating a dedicated user for running the adapter
+- Consider using a [**sanboxed environment**](docs/config-runners.md) for running commands.
 - Review all command templates for potential injection vulnerabilities
 - Only expose tools that are safe for external use
+- All of the above!
 
 Please read the [Security Considerations](docs/security.md) document before using this software.
 
