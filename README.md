@@ -61,8 +61,9 @@ space problems in your hard disk.
    ```
 
    Take a look at the [examples directory](examples) for more sophisticated and useful examples.
-   Maybe you prefer to let the LLM access you [kubectl](examples/kubectl-ro.yaml)?
-   Or tun some [AWS CLI](examples/aws-networking-ro.yaml) commands?
+   Maybe you prefer to let the LLM know about your Kubernetes cluster with
+   [kubectl](examples/kubectl-ro.yaml)?
+   Or let it run some [AWS CLI](examples/aws-networking-ro.yaml) commands?
 
 2. Configure the MCP server in Cursor (or in any other LLM client with support for MCP)
 
