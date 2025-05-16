@@ -21,10 +21,10 @@ func checkDockerRunning() bool {
 	// Then try to run a simple docker command to check if the daemon is running
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
-	
+
 	cmd := exec.CommandContext(ctx, "docker", "ps", "--format", "{{.ID}}", "--no-trunc", "--limit", "1")
 	err := cmd.Run()
-	
+
 	return err == nil
 }
 
@@ -148,14 +148,14 @@ func TestDockerRunnerNetworking(t *testing.T) {
 
 			// Try to ping google.com (will fail if networking is disabled)
 			_, err = runner.Run(context.Background(), "", "ping -c 1 -W 1 google.com", nil, nil, false)
-			
+
 			if tc.expectSuccess && err != nil {
 				t.Errorf("Expected network ping to succeed but got error: %v", err)
 			}
-			
+
 			if !tc.expectSuccess && err == nil {
 				t.Errorf("Expected network ping to fail but it succeeded")
 			}
 		})
 	}
-} 
+}

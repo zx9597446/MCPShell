@@ -232,4 +232,4 @@ func (r *DockerRunner) buildDockerCommand(scriptFile string, env []string) (stri
 	// Join all parts
 	dockerCmd := strings.Join(parts, " ")
 	return dockerCmd, nil
-} 
+}
