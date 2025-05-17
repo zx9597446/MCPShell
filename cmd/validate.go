@@ -21,14 +21,10 @@ This command checks the configuration file for errors including:
 - Command template syntax`,
 	PreRunE: func(cmd *cobra.Command, args []string) error {
 		// Initialize logger
-		level := common.LogLevelFromString(logLevel)
-		logger, err := common.NewLogger("[mcpshell] ", logFile, level, true)
+		logger, err := initLogger()
 		if err != nil {
-			return fmt.Errorf("failed to set up logger: %w", err)
+			return err
 		}
-
-		// Set global logger for application-wide use
-		common.SetLogger(logger)
 
 		// Setup panic handler
 		defer func() {
@@ -91,11 +87,6 @@ This command checks the configuration file for errors including:
 func init() {
 	// Add validate command to root
 	rootCmd.AddCommand(validateCommand)
-
-	// Add the same flags as the run command
-	validateCommand.Flags().StringVarP(&configFile, "config", "c", "", "Path to the YAML configuration file or URL (required)")
-	validateCommand.Flags().StringVarP(&logFile, "logfile", "l", "", "Path to the log file (optional)")
-	validateCommand.Flags().StringVarP(&logLevel, "log-level", "", "info", "Log level: none, error, info, debug")
 
 	// Mark required flags
 	_ = validateCommand.MarkFlagRequired("config")

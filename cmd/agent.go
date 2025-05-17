@@ -15,19 +15,6 @@ import (
 	"github.com/inercia/MCPShell/pkg/common"
 )
 
-// Command-line flags for agent
-var (
-	agentConfigFile   string
-	agentLogFile      string
-	agentLogLevel     string
-	agentModel        string
-	agentSystemPrompt string
-	agentUserPrompt   string
-	agentOpenAIApiKey string
-	agentOpenAIApiURL string
-	agentOnce         bool
-)
-
 // agentCommand is a command that executes the MCPShell as an agent
 var agentCommand = &cobra.Command{
 	Use:   "agent",
@@ -47,14 +34,10 @@ and the agent will try to debug the issue with the given tools.
 	Args: cobra.NoArgs,
 	PreRunE: func(cmd *cobra.Command, args []string) error {
 		// Initialize logger
-		level := common.LogLevelFromString(agentLogLevel)
-		logger, err := common.NewLogger("[mcpshell] ", agentLogFile, level, true)
+		logger, err := initLogger()
 		if err != nil {
-			return fmt.Errorf("failed to set up logger: %w", err)
+			return err
 		}
-
-		// Set global logger for application-wide use
-		common.SetLogger(logger)
 
 		// Setup panic handler
 		defer common.RecoverPanic()
@@ -62,7 +45,7 @@ and the agent will try to debug the issue with the given tools.
 		logger.Info("Starting MCPShell agent")
 
 		// Check if config file is provided
-		if agentConfigFile == "" {
+		if configFile == "" {
 			logger.Error("Configuration file is required")
 			return fmt.Errorf("configuration file is required. Use --config or -c flag to specify the path")
 		}
@@ -88,7 +71,7 @@ and the agent will try to debug the issue with the given tools.
 		logger := common.GetLogger()
 
 		agentConfig := agent.AgentConfig{
-			ConfigFile:   agentConfigFile,
+			ConfigFile:   configFile,
 			Model:        agentModel,
 			SystemPrompt: agentSystemPrompt,
 			UserPrompt:   agentUserPrompt,
@@ -195,10 +178,7 @@ func init() {
 	// Add agent command to root
 	rootCmd.AddCommand(agentCommand)
 
-	// Add flags
-	agentCommand.Flags().StringVarP(&agentConfigFile, "config", "c", "", "Path to the YAML configuration file or URL (required)")
-	agentCommand.Flags().StringVarP(&agentLogFile, "logfile", "l", "", "Path to the log file (optional)")
-	agentCommand.Flags().StringVarP(&agentLogLevel, "log-level", "", "info", "Log level: none, error, info, debug")
+	// Add agent-specific flags
 	agentCommand.Flags().StringVarP(&agentModel, "model", "m", "", "LLM model to use (required)")
 	agentCommand.Flags().StringVarP(&agentSystemPrompt, "system-prompt", "s", "You are a helpful assistant.", "System prompt for the LLM")
 	agentCommand.Flags().StringVarP(&agentUserPrompt, "user-prompt", "u", "", "Initial user prompt for the LLM")

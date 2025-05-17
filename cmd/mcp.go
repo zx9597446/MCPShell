@@ -9,17 +9,6 @@ import (
 	"github.com/spf13/cobra"
 )
 
-var (
-	// Command-line flags
-	configFile  string
-	logFile     string
-	logLevel    string
-	description string
-
-	// Application version (can be overridden at build time)
-	version = "1.0.0"
-)
-
 // mcpCommand represents the run command which starts the MCP server
 var mcpCommand = &cobra.Command{
 	Use:     "mcp",
@@ -35,13 +24,11 @@ available to AI applications via the MCP protocol.
 `,
 	PreRunE: func(cmd *cobra.Command, args []string) error {
 		// Initialize logger
-		level := common.LogLevelFromString(logLevel)
-		logger, err := common.NewLogger("[mcpshell] ", logFile, level, true)
+		logger, err := initLogger()
 		if err != nil {
-			return fmt.Errorf("failed to set up logger: %w", err)
+			return err
 		}
 
-		common.SetLogger(logger)
 		defer common.RecoverPanic()
 
 		logger.Info("Starting MCPShell")
@@ -70,10 +57,13 @@ available to AI applications via the MCP protocol.
 
 		// Create and start the server
 		srv := server.New(server.Config{
-			ConfigFile:  localConfigPath,
-			Logger:      logger,
-			Version:     version,
-			Description: description,
+			ConfigFile:         localConfigPath,
+			Logger:             logger,
+			Version:            version,
+			Description:        description,
+			DescriptionFile:    descriptionFile,
+			DescriptionAdd:     descriptionAdd,
+			DescriptionAddFile: descriptionAddFile,
 		})
 
 		return srv.Start()
@@ -84,11 +74,11 @@ available to AI applications via the MCP protocol.
 func init() {
 	rootCmd.AddCommand(mcpCommand)
 
-	// Add flags for the run command
-	mcpCommand.Flags().StringVarP(&configFile, "config", "c", "", "Path to the YAML configuration file or URL (required)")
-	mcpCommand.Flags().StringVarP(&logFile, "logfile", "l", "", "Path to the log file (optional)")
-	mcpCommand.Flags().StringVarP(&logLevel, "log-level", "", "info", "Log level: none, error, info, debug")
-	mcpCommand.Flags().StringVarP(&description, "description", "d", "", "Server description (optional)")
+	// Add MCP-specific flags
+	mcpCommand.Flags().StringVarP(&description, "description", "d", "", "MCP server description (optional)")
+	mcpCommand.Flags().StringVarP(&descriptionFile, "description-file", "", "", "Read the MCP server description from a file (optional)")
+	mcpCommand.Flags().StringVarP(&descriptionAdd, "description-add", "", "", "Add the given description to the MCP server description (optional)")
+	mcpCommand.Flags().StringVarP(&descriptionAddFile, "description-add-file", "", "", "Read some additional text to add to the MCP server description from a file (optional)")
 
 	// Mark required flags
 	_ = mcpCommand.MarkFlagRequired("config")

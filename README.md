@@ -93,12 +93,14 @@ space problems in your hard disk.
 4. Ask your LLM some questions it should be able to answer with the new tool. For example:
    _"I'm running out of space in my hard disk. Could you help me finding the problem?"_.
 
-## Configuration
+## Usage and Configuration
+
+Take a look at all the command in [this document](docs/usage.md).
 
 Configuration files use a YAML format defined [here](docs/config.md).
 See the [this directory](examples) for some examples.
 
-## Agent mode
+## Agent Mode
 
 MCPShell can also be run in agent mode, providing direct connectivity between Large Language Models
 (LLMs) and your command-line tools without requiring a separate MCP client. In this mode,

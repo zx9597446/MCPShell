@@ -15,6 +15,31 @@ import (
 // ApplicationName is the name of the application used in various places
 const ApplicationName = "mcpshell"
 
+// Common command-line flags
+var (
+	// Common flags
+	configFile string
+	logFile    string
+	logLevel   string
+
+	// MCP server flags
+	description        string
+	descriptionFile    string
+	descriptionAdd     string
+	descriptionAddFile string
+
+	// Agent-specific flags
+	agentModel        string
+	agentSystemPrompt string
+	agentUserPrompt   string
+	agentOpenAIApiKey string
+	agentOpenAIApiURL string
+	agentOnce         bool
+
+	// Application version (can be overridden at build time)
+	version = "1.0.0"
+)
+
 // rootCmd represents the base command when called without any subcommands
 var rootCmd = &cobra.Command{
 	Use:   ApplicationName,
@@ -42,9 +67,23 @@ func Execute() {
 
 // init registers all subcommands and sets up global flags
 func init() {
-	// Global flags can be set here
-	// rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default is $HOME/.mcpshell.yaml)")
+	// Add common persistent flags
+	rootCmd.PersistentFlags().StringVarP(&configFile, "config", "c", "", "Path to the YAML configuration file or URL")
+	rootCmd.PersistentFlags().StringVarP(&logFile, "logfile", "l", "", "Path to the log file (optional)")
+	rootCmd.PersistentFlags().StringVarP(&logLevel, "log-level", "", "info", "Log level: none, error, info, debug")
 
 	// Add version flag to all commands
 	rootCmd.PersistentFlags().BoolP("version", "v", false, "Print version information")
+}
+
+// initLogger initializes the logger with the specified configuration
+func initLogger() (*common.Logger, error) {
+	level := common.LogLevelFromString(logLevel)
+	logger, err := common.NewLogger("[mcpshell] ", logFile, level, true)
+	if err != nil {
+		return nil, fmt.Errorf("failed to set up logger: %w", err)
+	}
+
+	common.SetLogger(logger)
+	return logger, nil
 }

@@ -8,6 +8,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"os"
 	"strings"
 
 	"github.com/mark3labs/mcp-go/mcp"
@@ -34,11 +35,14 @@ type Server struct {
 
 // Config contains the configuration options for creating a new Server
 type Config struct {
-	ConfigFile  string         // Path to the YAML configuration file
-	Shell       string         // Shell to use for executing commands
-	Logger      *common.Logger // Logger for server operations
-	Version     string         // Version string for the server
-	Description string         // Description shown to AI clients
+	ConfigFile         string         // Path to the YAML configuration file
+	Shell              string         // Shell to use for executing commands
+	Logger             *common.Logger // Logger for server operations
+	Version            string         // Version string for the server
+	Description        string         // Description shown to AI clients
+	DescriptionFile    string         // Path to a file containing the description
+	DescriptionAdd     string         // Additional text to add to the description
+	DescriptionAddFile string         // Path to a file containing additional description text
 }
 
 // New creates a new Server instance with the provided configuration
@@ -49,13 +53,85 @@ type Config struct {
 // Returns:
 //   - A new Server instance
 func New(cfg Config) *Server {
+	// Process description based on input flags
+	finalDescription, err := getDescription(cfg)
+	if err != nil {
+		cfg.Logger.Error("Failed to process description flags: %v", err)
+	} else if finalDescription != "" {
+		cfg.Logger.Info("Using MCP server description: %s", finalDescription)
+	} else {
+		cfg.Logger.Info("No MCP server description provided")
+	}
+
 	return &Server{
 		configFile:  cfg.ConfigFile,
 		shell:       cfg.Shell,
 		logger:      cfg.Logger,
 		version:     cfg.Version,
-		description: cfg.Description,
+		description: finalDescription,
 	}
+}
+
+// getDescription handles the various description-related flags
+// and constructs the final description string
+func getDescription(cfg Config) (string, error) {
+	var finalDesc string
+
+	// Command line --description flag
+	if cfg.Description != "" {
+		finalDesc = cfg.Description
+		cfg.Logger.Info("Using description from command line flag")
+	} else {
+		// Try to load the configuration file to check for a description
+		configDesc := ""
+		loadedCfg, loadErr := config.NewConfigFromFile(cfg.ConfigFile)
+		if loadErr == nil && loadedCfg.MCP.Description != "" {
+			configDesc = loadedCfg.MCP.Description
+			cfg.Logger.Debug("Found description in config file: %s", configDesc)
+		}
+
+		if configDesc != "" {
+			// Config file description if no command line description
+			finalDesc = configDesc
+			cfg.Logger.Info("Using description from config file: %s", configDesc)
+		}
+	}
+
+	// Description file (overrides previous)
+	if cfg.DescriptionFile != "" {
+		cfg.Logger.Info("Reading server description from file: %s", cfg.DescriptionFile)
+		fileContent, err := os.ReadFile(cfg.DescriptionFile)
+		if err != nil {
+			return "", fmt.Errorf("failed to read description file: %w", err)
+		}
+		finalDesc = string(fileContent)
+	}
+
+	// Add text to the description if requested
+	if cfg.DescriptionAdd != "" {
+		cfg.Logger.Info("Adding additional description text")
+		if finalDesc != "" {
+			finalDesc += "\n" + cfg.DescriptionAdd
+		} else {
+			finalDesc = cfg.DescriptionAdd
+		}
+	}
+
+	// Add text from file to the description if requested
+	if cfg.DescriptionAddFile != "" {
+		cfg.Logger.Info("Reading additional description from file: %s", cfg.DescriptionAddFile)
+		fileContent, err := os.ReadFile(cfg.DescriptionAddFile)
+		if err != nil {
+			return "", fmt.Errorf("failed to read additional description file: %w", err)
+		}
+		if finalDesc != "" {
+			finalDesc += "\n" + string(fileContent)
+		} else {
+			finalDesc = string(fileContent)
+		}
+	}
+
+	return finalDesc, nil
 }
 
 // Validate verifies the configuration file without starting the server.
@@ -201,12 +277,6 @@ func (s *Server) CreateServer() error {
 		return fmt.Errorf("failed to load config: %w", err)
 	}
 
-	// Use description from config if present and no description is explicitly set
-	if s.description == "" && cfg.MCP.Description != "" {
-		s.description = cfg.MCP.Description
-		s.logger.Info("Using description from config: %s", s.description)
-	}
-
 	// Use shell from config if present and no shell is explicitly set
 	if s.shell == "" && cfg.MCP.Run.Shell != "" {
 		s.shell = cfg.MCP.Run.Shell
@@ -215,7 +285,7 @@ func (s *Server) CreateServer() error {
 
 	// Add description if provided
 	if s.description != "" {
-		s.logger.Info("Using custom description: %s", s.description)
+		s.logger.Info("Using description for MCP server: %s", s.description)
 		options = append(options, mcpserver.WithInstructions(s.description))
 	}
 
