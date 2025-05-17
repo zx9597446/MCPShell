@@ -34,6 +34,9 @@ type DockerRunnerOptions struct {
 	// Whether to allow networking in the container
 	AllowNetworking bool `json:"allow_networking"`
 
+	// Specific network to connect container to (e.g. "host", "bridge", or custom network name)
+	Network string `json:"network"`
+
 	// User to run as inside the container (defaults to current user)
 	User string `json:"user"`
 
@@ -42,14 +45,42 @@ type DockerRunnerOptions struct {
 
 	// PrepareCommand is a command to run before the main command
 	PrepareCommand string `json:"prepare_command"`
+
+	// Memory limit (e.g. "512m", "1g")
+	Memory string `json:"memory"`
+
+	// Memory soft limit (e.g. "256m", "512m")
+	MemoryReservation string `json:"memory_reservation"`
+
+	// Swap limit equal to memory plus swap: '-1' to enable unlimited swap
+	MemorySwap string `json:"memory_swap"`
+
+	// Tune container memory swappiness (0 to 100)
+	MemorySwappiness int `json:"memory_swappiness"`
+
+	// Linux capabilities to add to the container
+	CapAdd []string `json:"cap_add"`
+
+	// Linux capabilities to drop from the container
+	CapDrop []string `json:"cap_drop"`
+
+	// Custom DNS servers for the container
+	DNS []string `json:"dns"`
+
+	// Custom DNS search domains for the container
+	DNSSearch []string `json:"dns_search"`
+
+	// Set platform if server is multi-platform capable (e.g., "linux/amd64", "linux/arm64")
+	Platform string `json:"platform"`
 }
 
 // parseDockerOptions extracts Docker-specific options from generic runner options.
 func parseDockerOptions(genericOpts RunnerOptions) (DockerRunnerOptions, error) {
 	opts := DockerRunnerOptions{
-		AllowNetworking: true, // Default to allowing networking
-		User:            "",   // Default to Docker's default user
-		WorkDir:         "",   // Default to Docker's default working directory
+		AllowNetworking:  true, // Default to allowing networking
+		User:             "",   // Default to Docker's default user
+		WorkDir:          "",   // Default to Docker's default working directory
+		MemorySwappiness: -1,   // Default to Docker's default swappiness
 	}
 
 	// Parse image (required)
@@ -78,6 +109,11 @@ func parseDockerOptions(genericOpts RunnerOptions) (DockerRunnerOptions, error) 
 		opts.AllowNetworking = allowNetworking
 	}
 
+	// Parse network option
+	if network, ok := genericOpts["network"].(string); ok {
+		opts.Network = network
+	}
+
 	// Parse user option
 	if user, ok := genericOpts["user"].(string); ok {
 		opts.User = user
@@ -91,6 +127,67 @@ func parseDockerOptions(genericOpts RunnerOptions) (DockerRunnerOptions, error) 
 	// Parse prepare command option
 	if prepareCommand, ok := genericOpts["prepare_command"].(string); ok {
 		opts.PrepareCommand = prepareCommand
+	}
+
+	// Parse memory option
+	if memory, ok := genericOpts["memory"].(string); ok {
+		opts.Memory = memory
+	}
+
+	// Parse memory reservation option
+	if memoryReservation, ok := genericOpts["memory_reservation"].(string); ok {
+		opts.MemoryReservation = memoryReservation
+	}
+
+	// Parse memory swap option
+	if memorySwap, ok := genericOpts["memory_swap"].(string); ok {
+		opts.MemorySwap = memorySwap
+	}
+
+	// Parse memory swappiness option (integer)
+	if swappiness, ok := genericOpts["memory_swappiness"].(float64); ok {
+		opts.MemorySwappiness = int(swappiness)
+	}
+
+	// Parse capabilities to add
+	if capAdd, ok := genericOpts["cap_add"].([]interface{}); ok {
+		for _, cap := range capAdd {
+			if capStr, ok := cap.(string); ok {
+				opts.CapAdd = append(opts.CapAdd, capStr)
+			}
+		}
+	}
+
+	// Parse capabilities to drop
+	if capDrop, ok := genericOpts["cap_drop"].([]interface{}); ok {
+		for _, cap := range capDrop {
+			if capStr, ok := cap.(string); ok {
+				opts.CapDrop = append(opts.CapDrop, capStr)
+			}
+		}
+	}
+
+	// Parse DNS servers
+	if dns, ok := genericOpts["dns"].([]interface{}); ok {
+		for _, server := range dns {
+			if serverStr, ok := server.(string); ok {
+				opts.DNS = append(opts.DNS, serverStr)
+			}
+		}
+	}
+
+	// Parse DNS search domains
+	if dnsSearch, ok := genericOpts["dns_search"].([]interface{}); ok {
+		for _, domain := range dnsSearch {
+			if domainStr, ok := domain.(string); ok {
+				opts.DNSSearch = append(opts.DNSSearch, domainStr)
+			}
+		}
+	}
+
+	// Parse platform option
+	if platform, ok := genericOpts["platform"].(string); ok {
+		opts.Platform = platform
 	}
 
 	return opts, nil
@@ -246,6 +343,9 @@ func (r *DockerRunner) buildDockerCommand(scriptFile string, env []string) (stri
 	// Add networking option
 	if !r.opts.AllowNetworking {
 		parts = append(parts, "--network none")
+	} else if r.opts.Network != "" {
+		// If networking is allowed and a specific network is specified
+		parts = append(parts, fmt.Sprintf("--network %s", r.opts.Network))
 	}
 
 	// Add user if specified
@@ -256,6 +356,47 @@ func (r *DockerRunner) buildDockerCommand(scriptFile string, env []string) (stri
 	// Add working directory if specified
 	if r.opts.WorkDir != "" {
 		parts = append(parts, fmt.Sprintf("--workdir %s", r.opts.WorkDir))
+	}
+
+	// Add memory options if specified
+	if r.opts.Memory != "" {
+		parts = append(parts, fmt.Sprintf("--memory %s", r.opts.Memory))
+	}
+
+	if r.opts.MemoryReservation != "" {
+		parts = append(parts, fmt.Sprintf("--memory-reservation %s", r.opts.MemoryReservation))
+	}
+
+	if r.opts.MemorySwap != "" {
+		parts = append(parts, fmt.Sprintf("--memory-swap %s", r.opts.MemorySwap))
+	}
+
+	if r.opts.MemorySwappiness != -1 {
+		parts = append(parts, fmt.Sprintf("--memory-swappiness %d", r.opts.MemorySwappiness))
+	}
+
+	// Add Linux capabilities options
+	for _, cap := range r.opts.CapAdd {
+		parts = append(parts, fmt.Sprintf("--cap-add %s", cap))
+	}
+
+	for _, cap := range r.opts.CapDrop {
+		parts = append(parts, fmt.Sprintf("--cap-drop %s", cap))
+	}
+
+	// Add DNS servers
+	for _, dns := range r.opts.DNS {
+		parts = append(parts, fmt.Sprintf("--dns %s", dns))
+	}
+
+	// Add DNS search domains
+	for _, dnsSearch := range r.opts.DNSSearch {
+		parts = append(parts, fmt.Sprintf("--dns-search %s", dnsSearch))
+	}
+
+	// Add platform if specified
+	if r.opts.Platform != "" {
+		parts = append(parts, fmt.Sprintf("--platform %s", r.opts.Platform))
 	}
 
 	// Add custom docker run options

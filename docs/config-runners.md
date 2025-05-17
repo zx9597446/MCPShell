@@ -210,11 +210,21 @@ Available options:
 
 - `image`: (Required) The Docker image to use for running the command (e.g., "alpine:latest", "ubuntu:22.04")
 - `allow_networking`: When set to `false`, disables all network access for the container using `--network none`
+- `network`: Specific network to connect the container to (e.g., "host", "bridge", or custom network name)
 - `mounts`: A list of additional volumes to mount in the format "host-path:container-path[:options]"
 - `user`: Specify the user to run as within the container (format: "uid" or "uid:gid")
 - `workdir`: Set the working directory inside the container
 - `docker_run_opts`: String of additional options to pass to the `docker run` command
 - `prepare_command`: Commands to run before the main command (e.g., for installing packages or setting up the environment)
+- `memory`: Memory limit for the container (e.g., "512m", "1g")
+- `memory_reservation`: Memory soft limit (e.g., "256m", "512m") 
+- `memory_swap`: Swap limit equal to memory plus swap: '-1' to enable unlimited swap
+- `memory_swappiness`: Tune container memory swappiness (0 to 100, default -1)
+- `cap_add`: Linux capabilities to add to the container (e.g., ["NET_ADMIN", "SYS_PTRACE"])
+- `cap_drop`: Linux capabilities to drop from the container (e.g., ["ALL"])
+- `dns`: Custom DNS servers for the container (e.g., ["8.8.8.8", "1.1.1.1"])
+- `dns_search`: Custom DNS search domains for the container (e.g., ["example.com", "mydomain.local"])
+- `platform`: Set platform if server is multi-platform capable (e.g., "linux/amd64", "linux/arm64")
 
 #### Security Benefits
 
@@ -245,7 +255,11 @@ runners:
   - name: docker
     options:
       image: "python:3.9-slim"
-      docker_run_opts: "--cpus 0.5 --memory 256m --read-only"
+      docker_run_opts: "--cpus 0.5 --read-only"
+      memory: "256m"
+      memory_reservation: "128m"
+      memory_swap: "512m"
+      memory_swappiness: 0
       allow_networking: false
       workdir: "/app"
       user: "nobody"
@@ -262,6 +276,92 @@ runners:
         - "{{ .datadir }}:/data:ro"
         - "/tmp:/tmp"
       workdir: "/data"
+```
+
+##### Memory-Optimized Container
+
+```yaml
+runners:
+  - name: docker
+    options:
+      image: "node:16-alpine"
+      memory: "1g"                         # Hard memory limit
+      memory_reservation: "512m"           # Soft memory limit (container will try to release memory if below this value)
+      memory_swap: "1.5g"                  # Total memory+swap limit
+      memory_swappiness: 10                # Low swappiness value to prefer using RAM over swap
+      docker_run_opts: "--cpus 2"          # Limit to 2 CPU cores
+      workdir: "/app"
+```
+
+##### Container With Custom Capabilities
+
+```yaml
+runners:
+  - name: docker
+    options:
+      image: "ubuntu:22.04"
+      cap_drop: ["ALL"]                    # Drop all capabilities by default
+      cap_add: ["NET_ADMIN", "NET_RAW"]    # Add specific capabilities for network tools
+      allow_networking: true
+      prepare_command: |
+        apt-get update
+        apt-get install -y iputils-ping tcpdump
+```
+
+##### Container With Custom DNS Settings
+
+```yaml
+runners:
+  - name: docker
+    options:
+      image: "alpine:latest"
+      dns: ["8.8.8.8", "8.8.4.4"]          # Use Google's public DNS servers
+      dns_search: ["example.com", "internal.mycompany.net"]
+      prepare_command: |
+        # Install networking tools
+        apk add --no-cache curl bind-tools
+        
+        # Test DNS resolution
+        echo "Testing DNS resolution..."
+        nslookup api.example.com
+```
+
+##### Cross-Platform Container
+
+```yaml
+runners:
+  - name: docker
+    options:
+      image: "node:16"
+      platform: "linux/amd64"               # Force x86_64 architecture even on ARM systems
+      workdir: "/app"
+      mounts:
+        - "./app:/app"
+      prepare_command: |
+        # Install dependencies for x86_64 architecture
+        npm install
+        
+        # Run tests to ensure platform compatibility
+        npm test
+```
+
+##### Container with Host Network Access
+
+```yaml
+runners:
+  - name: docker
+    options:
+      image: "ubuntu:latest"
+      network: "host"                        # Use host network mode for full network access
+      prepare_command: |
+        # Update package list
+        apt-get update
+        
+        # Install networking tools
+        apt-get install -y net-tools iputils-ping
+        
+        # Test network connectivity with host network
+        netstat -tuln
 ```
 
 ##### Container With Package Installation
