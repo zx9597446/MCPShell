@@ -1,12 +1,14 @@
 # Runner Configuration
 
-The MCP CLI Adapter supports multiple execution runners that allow tools to run in different environments with various security restrictions. This document details how to configure and use these runners.
+The MCP CLI Adapter supports multiple _execution runners_ that allow tools to run in different
+environments with various security restrictions. This document details how to configure and use these runners.
 
 For basic configuration information, see [Configuration Overview](config.md).
 
 ## Multiple Runners and Selection Process
 
-You can define multiple runners for a tool to support different execution environments. The system will select the first runner whose requirements are satisfied by the current system.
+You can define multiple runners for a tool to support different execution environments. The system
+will select the first runner whose requirements are satisfied by the current system.
 
 Each runner definition includes:
 
@@ -23,60 +25,56 @@ run:
   command: "echo 'Hello {{ .name }}'"
   runners:
     - name: sandbox-exec
-      requirements:
-        os: darwin
-        executables: [sandbox-exec]
       options:
         allow_networking: false
         allow_user_folders: false
     - name: firejail
-      requirements:
-        os: linux
-        executables: [firejail]
       options:
         allow_networking: false
         allow_user_folders: false
-    - name: exec
-      requirements: {}  # No specific requirements, acts as a fallback
+    - name: exec                         # acts as a fallback
 ```
 
 In this example:
 
-1. On macOS with sandbox-exec available, the sandbox-exec runner will be used
-2. On Linux with firejail available, the firejail runner will be used
+1. On macOS with `sandbox-exec` available, the `sandbox-exec` runner will be used
+2. On Linux with `firejail` available, the firejail runner will be used
 3. On any other system, the exec runner will be used as a fallback
 
 **Important Notes on Runner Selection:**
 
-- The `runners` array is **optional**. If not provided, a default "exec" runner with no sandboxing will be used.
-- If you do specify `runners`, at least one of them must meet its requirements for the tool to be available.
-- No automatic fallback to "exec" occurs if you specify `runners` but none meet their requirements.
-- If you want a fallback, explicitly add an `exec` runner with empty requirements at the end of your runners list.
+- The `runners` array is **optional**. If not provided,
+  **a default `exec` runner with no sandboxing will be used**.
+- If you do specify `runners`, at least one of them must meet its requirements
+  for the tool to be available.
+- No automatic fallback to `exec` occurs if you specify `runners` but none meet their requirements.
+- If you want a fallback, explicitly add an `exec` runner with empty
+  requirements at the end of your runners list.
 
-It's recommended to always include a fallback runner (typically named "exec" with no requirements) to ensure your tool can run on any platform if you want it to be universally available.
+It's recommended to always include a fallback runner (typically named "exec" with
+no requirements) to ensure your tool can run on any platform if you want it to be universally available.
 
 ## Runner Types
 
 ### Default Runner (exec)
 
-The default runner executes commands directly on the host system using the configured shell. It has no special requirements or sandboxing.
+The default runner executes commands directly on the host system using the configured shell.
+It has no special requirements or sandboxing.
 
 ```yaml
 runners:
   - name: exec
-    requirements: {}  # No specific requirements
 ```
 
-### Sandbox Runner (macOS Only)
+### `sandbox-exec` Runner (macOS Only)
 
-The sandbox runner uses macOS's `sandbox-exec` command to run commands in a sandboxed environment with restricted access to the system. This provides an additional layer of security by restricting what commands can access.
+The sandbox runner uses macOS's `sandbox-exec` command to run commands in a sandboxed environment
+with restricted access to the system. This provides an additional layer of security by
+restricting what commands can access.
 
 ```yaml
 runners:
   - name: sandbox-exec
-    requirements:
-      os: darwin
-      executables: [sandbox-exec]
     options:
       allow_networking: false           # Disable network access
       allow_user_folders: false         # Restrict access to user folders
@@ -110,9 +108,6 @@ Here's an example of a custom profile that:
 ```yaml
 runners:
   - name: sandbox-exec
-    requirements:
-      os: darwin
-      executables: [sandbox-exec]
     options:
       custom_profile: |
         (version 1)
@@ -121,16 +116,13 @@ runners:
         (allow file-read-data (regex "^/tmp"))
 ```
 
-### Firejail Runner (Linux Only)
+### `firejail` Runner (Linux Only)
 
 The firejail runner uses [firejail](https://firejail.wordpress.com/) to run commands in a sandboxed environment on Linux systems. Firejail is a SUID sandbox program that restricts the running environment of untrusted applications using Linux namespaces and seccomp-bpf.
 
 ```yaml
 runners:
   - name: firejail
-    requirements:
-      os: linux
-      executables: [firejail]
     options:
       allow_networking: false           # Disable network access
       allow_user_folders: false         # Restrict access to user folders
@@ -173,9 +165,6 @@ For advanced usage, you can specify a completely custom firejail profile using t
 ```yaml
 runners:
   - name: firejail
-    requirements:
-      os: linux
-      executables: [firejail]
     options:
       custom_profile: |
         # Custom firejail profile
@@ -188,13 +177,13 @@ runners:
 
 ### Docker Runner
 
-The Docker runner executes commands inside Docker containers, providing strong isolation from the host system. This runner creates a temporary script file containing your command, then mounts it into a Docker container and executes it.
+The Docker runner executes commands inside Docker containers, providing
+**strong isolation** from the host system. This runner creates a temporary script
+file containing your command, then mounts it into a Docker container and executes it.
 
 ```yaml
 runners:
   - name: docker
-    requirements:
-      executables: [docker]
     options:
       image: "alpine:latest"            # Required: Docker image to use
       allow_networking: true            # Optional: Allow network access (default: true)
@@ -238,15 +227,13 @@ The Docker runner provides several security advantages:
 5. **Network isolation**: Can completely disable network access
 6. **User namespace separation**: Can run as non-root inside the container
 
-#### Examples
+#### Docker Runner Examples
 
 ##### Basic Alpine Container
 
 ```yaml
 runners:
   - name: docker
-    requirements:
-      executables: [docker]
     options:
       image: "alpine:latest"
 ```
@@ -256,8 +243,6 @@ runners:
 ```yaml
 runners:
   - name: docker
-    requirements:
-      executables: [docker]
     options:
       image: "python:3.9-slim"
       docker_run_opts: "--cpus 0.5 --memory 256m --read-only"
@@ -271,8 +256,6 @@ runners:
 ```yaml
 runners:
   - name: docker
-    requirements:
-      executables: [docker]
     options:
       image: "jupyter/datascience-notebook:latest"
       mounts:
@@ -286,8 +269,6 @@ runners:
 ```yaml
 runners:
   - name: docker
-    requirements:
-      executables: [docker]
     options:
       image: "debian:bullseye-slim"
       prepare_command: |
@@ -328,9 +309,6 @@ Here's a complete example of a tool that uses different runners based on the pla
     command: "cat {{ .filename }}"
     runners:
       - name: sandbox-exec
-        requirements:
-          os: darwin
-          executables: [sandbox-exec]
         options:
           allow_networking: false
           allow_user_folders: false
@@ -338,9 +316,6 @@ Here's a complete example of a tool that uses different runners based on the pla
             - "/tmp"
             - "{{ .filename }}"
       - name: firejail
-        requirements:
-          os: linux
-          executables: [firejail]
         options:
           allow_networking: false
           allow_user_folders: false
@@ -348,7 +323,6 @@ Here's a complete example of a tool that uses different runners based on the pla
             - "/tmp"
             - "{{ .filename }}"
       - name: exec
-        requirements: {}  # Fallback runner for other platforms
   output:
     prefix: "Contents of {{ .filename }}:"
 ``` 

@@ -96,6 +96,25 @@ func parseDockerOptions(genericOpts RunnerOptions) (DockerRunnerOptions, error) 
 	return opts, nil
 }
 
+// CheckImplicitRequirements checks if the runner meets its implicit requirements
+// Docker runner requires the docker executable and a running daemon
+func (r *DockerRunner) CheckImplicitRequirements() error {
+	// Check if docker executable exists
+	if !common.CheckExecutableExists("docker") {
+		return fmt.Errorf("docker executable not found in PATH")
+	}
+
+	// Check if Docker daemon is running
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+	cmd := exec.CommandContext(ctx, "docker", "stats", "--no-stream")
+	if err := cmd.Run(); err != nil {
+		return fmt.Errorf("docker daemon is not running: %w", err)
+	}
+
+	return nil
+}
+
 // NewDockerRunner creates a new Docker runner with the specified options.
 func NewDockerRunner(options RunnerOptions, logger *log.Logger) (*DockerRunner, error) {
 	if logger == nil {
@@ -107,18 +126,7 @@ func NewDockerRunner(options RunnerOptions, logger *log.Logger) (*DockerRunner, 
 		return nil, err
 	}
 
-	// Check if docker executable exists
-	if !common.CheckExecutableExists("docker") {
-		return nil, fmt.Errorf("docker executable not found in PATH")
-	}
-
-	// Check if Docker daemon is running
-	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
-	defer cancel()
-	cmd := exec.CommandContext(ctx, "docker", "stats", "--no-stream")
-	if err := cmd.Run(); err != nil {
-		return nil, fmt.Errorf("docker daemon is not running: %w", err)
-	}
+	// Docker executable and daemon checks are now handled by CheckImplicitRequirements()
 
 	return &DockerRunner{
 		logger: logger,

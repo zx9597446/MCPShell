@@ -177,3 +177,10 @@ func getShell(configShell string) string {
 
 	return "/bin/sh"
 }
+
+// CheckImplicitRequirements checks if the runner meets its implicit requirements
+// Exec runner has no special requirements
+func (r *RunnerExec) CheckImplicitRequirements() error {
+	// No special requirements for the basic exec runner
+	return nil
+}

@@ -10,6 +10,7 @@ import (
 	"log"
 	"os"
 	"os/exec"
+	"runtime"
 	"strings"
 	"text/template"
 
@@ -259,4 +260,20 @@ func (r *RunnerFirejail) Run(ctx context.Context,
 
 	// Return the stdout output
 	return outputStr, nil
+}
+
+// CheckImplicitRequirements checks if the runner meets its implicit requirements
+// Firejail runner requires Linux and the firejail executable
+func (r *RunnerFirejail) CheckImplicitRequirements() error {
+	// Firejail is Linux only
+	if runtime.GOOS != "linux" {
+		return fmt.Errorf("firejail runner requires Linux")
+	}
+
+	// Check if firejail is available
+	if !common.CheckExecutableExists("firejail") {
+		return fmt.Errorf("firejail executable not found in PATH")
+	}
+
+	return nil
 }

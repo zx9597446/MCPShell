@@ -122,6 +122,7 @@ func (h *CommandHandler) executeToolCommand(ctx context.Context, params map[stri
 	}
 
 	// Create the appropriate runner with options
+	h.logger.Printf("Creating runner of type %s and checking implicit requirements", runnerType)
 	runner, err := NewRunner(runnerType, runnerOptions, h.logger)
 	if err != nil {
 		h.logger.Printf("Error creating runner: %v", err)

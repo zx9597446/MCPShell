@@ -10,6 +10,7 @@ import (
 	"log"
 	"os"
 	"os/exec"
+	"runtime"
 	"strings"
 	"text/template"
 
@@ -226,4 +227,20 @@ func (r *RunnerSandboxExec) Run(ctx context.Context, shell string, command strin
 
 	// Return the stdout output
 	return outputStr, nil
+}
+
+// CheckImplicitRequirements checks if the runner meets its implicit requirements
+// SandboxExec runner requires macOS and the sandbox-exec executable
+func (r *RunnerSandboxExec) CheckImplicitRequirements() error {
+	// Sandbox exec is macOS only
+	if runtime.GOOS != "darwin" {
+		return fmt.Errorf("sandbox-exec runner requires macOS")
+	}
+
+	// Check if sandbox-exec is available
+	if !common.CheckExecutableExists("sandbox-exec") {
+		return fmt.Errorf("sandbox-exec executable not found in PATH")
+	}
+
+	return nil
 }

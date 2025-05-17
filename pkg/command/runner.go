@@ -7,13 +7,27 @@ import (
 	"log"
 )
 
+// RunnerType is an identifier for the type of runner to use.
+// Each runner has its own set of implicit requirements that are checked
+// automatically, so users don't need to explicitly specify common requirements
+// in their tool configurations.
 type RunnerType string
 
 const (
-	RunnerTypeExec        RunnerType = "exec"
+	// RunnerTypeExec is the standard command execution runner with no additional requirements
+	RunnerTypeExec RunnerType = "exec"
+
+	// RunnerTypeSandboxExec is the macOS-specific sandbox-exec runner
+	// Implicit requirements: OS=darwin, executables=[sandbox-exec]
 	RunnerTypeSandboxExec RunnerType = "sandbox-exec"
-	RunnerTypeFirejail    RunnerType = "firejail"
-	RunnerTypeDocker      RunnerType = "docker"
+
+	// RunnerTypeFirejail is the Linux-specific firejail runner
+	// Implicit requirements: OS=linux, executables=[firejail]
+	RunnerTypeFirejail RunnerType = "firejail"
+
+	// RunnerTypeDocker is the Docker-based runner
+	// Implicit requirements: executables=[docker]
+	RunnerTypeDocker RunnerType = "docker"
 )
 
 // RunnerOptions is a map of options for the runner
@@ -27,20 +41,40 @@ func (ro RunnerOptions) ToJSON() (string, error) {
 // Runner is an interface for running commands
 type Runner interface {
 	Run(ctx context.Context, shell string, command string, env []string, params map[string]interface{}, tmpfile bool) (string, error)
+	CheckImplicitRequirements() error
 }
 
 // NewRunner creates a new Runner based on the given type
 func NewRunner(runnerType RunnerType, options RunnerOptions, logger *log.Logger) (Runner, error) {
+	var runner Runner
+	var err error
+
+	// Create the runner instance based on type
 	switch runnerType {
 	case RunnerTypeExec:
-		return NewRunnerExec(options, logger)
+		runner, err = NewRunnerExec(options, logger)
 	case RunnerTypeSandboxExec:
-		return NewRunnerSandboxExec(options, logger)
+		runner, err = NewRunnerSandboxExec(options, logger)
 	case RunnerTypeFirejail:
-		return NewRunnerFirejail(options, logger)
+		runner, err = NewRunnerFirejail(options, logger)
 	case RunnerTypeDocker:
-		return NewDockerRunner(options, logger)
+		runner, err = NewDockerRunner(options, logger)
+	default:
+		return nil, fmt.Errorf("unknown runner type: %s", runnerType)
 	}
 
-	return nil, fmt.Errorf("unknown runner type: %s", runnerType)
+	// Check if runner creation failed
+	if err != nil {
+		return nil, err
+	}
+
+	// Check implicit requirements for the created runner
+	if err := runner.CheckImplicitRequirements(); err != nil {
+		if logger != nil {
+			logger.Printf("Runner %s failed implicit requirements check: %v", runnerType, err)
+		}
+		return nil, err
+	}
+
+	return runner, nil
 }
