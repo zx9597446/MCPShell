@@ -1,8 +1,8 @@
 # MCPShell
 
-<!--p align="center">
-  <img src="docs/banner.png" alt="banner" width="600"/>
-</p-->
+<p align="center">
+  <img src="docs/logo.png" alt="banner" width="300"/>
+</p>
 
 
 The **MCPShell** is a tool that allows LLMs to safely execute **command-line tools**
