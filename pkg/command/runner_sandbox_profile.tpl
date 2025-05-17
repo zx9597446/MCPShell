@@ -5,6 +5,21 @@
 
 (allow default)
 
+;; Protect system directories from writes
+(deny file-write* (subpath "/bin"))
+(deny file-write* (subpath "/sbin"))
+(deny file-write* (subpath "/usr/bin"))
+(deny file-write* (subpath "/usr/sbin"))
+(deny file-write* (subpath "/usr/local/bin"))
+(deny file-write* (subpath "/usr/local/sbin"))
+(deny file-write* (subpath "/etc"))
+(deny file-write* (subpath "/System"))
+(deny file-write* (subpath "/Library"))
+(deny file-write* (literal "/var/root"))
+(deny file-write* (subpath "/var/db"))
+(deny file-write* (subpath "/private/etc"))
+(deny file-write* (subpath "/private/var/db"))
+
 {{ if .AllowNetworking }}
 (allow network*)
 {{ else }}
@@ -20,4 +35,5 @@
 {{ range .AllowReadFolders }}
 (allow file-read* (subpath "{{ . }}"))
 {{ end }}
+
 {{ end }}
