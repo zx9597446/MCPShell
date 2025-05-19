@@ -66,10 +66,10 @@ This command checks the configuration file for errors including:
 
 		// Create server instance for validation only
 		srv := server.New(server.Config{
-			ConfigFile:  localConfigPath,
-			Logger:      logger,
-			Version:     version,
-			Description: description,
+			ConfigFile:   localConfigPath,
+			Logger:       logger,
+			Version:      version,
+			Descriptions: description,
 		})
 
 		// Validate the configuration

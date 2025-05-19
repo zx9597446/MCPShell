@@ -34,6 +34,8 @@ func NewRunnerExecOptions(options RunnerOptions) (RunnerExecOptions, error) {
 	return reopts, err
 }
 
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 // NewRunnerExec creates a new ExecRunner with the provided logger
 // If logger is nil, a default logger is created
 func NewRunnerExec(options RunnerOptions, logger *log.Logger) (*RunnerExec, error) {
@@ -70,7 +72,18 @@ func (r *RunnerExec) Run(ctx context.Context, shell string,
 	var execCmd *exec.Cmd
 	var tmpDir string
 
-	if tmpfile {
+	if isSingleExecutableCommand(command) {
+		r.logger.Printf("Optimization: running single executable command directly: %s", command)
+		execCmd = exec.Command(command)
+		if len(env) > 0 {
+			r.logger.Printf("Adding %d environment variables to command", len(env))
+			for _, e := range env {
+				r.logger.Printf("... adding environment variable: %s", e)
+			}
+			execCmd.Env = append(os.Environ(), env...)
+		}
+		r.logger.Printf("Created command: %s", command)
+	} else if tmpfile {
 		// Create a temporary file for the command
 		var err error
 		tmpDir, err = os.MkdirTemp("", "mcpshell")

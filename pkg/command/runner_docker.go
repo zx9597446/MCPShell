@@ -74,8 +74,122 @@ type DockerRunnerOptions struct {
 	Platform string `json:"platform"`
 }
 
-// parseDockerOptions extracts Docker-specific options from generic runner options.
-func parseDockerOptions(genericOpts RunnerOptions) (DockerRunnerOptions, error) {
+// GetBaseDockerCommand creates the common parts of a docker run command with all configured options.
+// It returns a slice of command parts that can be further customized by the calling method.
+func (o *DockerRunnerOptions) GetBaseDockerCommand(env []string) []string {
+	// Start with basic docker run command
+	parts := []string{"docker run --rm"}
+
+	// Add networking option
+	if !o.AllowNetworking {
+		parts = append(parts, "--network none")
+	} else if o.Network != "" {
+		parts = append(parts, fmt.Sprintf("--network %s", o.Network))
+	}
+
+	// Add user if specified
+	if o.User != "" {
+		parts = append(parts, fmt.Sprintf("--user %s", o.User))
+	}
+
+	// Add working directory if specified
+	if o.WorkDir != "" {
+		parts = append(parts, fmt.Sprintf("--workdir %s", o.WorkDir))
+	}
+
+	// Add memory options if specified
+	if o.Memory != "" {
+		parts = append(parts, fmt.Sprintf("--memory %s", o.Memory))
+	}
+
+	if o.MemoryReservation != "" {
+		parts = append(parts, fmt.Sprintf("--memory-reservation %s", o.MemoryReservation))
+	}
+
+	if o.MemorySwap != "" {
+		parts = append(parts, fmt.Sprintf("--memory-swap %s", o.MemorySwap))
+	}
+
+	if o.MemorySwappiness != -1 {
+		parts = append(parts, fmt.Sprintf("--memory-swappiness %d", o.MemorySwappiness))
+	}
+
+	// Add Linux capabilities options
+	for _, cap := range o.CapAdd {
+		parts = append(parts, fmt.Sprintf("--cap-add %s", cap))
+	}
+
+	for _, cap := range o.CapDrop {
+		parts = append(parts, fmt.Sprintf("--cap-drop %s", cap))
+	}
+
+	// Add DNS servers
+	for _, dns := range o.DNS {
+		parts = append(parts, fmt.Sprintf("--dns %s", dns))
+	}
+
+	// Add DNS search domains
+	for _, dnsSearch := range o.DNSSearch {
+		parts = append(parts, fmt.Sprintf("--dns-search %s", dnsSearch))
+	}
+
+	// Add platform if specified
+	if o.Platform != "" {
+		parts = append(parts, fmt.Sprintf("--platform %s", o.Platform))
+	}
+
+	// Add custom docker run options
+	if o.DockerRunOpts != "" {
+		parts = append(parts, o.DockerRunOpts)
+	}
+
+	// Add additional mounts
+	for _, mount := range o.Mounts {
+		parts = append(parts, fmt.Sprintf("-v %s", mount))
+	}
+
+	// Add environment variables
+	for _, e := range env {
+		parts = append(parts, fmt.Sprintf("-e %s", e))
+	}
+
+	return parts
+}
+
+// GetDockerCommand constructs the docker run command with a script file.
+func (o *DockerRunnerOptions) GetDockerCommand(scriptFile string, env []string) string {
+	// Get base docker command parts
+	parts := o.GetBaseDockerCommand(env)
+
+	// Mount the script file
+	scriptName := filepath.Base(scriptFile)
+	containerScriptPath := filepath.Join("/tmp", scriptName)
+	parts = append(parts, fmt.Sprintf("-v %s:%s", scriptFile, containerScriptPath))
+
+	// Add image and the command to execute the script
+	parts = append(parts, o.Image)
+	parts = append(parts, fmt.Sprintf("sh %s", containerScriptPath))
+
+	// Join all parts
+	return strings.Join(parts, " ")
+}
+
+// GetDirectExecutionCommand constructs the docker run command for direct executable execution.
+// This is used to optimize the case where we're just running a single executable without a temp script.
+func (o *DockerRunnerOptions) GetDirectExecutionCommand(cmd string, env []string) string {
+	// Get base docker command parts
+	parts := o.GetBaseDockerCommand(env)
+
+	// Add image and direct command
+	parts = append(parts, o.Image)
+	parts = append(parts, cmd)
+
+	// Join all parts into a single command
+	return strings.Join(parts, " ")
+}
+
+// NewDockerRunnerOptions extracts Docker-specific options from generic runner options.
+func NewDockerRunnerOptions(genericOpts RunnerOptions) (DockerRunnerOptions, error) {
 	opts := DockerRunnerOptions{
 		AllowNetworking:  true, // Default to allowing networking
 		User:             "",   // Default to Docker's default user
@@ -193,6 +307,26 @@ func parseDockerOptions(genericOpts RunnerOptions) (DockerRunnerOptions, error) 
 	return opts, nil
 }
 
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+// NewDockerRunner creates a new Docker runner with the specified options.
+func NewDockerRunner(options RunnerOptions, logger *log.Logger) (*DockerRunner, error) {
+	if logger == nil {
+		return nil, fmt.Errorf("logger is required for DockerRunner")
+	}
+
+	dockerOpts, err := NewDockerRunnerOptions(options)
+	if err != nil {
+		return nil, err
+	}
+
+	// Docker executable and daemon checks are now handled by CheckImplicitRequirements()
+	return &DockerRunner{
+		logger: logger,
+		opts:   dockerOpts,
+	}, nil
+}
+
 // CheckImplicitRequirements checks if the runner meets its implicit requirements
 // Docker runner requires the docker executable and a running daemon
 func (r *DockerRunner) CheckImplicitRequirements() error {
@@ -212,55 +346,43 @@ func (r *DockerRunner) CheckImplicitRequirements() error {
 	return nil
 }
 
-// NewDockerRunner creates a new Docker runner with the specified options.
-func NewDockerRunner(options RunnerOptions, logger *log.Logger) (*DockerRunner, error) {
-	if logger == nil {
-		return nil, fmt.Errorf("logger is required for DockerRunner")
-	}
-
-	dockerOpts, err := parseDockerOptions(options)
-	if err != nil {
-		return nil, err
-	}
-
-	// Docker executable and daemon checks are now handled by CheckImplicitRequirements()
-
-	return &DockerRunner{
-		logger: logger,
-		opts:   dockerOpts,
-	}, nil
-}
-
 // Run executes the command using Docker.
 func (r *DockerRunner) Run(ctx context.Context, shell string, cmd string, env []string, params map[string]interface{}, tmpfile bool) (string, error) {
-	// Create a temporary script file
-	scriptFile, err := r.createScriptFile(shell, cmd, env)
-	if err != nil {
-		return "", fmt.Errorf("failed to create script file: %w", err)
-	}
-
-	// Use a named function for deferred cleanup to handle the error
-	defer func() {
-		if err := os.Remove(scriptFile); err != nil {
-			r.logger.Printf("Warning: failed to remove temporary script file %s: %v", scriptFile, err)
-		}
-	}()
-
-	r.logger.Printf("Created temporary script file: %s", scriptFile)
-
-	// Construct the docker run command
-	dockerCmd, err := r.buildDockerCommand(scriptFile, env)
-	if err != nil {
-		return "", fmt.Errorf("failed to build docker command: %w", err)
-	}
-
-	r.logger.Printf("Running command in Docker: %s", dockerCmd)
-
-	// Use the exec runner to execute the docker command
+	// Create an exec runner that we'll use to execute the docker command
 	execRunner, err := NewRunnerExec(RunnerOptions{}, r.logger)
 	if err != nil {
 		return "", fmt.Errorf("failed to create exec runner: %w", err)
 	}
+
+	var dockerCmd string
+
+	// Determine if we should run directly or via script
+	if isSingleExecutableCommand(cmd) {
+		r.logger.Printf("Optimization: running single executable command directly in Docker: %s", cmd)
+
+		// Build docker command to directly execute the command without a temp script
+		dockerCmd = r.opts.GetDirectExecutionCommand(cmd, env)
+	} else {
+		// Create a temporary script file
+		scriptFile, err := r.createScriptFile(shell, cmd, env)
+		if err != nil {
+			return "", fmt.Errorf("failed to create script file: %w", err)
+		}
+
+		// Clean up the temporary script file when done
+		defer func() {
+			if err := os.Remove(scriptFile); err != nil {
+				r.logger.Printf("Warning: failed to remove temporary script file %s: %v", scriptFile, err)
+			}
+		}()
+
+		r.logger.Printf("Created temporary script file: %s", scriptFile)
+
+		// Construct the docker run command with the script file
+		dockerCmd = r.opts.GetDockerCommand(scriptFile, env)
+	}
+
+	r.logger.Printf("Running command in Docker: %s", dockerCmd)
 
 	// Run the docker command - we set tmpfile to false because dockerCmd is already a full command
 	output, err := execRunner.Run(ctx, "sh", dockerCmd, nil, params, false)
@@ -333,97 +455,4 @@ func (r *DockerRunner) createScriptFile(shell string, cmd string, env []string) 
 
 	r.logger.Printf("Created temporary script file at: %s", scriptPath)
 	return scriptPath, nil
-}
-
-// buildDockerCommand constructs the docker run command.
-func (r *DockerRunner) buildDockerCommand(scriptFile string, env []string) (string, error) {
-	// Basic docker run command
-	parts := []string{"docker run --rm"}
-
-	// Add networking option
-	if !r.opts.AllowNetworking {
-		parts = append(parts, "--network none")
-	} else if r.opts.Network != "" {
-		// If networking is allowed and a specific network is specified
-		parts = append(parts, fmt.Sprintf("--network %s", r.opts.Network))
-	}
-
-	// Add user if specified
-	if r.opts.User != "" {
-		parts = append(parts, fmt.Sprintf("--user %s", r.opts.User))
-	}
-
-	// Add working directory if specified
-	if r.opts.WorkDir != "" {
-		parts = append(parts, fmt.Sprintf("--workdir %s", r.opts.WorkDir))
-	}
-
-	// Add memory options if specified
-	if r.opts.Memory != "" {
-		parts = append(parts, fmt.Sprintf("--memory %s", r.opts.Memory))
-	}
-
-	if r.opts.MemoryReservation != "" {
-		parts = append(parts, fmt.Sprintf("--memory-reservation %s", r.opts.MemoryReservation))
-	}
-
-	if r.opts.MemorySwap != "" {
-		parts = append(parts, fmt.Sprintf("--memory-swap %s", r.opts.MemorySwap))
-	}
-
-	if r.opts.MemorySwappiness != -1 {
-		parts = append(parts, fmt.Sprintf("--memory-swappiness %d", r.opts.MemorySwappiness))
-	}
-
-	// Add Linux capabilities options
-	for _, cap := range r.opts.CapAdd {
-		parts = append(parts, fmt.Sprintf("--cap-add %s", cap))
-	}
-
-	for _, cap := range r.opts.CapDrop {
-		parts = append(parts, fmt.Sprintf("--cap-drop %s", cap))
-	}
-
-	// Add DNS servers
-	for _, dns := range r.opts.DNS {
-		parts = append(parts, fmt.Sprintf("--dns %s", dns))
-	}
-
-	// Add DNS search domains
-	for _, dnsSearch := range r.opts.DNSSearch {
-		parts = append(parts, fmt.Sprintf("--dns-search %s", dnsSearch))
-	}
-
-	// Add platform if specified
-	if r.opts.Platform != "" {
-		parts = append(parts, fmt.Sprintf("--platform %s", r.opts.Platform))
-	}
-
-	// Add custom docker run options
-	if r.opts.DockerRunOpts != "" {
-		parts = append(parts, r.opts.DockerRunOpts)
-	}
-
-	// Mount the script file
-	scriptName := filepath.Base(scriptFile)
-	containerScriptPath := filepath.Join("/tmp", scriptName)
-	parts = append(parts, fmt.Sprintf("-v %s:%s", scriptFile, containerScriptPath))
-
-	// Add additional mounts
-	for _, mount := range r.opts.Mounts {
-		parts = append(parts, fmt.Sprintf("-v %s", mount))
-	}
-
-	// Add environment variables
-	for _, e := range env {
-		parts = append(parts, fmt.Sprintf("-e %s", e))
-	}
-
-	// Add image and command
-	parts = append(parts, r.opts.Image)
-	parts = append(parts, fmt.Sprintf("sh %s", containerScriptPath))
-
-	// Join all parts
-	dockerCmd := strings.Join(parts, " ")
-	return dockerCmd, nil
 }

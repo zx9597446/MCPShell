@@ -48,6 +48,8 @@ func NewRunnerFirejailOptions(options RunnerOptions) (RunnerFirejailOptions, err
 	return reopts, err
 }
 
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 // NewRunnerFirejail creates a new RunnerFirejail with the provided logger
 // If logger is nil, a default logger is created
 func NewRunnerFirejail(options RunnerOptions, logger *log.Logger) (*RunnerFirejail, error) {
@@ -84,7 +86,6 @@ func (r *RunnerFirejail) Run(ctx context.Context,
 	shell string, command string,
 	env []string, params map[string]interface{}, tmpfile bool,
 ) (string, error) {
-	// Combine command and args
 	fullCmd := command
 
 	// Check if context is done
@@ -120,8 +121,6 @@ func (r *RunnerFirejail) Run(ctx context.Context,
 		r.logger.Printf("Failed to create temporary profile file: %v", err)
 		return "", fmt.Errorf("failed to create temporary profile file: %w", err)
 	}
-
-	// Ensure temporary file is deleted when this function exits
 	defer func() {
 		profileFilePath := profileFile.Name()
 		if err := profileFile.Close(); err != nil {
@@ -144,70 +143,49 @@ func (r *RunnerFirejail) Run(ctx context.Context,
 		return "", fmt.Errorf("failed to sync profile file: %w", err)
 	}
 
-	// we always create a temporary file in the firejail environment
-	// because the command might be executed with a different shell
-	// and we need to ensure it's executable
-	tmpFile, err := os.CreateTemp("", "firejail-command-*.sh")
-	if err != nil {
-		r.logger.Printf("Failed to create temporary command file: %v", err)
-		return "", fmt.Errorf("failed to create temporary command file: %w", err)
-	}
-	defer func() {
-		if err := os.Remove(tmpFile.Name()); err != nil {
-			r.logger.Printf("Warning: failed to remove temporary command file: %v", err)
+	var execCmd *exec.Cmd
+
+	// Check if we can optimize by running a single executable directly
+	if isSingleExecutableCommand(fullCmd) {
+		r.logger.Printf("Optimization: running single executable command directly: %s", fullCmd)
+		execCmd = exec.Command("firejail", "--profile="+profileFile.Name(), fullCmd)
+	} else {
+		// Create a temporary file for the command
+		tmpScript, err := os.CreateTemp("", "firejail-command-*.sh")
+		if err != nil {
+			r.logger.Printf("Failed to create temporary command file: %v", err)
+			return "", fmt.Errorf("failed to create temporary command file: %w", err)
 		}
-	}()
+		// Ensure temporary file is deleted when this function exits
+		defer func() {
+			tmpScriptPath := tmpScript.Name()
+			if err := tmpScript.Close(); err != nil {
+				r.logger.Printf("Warning: failed to close script file: %v", err)
+			}
+			if err := os.Remove(tmpScriptPath); err != nil {
+				r.logger.Printf("Warning: failed to remove temporary script file: %v", err)
+			}
+		}()
 
-	// write the command to the temporary file
-	if _, err := tmpFile.WriteString(fullCmd); err != nil {
-		r.logger.Printf("Failed to write command to temporary file: %v", err)
-		return "", fmt.Errorf("failed to write command to temporary file: %w", err)
-	}
-
-	// make the temporary file executable
-	if err := os.Chmod(tmpFile.Name(), 0o700); err != nil {
-		r.logger.Printf("Failed to make temporary file executable: %v", err)
-		return "", fmt.Errorf("failed to make temporary file executable: %w", err)
-	}
-
-	// Create the firejail command using --profile flag for file-based profile
-	firejailCmd := fmt.Sprintf("firejail --profile=%s %s", profileFile.Name(), tmpFile.Name())
-	r.logger.Printf("Created firejail command: %s", firejailCmd)
-
-	// create a temporary file for the command
-	tmpScript, err := os.CreateTemp("", "sandbox-script-*.sh")
-	if err != nil {
-		r.logger.Printf("Failed to create temporary command file: %v", err)
-		return "", fmt.Errorf("failed to create temporary command file: %w", err)
-	}
-	// Ensure temporary file is deleted when this function exits
-	defer func() {
-		tmpScriptPath := tmpScript.Name()
-		if err := tmpScript.Close(); err != nil {
-			r.logger.Printf("Warning: failed to close profile file: %v", err)
+		// Write the command to the temporary file
+		if _, err := tmpScript.WriteString(fullCmd); err != nil {
+			r.logger.Printf("Failed to write command to temporary file: %v", err)
+			return "", fmt.Errorf("failed to write command to temporary file: %w", err)
 		}
-		if err := os.Remove(tmpScriptPath); err != nil {
-			r.logger.Printf("Warning: failed to remove temporary profile file: %v", err)
+
+		// Flush data to ensure it's written to disk
+		if err := tmpScript.Sync(); err != nil {
+			r.logger.Printf("Failed to sync script file: %v", err)
+			return "", fmt.Errorf("failed to sync script file: %w", err)
 		}
-	}()
 
-	// write the command to the temporary file
-	// we always create a temporary file in the sandboxed environment
-	if _, err := tmpScript.WriteString(fullCmd); err != nil {
-		r.logger.Printf("Failed to write command to temporary file: %v", err)
-		return "", fmt.Errorf("failed to write command to temporary file: %w", err)
-	}
+		// Make the temporary file executable
+		if err := os.Chmod(tmpScript.Name(), 0o700); err != nil {
+			r.logger.Printf("Failed to make temporary file executable: %v", err)
+			return "", fmt.Errorf("failed to make temporary file executable: %w", err)
+		}
 
-	// Flush data to ensure it's written to disk
-	if err := tmpScript.Sync(); err != nil {
-		r.logger.Printf("Failed to sync script file: %v", err)
-		return "", fmt.Errorf("failed to sync script file: %w", err)
-	}
-
-	// make the temporary file executable
-	if err := os.Chmod(tmpScript.Name(), 0o700); err != nil {
-		r.logger.Printf("Failed to make temporary file executable: %v", err)
-		return "", fmt.Errorf("failed to make temporary file executable: %w", err)
+		execCmd = exec.Command("firejail", "--profile="+profileFile.Name(), tmpScript.Name())
 	}
 
 	// Check if context is done
@@ -218,8 +196,6 @@ func (r *RunnerFirejail) Run(ctx context.Context,
 		// Continue execution
 	}
 
-	// Execute the command directly without a temporary file
-	execCmd := exec.Command("firejail", "--profile="+profileFile.Name(), tmpFile.Name())
 	r.logger.Printf("Created command: %s", execCmd.String())
 
 	// Set environment variables if provided

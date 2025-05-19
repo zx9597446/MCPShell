@@ -18,10 +18,10 @@ func TestServer_New(t *testing.T) {
 
 	// Test creating a new server instance
 	srv := New(Config{
-		ConfigFile:  "test-config.yaml",
-		Logger:      logger,
-		Version:     "test",
-		Description: "test description",
+		ConfigFile:   "test-config.yaml",
+		Logger:       logger,
+		Version:      "test",
+		Descriptions: []string{"test description"},
 	})
 
 	if srv == nil {

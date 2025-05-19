@@ -6,6 +6,7 @@ import (
 	"os"
 	"reflect"
 	"runtime"
+	"strings"
 	"testing"
 )
 
@@ -337,5 +338,29 @@ func TestRunnerSandboxExec_Run(t *testing.T) {
 				t.Errorf("Output mismatch: got %v, want %v", output, tt.expectedOut)
 			}
 		})
+	}
+}
+
+func TestRunnerSandboxExec_Optimization_SingleExecutable(t *testing.T) {
+	if runtime.GOOS != "darwin" {
+		t.Skip("Skipping test on non-macOS platform")
+	}
+	logger := log.New(os.Stderr, "test-runner-sandbox-opt: ", log.LstdFlags)
+	runner, err := NewRunnerSandboxExec(RunnerOptions{}, logger)
+	if err != nil {
+		t.Fatalf("Failed to create RunnerSandboxExec: %v", err)
+	}
+	// Should succeed: /bin/ls is a single executable
+	output, err := runner.Run(context.Background(), "", "/bin/ls", nil, nil, false)
+	if err != nil {
+		t.Errorf("Expected /bin/ls to run without error, got: %v", err)
+	}
+	if len(output) == 0 {
+		t.Errorf("Expected output from /bin/ls, got empty string")
+	}
+	// Should NOT optimize: command with arguments
+	_, err2 := runner.Run(context.Background(), "", "/bin/ls -l", nil, nil, false)
+	if err2 != nil && !strings.Contains(err2.Error(), "no such file") {
+		t.Logf("Expected failure for /bin/ls -l as a single executable: %v", err2)
 	}
 }

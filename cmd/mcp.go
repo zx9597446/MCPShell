@@ -57,13 +57,12 @@ available to AI applications via the MCP protocol.
 
 		// Create and start the server
 		srv := server.New(server.Config{
-			ConfigFile:         localConfigPath,
-			Logger:             logger,
-			Version:            version,
-			Description:        description,
-			DescriptionFile:    descriptionFile,
-			DescriptionAdd:     descriptionAdd,
-			DescriptionAddFile: descriptionAddFile,
+			ConfigFile:          localConfigPath,
+			Logger:              logger,
+			Version:             version,
+			Descriptions:        description,
+			DescriptionFiles:    descriptionFile,
+			DescriptionOverride: descriptionOverride,
 		})
 
 		return srv.Start()
@@ -75,10 +74,9 @@ func init() {
 	rootCmd.AddCommand(mcpCommand)
 
 	// Add MCP-specific flags
-	mcpCommand.Flags().StringVarP(&description, "description", "d", "", "MCP server description (optional)")
-	mcpCommand.Flags().StringVarP(&descriptionFile, "description-file", "", "", "Read the MCP server description from a file (optional)")
-	mcpCommand.Flags().StringVarP(&descriptionAdd, "description-add", "", "", "Add the given description to the MCP server description (optional)")
-	mcpCommand.Flags().StringVarP(&descriptionAddFile, "description-add-file", "", "", "Read some additional text to add to the MCP server description from a file (optional)")
+	mcpCommand.Flags().StringSliceVarP(&description, "description", "d", []string{}, "MCP server description (optional, can be specified multiple times)")
+	mcpCommand.Flags().StringSliceVarP(&descriptionFile, "description-file", "", []string{}, "Read the MCP server description from files (optional, can be specified multiple times)")
+	mcpCommand.Flags().BoolVarP(&descriptionOverride, "description-override", "", false, "Override the description found in the config file")
 
 	// Mark required flags
 	_ = mcpCommand.MarkFlagRequired("config")

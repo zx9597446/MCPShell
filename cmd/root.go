@@ -23,10 +23,9 @@ var (
 	logLevel   string
 
 	// MCP server flags
-	description        string
-	descriptionFile    string
-	descriptionAdd     string
-	descriptionAddFile string
+	description         []string
+	descriptionFile     []string
+	descriptionOverride bool
 
 	// Agent-specific flags
 	agentModel        string

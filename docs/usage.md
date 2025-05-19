@@ -19,13 +19,44 @@ MCPShell provides the following commands:
 
 ## Common arguments
 
+This is the list of argument that are common to all the commands:
+
 - `--config`, `-c` (required): Path to the YAML configuration file or URL
 - `--logfile`, `-l`: Path to the log file (optional)
 - `--log-level`: Log level: none, error, info, debug (default: "info")
-- `--description`, `-d`: Server description (optional)
-- `--description-file`: Read the MCP server description from a file (optional)
-- `--description-add`: Add the given description to the MCP server description (optional)
-- `--description-add-file`: Read some additional text to add to the MCP server description from a file (optional)
+- `--description-override`: override the description found in the config file.
+- `--description`, `-d`: Server description (optional, can be specified multiple times).
+  If an existing description is specified in the config file (and `--description-override` is not passed)
+  it will append the description to the existing one. If it is specified multiple times, the
+  resulting description with be the join of all of them
+- `--description-file`: Read the description from files (optional, can be specified multiple times).   
+  Shell globbing is supported (e.g., `--description-file *.md`). URLs are also supported (e.g., 
+  `--description-file https://example.com/description.txt`). It follows the same behaviour of
+  `--description`, where the final description is the result of the concatenation of all of them
+  
+For example, imagine you want to use the [kubectl](../examples/kubectl-ro.yaml) toolkit,
+but you want to add some additional instructions specific to your infrastructure,
+you could do:
+
+```console
+mcpshell mcp \
+    --configfile example/kubectl-ro.yaml \
+    --description "Monitoring namespace is called 'monitoring'"
+    --description "Envoy is running in namespace 'envoy'"
+```
+
+So multiple descriptions can be combined in the order they are provided in the command line,
+like:
+
+```console
+# Combine multiple descriptions from different sources
+mcpshell mcp --config=examples/config.yaml \
+  --description "Primary server description" \
+  --description "Additional information" \
+  --description-file docs/intro.txt \
+  --description-file "docs/details.md" \
+  --description-file docs/*.md
+```
 
 ### MCP Command
 

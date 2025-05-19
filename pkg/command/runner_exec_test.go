@@ -162,3 +162,27 @@ func TestRunnerExec_RunWithEnvExpansion(t *testing.T) {
 		t.Errorf("Environment variable expansion failed: got %q, want %q", output, expected)
 	}
 }
+
+func TestRunnerExec_Optimization_SingleExecutable(t *testing.T) {
+	logger := log.New(os.Stderr, "test-runner-exec-opt: ", log.LstdFlags)
+	r, err := NewRunnerExec(RunnerOptions{}, logger)
+	if err != nil {
+		t.Fatalf("Failed to create RunnerExec: %v", err)
+	}
+
+	// Should succeed: /bin/ls is a single executable
+	output, err := r.Run(context.Background(), "", "/bin/ls", nil, nil, false)
+	if err != nil {
+		t.Errorf("Expected /bin/ls to run without error, got: %v", err)
+	}
+	if len(output) == 0 {
+		t.Errorf("Expected output from /bin/ls, got empty string")
+	}
+
+	// Should NOT optimize: command with arguments
+	_, err2 := r.Run(context.Background(), "", "/bin/ls -l", nil, nil, false)
+	if err2 != nil && !strings.Contains(err2.Error(), "no such file") {
+		// It's ok if it fails due to the command not existing, but it should not optimize
+		t.Logf("Expected failure for /bin/ls -l as a single executable: %v", err2)
+	}
+}

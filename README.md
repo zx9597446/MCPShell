@@ -18,7 +18,8 @@ It provides a secure bridge between LLMs and operating system commands.
 - **Security through constraints**: Validate tool parameters using CEL expressions
   before execution, as well as optional [**sanboxed environments**](docs/config-runners.md)
   for running commands.
-- **Robust error handling**: Graceful recovery from panics with detailed logging.
+- **Quick proptotyping of MCP tools**: just add some shell code and use it as
+  a MCP tool in your LLM.
 - **Simple integration**: Works with any LLM client supporting the MCP protocol
   (ie, Cursor, VSCode, Witsy...)
 
@@ -27,7 +28,7 @@ It provides a secure bridge between LLMs and operating system commands.
 Imagine you want Cursor (or some other MCP client) help you with your
 space problems in your hard disk.
 
-1. Create a configuration file `example.yaml` defining your tools:
+1. Create a configuration file `/my/example.yaml` defining your tools:
 
    ```yaml
    mcp:
@@ -77,7 +78,8 @@ space problems in your hard disk.
                "command": "go",
                "args": [
                   "run", "github.com/inercia/MCPShell@v0.1.4",
-                  "mcp", "--config", "/my/example.yaml", "--logfile", "/some/path/mcpshell/example.log"
+                  "mcp", "--config", "/my/example.yaml",
+                  "--logfile", "/some/path/mcpshell/example.log"
                ]
            }
        }
