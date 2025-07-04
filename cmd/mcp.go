@@ -87,8 +87,8 @@ func init() {
 	mcpCommand.Flags().BoolVarP(&descriptionOverride, "description-override", "", false, "Override the description found in the config file")
 
 	// Add HTTP server flags
-	mcpCommand.Flags().BoolVar(&useHTTP, "http", false, "Enable HTTP server mode")
-	mcpCommand.Flags().IntVar(&httpPort, "port", 8080, "Port for HTTP server")
+	mcpCommand.Flags().BoolVar(&useHTTP, "http", false, "Enable HTTP server mode (serve MCP over HTTP/SSE instead of stdio)")
+	mcpCommand.Flags().IntVar(&httpPort, "port", 8080, "Port for HTTP server (default: 8080, only used with --http)")
 
 	// Mark required flags
 	_ = mcpCommand.MarkFlagRequired("config")
