@@ -8,6 +8,8 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
+	"net/http"
 	"strings"
 
 	"github.com/mark3labs/mcp-go/mcp"
@@ -601,4 +603,114 @@ func mustMarshalJSON(v interface{}) json.RawMessage {
 		panic(fmt.Sprintf("failed to marshal JSON: %v", err))
 	}
 	return data
+}
+
+// StartHTTP initializes the MCP server and starts an HTTP server for MCP protocol over HTTP/SSE
+func (s *Server) StartHTTP(port int) error {
+	s.logger.Info("Initializing MCP HTTP server on port %d", port)
+	if err := s.CreateServer(); err != nil {
+		return err
+	}
+	http.HandleFunc("/sse", s.handleMCPHTTP)
+	addr := fmt.Sprintf(":%d", port)
+	s.logger.Info("Listening on http://localhost%s/sse", addr)
+	fmt.Printf("MCP HTTP server listening on http://localhost%s/sse\n", addr)
+	return http.ListenAndServe(addr, nil)
+}
+
+// handleMCPHTTP handles HTTP POST requests for MCP protocol
+func (s *Server) handleMCPHTTP(w http.ResponseWriter, r *http.Request) {
+	s.logger.Info("New HTTP connection from %s %s %s", r.RemoteAddr, r.Method, r.URL.Path)
+	if r.Method != http.MethodPost {
+		http.Error(w, "Only POST allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	body, err := io.ReadAll(r.Body)
+	if err != nil {
+		http.Error(w, "Failed to read body", http.StatusBadRequest)
+		s.logger.Error("Failed to read request body from %s: %v", r.RemoteAddr, err)
+		return
+	}
+
+	s.logger.Info("Request body: %s", string(body))
+
+	// Parse the JSON-RPC request
+	var req map[string]interface{}
+	if err := json.Unmarshal(body, &req); err != nil {
+		http.Error(w, "Invalid JSON", http.StatusBadRequest)
+		s.logger.Error("Invalid JSON from %s: %v", r.RemoteAddr, err)
+		return
+	}
+
+	// Intercept "initialize" method
+	if method, ok := req["method"].(string); ok && method == "initialize" {
+		id := req["id"]
+		s.logger.Info("Received 'initialize' from %s (id=%v)", r.RemoteAddr, id)
+
+		// Extract protocolVersion from params
+		protocolVersion := ""
+		if params, ok := req["params"].(map[string]interface{}); ok {
+			if pv, ok := params["protocolVersion"].(string); ok {
+				protocolVersion = pv
+			}
+		}
+		if protocolVersion == "" {
+			protocolVersion = "2025-03-26" // fallback, should always be present
+		}
+
+		resp := map[string]interface{}{
+			"jsonrpc": "2.0",
+			"id":      id,
+			"result": map[string]interface{}{
+				"serverInfo": map[string]interface{}{
+					"name":    "MCPShell",
+					"version": s.version,
+				},
+				"capabilities": map[string]interface{}{
+					"tools": map[string]interface{}{
+						"allowedTools": s.getAllowedToolNames(),
+					},
+				},
+				"sessionId":       "local",
+				"protocolVersion": protocolVersion,
+			},
+		}
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		respBytes, _ := json.Marshal(resp)
+		s.logger.Info("Response: %s", string(respBytes))
+		w.Write(respBytes)
+		return
+	}
+
+	// Fallback to normal MCP handling
+	s.logger.Info("Received MCP request from %s: method=%v id=%v", r.RemoteAddr, req["method"], req["id"])
+	ctx := r.Context()
+	resp := s.mcpServer.HandleMessage(ctx, body)
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	var respBytes []byte
+	switch v := resp.(type) {
+	case []byte:
+		respBytes = v
+	case string:
+		respBytes = []byte(v)
+	default:
+		respBytes, _ = json.Marshal(v)
+	}
+	s.logger.Info("Response: %s", string(respBytes))
+	w.Write(respBytes)
+}
+
+// Helper to get tool names
+func (s *Server) getAllowedToolNames() []string {
+	tools, err := s.GetTools()
+	if err != nil {
+		return []string{}
+	}
+	names := make([]string, 0, len(tools))
+	for _, t := range tools {
+		names = append(names, t.Name)
+	}
+	return names
 }
