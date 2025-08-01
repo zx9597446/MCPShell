@@ -74,10 +74,15 @@ mcpshell mcp [flags]
 
 Runs an MCP server that communicates using the Model Context Protocol and exposes the tools defined in a MCP configuration file. The server loads tool definitions from a YAML configuration file and makes them available to AI applications via the MCP protocol.
 
+**HTTP/SSE Mode**:
+
+- `--http`: Enable HTTP server mode (serve MCP over HTTP/SSE instead of stdio)
+- `--port`: Port for HTTP server (default: 8080, only used with --http)
+
 **Example**:
 
 ```console
-mcpshell mcp --config=examples/config.yaml --log-level=debug
+mcpshell mcp --config=examples/config.yaml --http --port=9090 --log-level=debug
 ```
 
 ### EXE Command
