@@ -67,7 +67,7 @@ func Execute() {
 // init registers all subcommands and sets up global flags
 func init() {
 	// Add common persistent flags
-	rootCmd.PersistentFlags().StringVarP(&configFile, "config", "c", "", "Path to the YAML configuration file or URL")
+	rootCmd.PersistentFlags().StringVarP(&configFile, "config", "c", "", "Path to the YAML configuration file, URL, or directory containing YAML files")
 	rootCmd.PersistentFlags().StringVarP(&logFile, "logfile", "l", "", "Path to the log file (optional)")
 	rootCmd.PersistentFlags().StringVarP(&logLevel, "log-level", "", "info", "Log level: none, error, info, debug")
 

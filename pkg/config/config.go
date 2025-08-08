@@ -169,3 +169,56 @@ func (c *Config) GetTools() []Tool {
 
 	return tools
 }
+
+// ToYAML serializes the configuration back to YAML format.
+//
+// Returns:
+//   - YAML data as bytes
+//   - An error if serialization fails
+func (c *Config) ToYAML() ([]byte, error) {
+	return yaml.Marshal(c)
+}
+
+// LoadAndMergeConfigs loads multiple configuration files and merges them into a single configuration.
+// The merging strategy is:
+// - Prompts are concatenated from all files
+// - MCP description from the first file is used (others are ignored)
+// - MCP run config from the first file is used (others are ignored)
+// - Tools from all files are combined
+//
+// Parameters:
+//   - filepaths: List of paths to YAML configuration files
+//
+// Returns:
+//   - A pointer to the merged Config structure
+//   - An error if loading or merging fails
+func LoadAndMergeConfigs(filepaths []string) (*Config, error) {
+	if len(filepaths) == 0 {
+		return nil, fmt.Errorf("no configuration files provided")
+	}
+
+	var mergedConfig Config
+	var isFirstFile = true
+
+	for _, filepath := range filepaths {
+		config, err := NewConfigFromFile(filepath)
+		if err != nil {
+			return nil, fmt.Errorf("failed to load config file %s: %w", filepath, err)
+		}
+
+		// Merge prompts (concatenate from all files)
+		mergedConfig.Prompts = append(mergedConfig.Prompts, config.Prompts...)
+
+		// For MCP config, use the first file's description and run config
+		if isFirstFile {
+			mergedConfig.MCP.Description = config.MCP.Description
+			mergedConfig.MCP.Run = config.MCP.Run
+			isFirstFile = false
+		}
+
+		// Merge tools (combine from all files)
+		mergedConfig.MCP.Tools = append(mergedConfig.MCP.Tools, config.MCP.Tools...)
+	}
+
+	return &mergedConfig, nil
+}

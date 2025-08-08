@@ -21,7 +21,7 @@ MCPShell provides the following commands:
 
 This is the list of argument that are common to all the commands:
 
-- `--config`, `-c` (required): Path to the YAML configuration file or URL
+- `--config`, `-c` (required): Path to the YAML configuration file, URL, or directory containing YAML files
 - `--logfile`, `-l`: Path to the log file (optional)
 - `--log-level`: Log level: none, error, info, debug (default: "info")
 - `--description-override`: override the description found in the config file.
@@ -33,6 +33,21 @@ This is the list of argument that are common to all the commands:
   Shell globbing is supported (e.g., `--description-file *.md`). URLs are also supported (e.g., 
   `--description-file https://example.com/description.txt`). It follows the same behaviour of
   `--description`, where the final description is the result of the concatenation of all of them
+
+**Configuration Loading**:
+
+The `--config` flag supports three types of inputs:
+
+1. **Single YAML file**: `--config=examples/config.yaml`
+2. **URL**: `--config=https://example.com/config.yaml`
+3. **Directory**: `--config=./configs/` - loads all `.yaml` and `.yml` files in the directory
+
+When loading from a directory, MCPShell will:
+- Scan the directory recursively for YAML files
+- Merge all found configurations into a single configuration
+- Use the description and run settings from the first file
+- Combine all tools from all files
+- Concatenate all prompts from all files
   
 For example, imagine you want to use the [kubectl](../examples/kubectl-ro.yaml) toolkit,
 but you want to add some additional instructions specific to your infrastructure,
