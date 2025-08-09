@@ -675,11 +675,18 @@ func (s *Server) handleMCPHTTP(w http.ResponseWriter, r *http.Request) {
 				"protocolVersion": protocolVersion,
 			},
 		}
+		respBytes, err := json.Marshal(resp)
+		if err != nil {
+			s.logger.Error("Failed to marshal response: %v", err)
+			http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+			return
+		}
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
-		respBytes, _ := json.Marshal(resp)
 		s.logger.Info("Response: %s", string(respBytes))
-		w.Write(respBytes)
+		if _, err := w.Write(respBytes); err != nil {
+			s.logger.Error("Failed to write response: %v", err)
+		}
 		return
 	}
 
@@ -687,8 +694,6 @@ func (s *Server) handleMCPHTTP(w http.ResponseWriter, r *http.Request) {
 	s.logger.Info("Received MCP request from %s: method=%v id=%v", r.RemoteAddr, req["method"], req["id"])
 	ctx := r.Context()
 	resp := s.mcpServer.HandleMessage(ctx, body)
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusOK)
 	var respBytes []byte
 	switch v := resp.(type) {
 	case []byte:
@@ -696,10 +701,20 @@ func (s *Server) handleMCPHTTP(w http.ResponseWriter, r *http.Request) {
 	case string:
 		respBytes = []byte(v)
 	default:
-		respBytes, _ = json.Marshal(v)
+		b, err := json.Marshal(v)
+		if err != nil {
+			s.logger.Error("Failed to marshal MCP response: %v", err)
+			http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+			return
+		}
+		respBytes = b
 	}
 	s.logger.Info("Response: %s", string(respBytes))
-	w.Write(respBytes)
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	if _, err := w.Write(respBytes); err != nil {
+		s.logger.Error("Failed to write response: %v", err)
+	}
 }
 
 // Helper to get tool names
