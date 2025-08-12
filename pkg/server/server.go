@@ -240,7 +240,7 @@ func (s *Server) CreateServer() error {
 }
 
 // loadTools loads tools from the configuration and registers them with the server
-func (s *Server) loadTools(cfg *config.Config) error {
+func (s *Server) loadTools(cfg *config.ToolsConfig) error {
 	s.logger.Info("Loading configuration from file: %s", s.configFile)
 
 	// Check if there are any tools defined

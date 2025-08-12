@@ -36,9 +36,9 @@ This command checks the configuration file for errors including:
 		logger.Info("Validating MCP configuration")
 
 		// Check if config file is provided
-		if configFile == "" {
-			logger.Error("Configuration file is required")
-			return fmt.Errorf("configuration file is required. Use --config or -c flag to specify the path")
+		if toolsFile == "" {
+			logger.Error("Tools configuration file is required")
+			return fmt.Errorf("tools configuration file is required. Use --tools flag to specify the path")
 		}
 
 		return nil
@@ -55,7 +55,7 @@ This command checks the configuration file for errors including:
 		}()
 
 		// Load the configuration file (local or remote)
-		localConfigPath, cleanup, err := config.ResolveConfigPath(configFile, logger)
+		localConfigPath, cleanup, err := config.ResolveConfigPath(toolsFile, logger)
 		if err != nil {
 			logger.Error("Failed to load configuration: %v", err)
 			return fmt.Errorf("failed to load configuration: %w", err)
@@ -89,5 +89,5 @@ func init() {
 	rootCmd.AddCommand(validateCommand)
 
 	// Mark required flags
-	_ = validateCommand.MarkFlagRequired("config")
+	_ = validateCommand.MarkFlagRequired("tools")
 }

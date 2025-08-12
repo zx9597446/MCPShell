@@ -876,10 +876,7 @@ mcp:
           
           # Run a more comprehensive dig query
           echo "Basic DNS query:"
-          dig +noall +answer $NS_PARAM {{ .domain }} $TYPE_PARAM
-          
-          echo -e "\nDetailed query with trace information:"
-          dig +trace $NS_PARAM {{ .domain }} $TYPE_PARAM
+          dig +noall +answer $NS_PARAM {{ .domain }} $TYPE_PARAM          
       output:
         prefix: "DNS lookup for {{ .domain }} (type {{ if .record_type }}{{ .record_type }}{{ else }}A{{ end }}){{ if .nameserver }} using nameserver {{ .nameserver }}{{ end }}:"
 

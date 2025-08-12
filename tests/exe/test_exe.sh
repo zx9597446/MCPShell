@@ -4,11 +4,12 @@
 
 # Source common utilities
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-source "$SCRIPT_DIR/common.sh"
+TESTS_ROOT="$(dirname "$SCRIPT_DIR")"
+source "$TESTS_ROOT/common/common.sh"
 
 #####################################################################################
 # Test configuration
-CONFIG_FILE="$SCRIPT_DIR/test_exe_config.yaml"
+TOOLS_FILE="$SCRIPT_DIR/test_exe_config.yaml"
 TEST_NAME="test_exe_command"
 
 #####################################################################################
@@ -16,7 +17,7 @@ TEST_NAME="test_exe_command"
 
 testcase "$TEST_NAME"
 
-info_blue "Configuration file: $CONFIG_FILE"
+info_blue "Configuration file: $TOOLS_FILE"
 
 # Generate a random test file path
 TEST_FILE=$(random_tmpfile "mcpshell_test_file")
@@ -31,7 +32,7 @@ check_cli_exists
 
 # Command to test
 TEST_CONTENT="This is a test file created by the mcpshell exe command test."
-CMD="$CLI_BIN exe -c $CONFIG_FILE create_file filepath=$TEST_FILE content=\"$TEST_CONTENT\""
+CMD="$CLI_BIN exe --tools $TOOLS_FILE create_file filepath=$TEST_FILE content=\"$TEST_CONTENT\""
 info "Executing: $CMD"
 
 # Run the command

@@ -78,13 +78,32 @@ space problems in your hard disk.
                "command": "go",
                "args": [
                   "run", "github.com/inercia/MCPShell@v0.1.5",
-                  "mcp", "--config", "/my/example.yaml",
+                  "mcp", "--tools", "/my/example.yaml",
                   "--logfile", "/some/path/mcpshell/example.log"
                ]
            }
        }
    }
    ```
+
+   You can also use relative paths and omit the `.yaml` extension:
+   
+   ```json
+   {
+       "mcpServers": {
+           "mcp-cli-examples": {
+               "command": "go",
+               "args": [
+                  "run", "github.com/inercia/MCPShell@v0.1.5",
+                  "mcp", "--tools", "example",
+                  "--logfile", "/some/path/mcpshell/example.log"
+               ]
+           }
+       }
+   }
+   ```
+   
+   This will look for `example.yaml` in the tools directory (`~/.mcpshell/tools/` by default).
 
    See more details on how to configure [Cursor](docs/usage-cursor.md) or
    [Visual Studio Code](docs/usage-vscode.md). Other LLMs with support for MCPs

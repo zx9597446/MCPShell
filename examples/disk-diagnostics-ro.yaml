@@ -38,7 +38,35 @@ mcp:
           fi
       output:
         prefix: "Storage Overview:"
-
+      runners:
+        - name: sandbox-exec
+          options:
+            allow_networking: true
+            allow_user_folders: false
+            allow_read_folders:
+              - /usr/bin
+              - /usr/local/bin
+              - /bin
+              - /etc
+              - /dev
+              - /Volumes
+              - /System/Volumes
+        - name: firejail
+          options:
+            allow_networking: true
+            allow_user_folders: false
+            allow_read_folders:
+              - /usr/bin
+              - /usr/local/bin
+              - /bin
+              - /etc
+              - /dev
+              - /proc
+              - /sys
+              - /mnt
+              - /media
+        - name: exec
+          requirements: {}
     - name: "filesystem_usage"
       description: "Show detailed filesystem usage by directories"
       params:
@@ -49,34 +77,34 @@ mcp:
           type: number
           description: "Depth for directory analysis (1-3)"
       constraints:
-        - "path == '' || !path.contains('../')"                  # Prevent directory traversal
-        - "path == '' || !path.contains('~')"                    # Prevent home directory references
-        - "path == '' || path.startsWith('/')"                   # Only absolute paths
-        - "path == '' || path.matches('^[a-zA-Z0-9/._\\\\-]+$')"   # Safe path characters
-        - "depth == 0.0 || (depth >= 1.0 && depth <= 3.0)"      # Reasonable depth values
+        - "path == '' || !path.contains('../')" # Prevent directory traversal
+        - "path == '' || !path.contains('~')" # Prevent home directory references
+        - "path == '' || path.startsWith('/')" # Only absolute paths
+        - "path == '' || path.matches('^[a-zA-Z0-9/._\\\\-]+$')" # Safe path characters
+        - "depth == 0.0 || (depth >= 1.0 && depth <= 3.0)" # Reasonable depth values
       run:
         command: |
           # Set default values
           DEPTH=2
           DIR_PATH="."
-          
+
           if [[ "{{ .path }}" != "" ]]; then
             DIR_PATH="{{ .path }}"
           fi
-          
+
           if [ {{ .depth }} -gt 0 ]; then
             DEPTH={{ .depth }}
           fi
-          
+
           echo "Analyzing: $DIR_PATH (depth: $DEPTH)"
           echo ""
-          
+
           # Check if path exists and is accessible
           if [ ! -d "$DIR_PATH" ]; then
             echo "Error: '$DIR_PATH' is not a valid directory or is not accessible."
             exit 1
           fi
-          
+
           echo "Directory sizes:"
           if [[ "$(uname)" == "Darwin" ]]; then
             # MacOS
@@ -85,7 +113,7 @@ mcp:
             # Linux
             du -h --max-depth=$DEPTH "$DIR_PATH" 2>/dev/null | sort -hr | head -20
           fi
-          
+
           echo ""
           echo "Largest files:"
           if [[ "$(uname)" == "Darwin" ]]; then
@@ -95,13 +123,49 @@ mcp:
             # Linux
             find "$DIR_PATH" -type f -not -path "*/\.*" -printf "%s %p\n" 2>/dev/null | sort -nr | head -15 | awk '{ printf "%.2f MB %s\n", $1/1024/1024, $2 }'
           fi
-          
+
           echo ""
           echo "File types summary:"
           find "$DIR_PATH" -type f -not -path "*/\.*" | grep -o "\\.[^./]*$" | sort | uniq -c | sort -nr | head -10
       output:
         prefix: "Filesystem Usage Analysis:"
-
+      runners:
+        - name: sandbox-exec
+          requirements:
+            os: darwin
+            executables:
+              - sandbox-exec
+          options:
+            allow_networking: true
+            allow_user_folders: false
+            allow_read_folders:
+              - /usr/bin
+              - /usr/local/bin
+              - /bin
+              - /etc
+              - /dev
+              - /Volumes
+              - /System/Volumes
+        - name: firejail
+          requirements:
+            os: linux
+            executables:
+              - firejail
+          options:
+            allow_networking: true
+            allow_user_folders: false
+            allow_read_folders:
+              - /usr/bin
+              - /usr/local/bin
+              - /bin
+              - /etc
+              - /dev
+              - /proc
+              - /sys
+              - /mnt
+              - /media
+        - name: exec
+          requirements: {}
     - name: "inodes_check"
       description: "Check inode usage on filesystems"
       run:
@@ -122,7 +186,43 @@ mcp:
           fi
       output:
         prefix: "Inode Usage Analysis:"
-
+      runners:
+        - name: sandbox-exec
+          requirements:
+            os: darwin
+            executables:
+              - sandbox-exec
+          options:
+            allow_networking: true
+            allow_user_folders: false
+            allow_read_folders:
+              - /usr/bin
+              - /usr/local/bin
+              - /bin
+              - /etc
+              - /dev
+              - /Volumes
+              - /System/Volumes
+        - name: firejail
+          requirements:
+            os: linux
+            executables:
+              - firejail
+          options:
+            allow_networking: true
+            allow_user_folders: false
+            allow_read_folders:
+              - /usr/bin
+              - /usr/local/bin
+              - /bin
+              - /etc
+              - /dev
+              - /proc
+              - /sys
+              - /mnt
+              - /media
+        - name: exec
+          requirements: {}
     - name: "disk_space_hogs"
       description: "Find largest files and directories consuming disk space"
       params:
@@ -133,36 +233,36 @@ mcp:
           type: number
           description: "Minimum file size in MB to report (default: 100)"
       constraints:
-        - "path == '' || !path.contains('../')"                  # Prevent directory traversal
-        - "path == '' || !path.contains('~')"                    # Prevent home directory references
-        - "path == '' || path.startsWith('/')"                   # Only absolute paths
-        - "path == '' || path.matches('^[a-zA-Z0-9/._\\\\-]+$')"   # Safe path characters
-        - "min_size_mb == 0.0 || (min_size_mb >= 10.0 && min_size_mb <= 1000.0)"  # Reasonable size
+        - "path == '' || !path.contains('../')" # Prevent directory traversal
+        - "path == '' || !path.contains('~')" # Prevent home directory references
+        - "path == '' || path.startsWith('/')" # Only absolute paths
+        - "path == '' || path.matches('^[a-zA-Z0-9/._\\\\-]+$')" # Safe path characters
+        - "min_size_mb == 0.0 || (min_size_mb >= 10.0 && min_size_mb <= 1000.0)" # Reasonable size
       run:
         command: |
           # Set default values
           MIN_SIZE=100
           DIR_PATH="."
-          
+
           if [[ "{{ .path }}" != "" ]]; then
             DIR_PATH="{{ .path }}"
           fi
-          
+
           if [ {{ .min_size_mb }} -gt 0 ]; then
             MIN_SIZE={{ .min_size_mb }}
           fi
-          
+
           SIZE_BYTES=$((MIN_SIZE * 1024 * 1024))
-          
+
           echo "Searching for files larger than ${MIN_SIZE}MB in: $DIR_PATH"
           echo ""
-          
+
           # Check if path exists and is accessible
           if [ ! -d "$DIR_PATH" ]; then
             echo "Error: '$DIR_PATH' is not a valid directory or is not accessible."
             exit 1
           fi
-          
+
           echo "Top disk space consumers (files larger than ${MIN_SIZE}MB):"
           if [[ "$(uname)" == "Darwin" ]]; then
             # MacOS
@@ -171,7 +271,7 @@ mcp:
             # Linux
             find "$DIR_PATH" -type f -size +${SIZE_BYTES}c -not -path "*/\.*" -printf "%s %p\n" 2>/dev/null | sort -nr | head -20 | awk '{ printf "%.2f MB %s\n", $1/1024/1024, $2 }'
           fi
-          
+
           echo ""
           echo "Top directories by size:"
           if [[ "$(uname)" == "Darwin" ]]; then
@@ -183,7 +283,35 @@ mcp:
           fi
       output:
         prefix: "Disk Space Usage Report:"
-
+      runners:
+        - name: sandbox-exec
+          options:
+            allow_networking: true
+            allow_user_folders: false
+            allow_read_folders:
+              - /usr/bin
+              - /usr/local/bin
+              - /bin
+              - /etc
+              - /dev
+              - /Volumes
+              - /System/Volumes
+        - name: firejail
+          options:
+            allow_networking: true
+            allow_user_folders: false
+            allow_read_folders:
+              - /usr/bin
+              - /usr/local/bin
+              - /bin
+              - /etc
+              - /dev
+              - /proc
+              - /sys
+              - /mnt
+              - /media
+        - name: exec
+          requirements: {}
     - name: "fs_type_summary"
       description: "Show summary of filesystem types and mount options"
       run:
@@ -220,7 +348,35 @@ mcp:
           fi
       output:
         prefix: "Filesystem Types and Mount Options:"
-
+      runners:
+        - name: sandbox-exec
+          options:
+            allow_networking: true
+            allow_user_folders: false
+            allow_read_folders:
+              - /usr/bin
+              - /usr/local/bin
+              - /bin
+              - /etc
+              - /dev
+              - /Volumes
+              - /System/Volumes
+        - name: firejail
+          options:
+            allow_networking: true
+            allow_user_folders: false
+            allow_read_folders:
+              - /usr/bin
+              - /usr/local/bin
+              - /bin
+              - /etc
+              - /dev
+              - /proc
+              - /sys
+              - /mnt
+              - /media
+        - name: exec
+          requirements: {}
     - name: "disk_health_check"
       description: "Check disk health status (read-only, non-destructive)"
       params:
@@ -228,8 +384,8 @@ mcp:
           type: string
           description: "Disk to check (e.g., 'sda', 'nvme0n1', 'disk0')"
       constraints:
-        - "disk == '' || disk.matches('^[a-zA-Z0-9]+$')"          # Only alphanumeric disk names
-        - "disk == '' || disk.size() <= 20"                       # Reasonable disk name length
+        - "disk == '' || disk.matches('^[a-zA-Z0-9]+$')" # Only alphanumeric disk names
+        - "disk == '' || disk.size() <= 20" # Reasonable disk name length
       run:
         command: |
           DISK="{{ .disk }}"
@@ -278,4 +434,33 @@ mcp:
             dmesg | grep -i "$DISK\\|error\\|ata\\|failed" | tail -10
           fi
       output:
-        prefix: "Disk Health Check:" 
+        prefix: "Disk Health Check:"
+      runners:
+        - name: sandbox-exec
+          options:
+            allow_networking: true
+            allow_user_folders: false
+            allow_read_folders:
+              - /usr/bin
+              - /usr/local/bin
+              - /bin
+              - /etc
+              - /dev
+              - /Volumes
+              - /System/Volumes
+        - name: firejail
+          options:
+            allow_networking: true
+            allow_user_folders: false
+            allow_read_folders:
+              - /usr/bin
+              - /usr/local/bin
+              - /bin
+              - /etc
+              - /dev
+              - /proc
+              - /sys
+              - /mnt
+              - /media
+        - name: exec
+          requirements: {}

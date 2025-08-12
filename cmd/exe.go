@@ -25,7 +25,7 @@ evaluation, tool selection and tool execution.
 
 For example, you can run:
 
-$ mcpshell exe --configfile=examples/config.yaml "hello_world" "name=John"
+$ mcpshell exe --tools=examples/config.yaml "hello_world" "name=John"
 
 and it will run the "hello_world" tool with the parameter "name" set to "John".
 Any error in the constraint evaluation, tool selection or tool execution
@@ -46,9 +46,9 @@ will be reported.
 		logger.Info("Executing MCP tool directly")
 
 		// Check if config file is provided
-		if configFile == "" {
-			logger.Error("Configuration file is required")
-			return fmt.Errorf("configuration file is required. Use --config or -c flag to specify the path")
+		if toolsFile == "" {
+			logger.Error("Tools configuration file is required")
+			return fmt.Errorf("tools configuration file is required. Use --tools flag to specify the path")
 		}
 
 		return nil
@@ -65,7 +65,7 @@ will be reported.
 		logger.Info("Executing tool: %s", toolName)
 
 		// Load the configuration file (local or remote)
-		localConfigPath, cleanup, err := config.ResolveConfigPath(configFile, logger)
+		localConfigPath, cleanup, err := config.ResolveConfigPath(toolsFile, logger)
 		if err != nil {
 			logger.Error("Failed to load configuration: %v", err)
 			return fmt.Errorf("failed to load configuration: %w", err)
@@ -176,5 +176,5 @@ func init() {
 	rootCmd.AddCommand(exeCommand)
 
 	// Mark required flags
-	_ = exeCommand.MarkFlagRequired("config")
+	_ = exeCommand.MarkFlagRequired("tools")
 }

@@ -12,8 +12,78 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/inercia/MCPShell/pkg/agent"
-	"github.com/inercia/MCPShell/pkg/common"
 )
+
+// buildAgentConfig creates an AgentConfig by merging command-line flags with configuration file
+func buildAgentConfig() (agent.AgentConfig, error) {
+	// Load configuration from file
+	config, err := agent.GetConfig()
+	if err != nil {
+		return agent.AgentConfig{}, fmt.Errorf("failed to load config: %w", err)
+	}
+
+	// Start with default model from config file
+	var modelConfig agent.ModelConfig
+	if defaultModel := config.GetDefaultModel(); defaultModel != nil {
+		modelConfig = *defaultModel
+	}
+
+	// Override with command-line flags if provided
+	if agentModel != "" {
+		// Check if the specified model exists in config
+		if configModel := config.GetModelByName(agentModel); configModel != nil {
+			modelConfig = *configModel
+		} else {
+			// Use command-line model name if not found in config
+			modelConfig.Model = agentModel
+		}
+	}
+
+	// Merge system prompts from config file and command-line
+	if agentSystemPrompt != "" {
+		// Join system prompts from config with command-line system prompt
+		var allSystemPrompts []string
+
+		// Add existing system prompts from config
+		if modelConfig.Prompts.HasSystemPrompts() {
+			allSystemPrompts = append(allSystemPrompts, modelConfig.Prompts.System...)
+		}
+
+		// Add command-line system prompt
+		allSystemPrompts = append(allSystemPrompts, agentSystemPrompt)
+
+		// Update the prompts config with merged system prompts
+		modelConfig.Prompts.System = allSystemPrompts
+		// Clear user prompts as they should be ignored from config
+		modelConfig.Prompts.User = nil
+	} else {
+		// No command-line system prompt provided, but still clear user prompts from config
+		modelConfig.Prompts.User = nil
+	}
+	if agentOpenAIApiKey != "" {
+		modelConfig.APIKey = agentOpenAIApiKey
+	}
+	if agentOpenAIApiURL != "" {
+		modelConfig.APIURL = agentOpenAIApiURL
+	}
+
+	// If no API key is set, try environment variable or handle template value
+	switch modelConfig.APIKey {
+	case "":
+		modelConfig.APIKey = os.Getenv("OPENAI_API_KEY")
+	case "${OPENAI_API_KEY}":
+		// Handle environment variable substitution
+		modelConfig.APIKey = os.Getenv("OPENAI_API_KEY")
+	}
+
+	return agent.AgentConfig{
+		ToolsFile:   toolsFile,
+		UserPrompt:  agentUserPrompt,
+		Once:        agentOnce,
+		Version:     version,
+		ModelConfig: modelConfig,
+	}, nil
+}
 
 // agentCommand is a command that executes the MCPShell as an agent
 var agentCommand = &cobra.Command{
@@ -22,14 +92,23 @@ var agentCommand = &cobra.Command{
 	Long: `
 
 The agent command will execute the MCPShell as an agent, connecting to a remote LLM.
-For example, you can do
 
-$ mcpshell agent --configfile=examples/config.yaml \
+Configuration is loaded from ~/.mcpshell/agent.yaml and can be overridden with command-line flags.
+The configuration file should contain model definitions with their API keys and prompts.
+
+For example, you can do:
+
+$ mcpshell agent --tools=examples/config.yaml \
      --model "gpt-4o" \
      --system-prompt "You are a helpful assistant that debugs performance issues" \
-	 --user-prompt "I am having trouble with my computer. It is slow and I think it is due to the CPU usage."
+     --user-prompt "I am having trouble with my computer. It is slow and I think it is due to the CPU usage."
 
-and the agent will try to debug the issue with the given tools.
+If a model is configured as default in the agent configuration file, you can omit the --model flag:
+
+$ mcpshell agent --tools=examples/config.yaml \
+     --user-prompt "I am having trouble with my computer. It is slow and I think it is due to the CPU usage."
+
+The agent will try to debug the issue with the given tools.
 `,
 	Args: cobra.NoArgs,
 	PreRunE: func(cmd *cobra.Command, args []string) error {
@@ -39,136 +118,96 @@ and the agent will try to debug the issue with the given tools.
 			return err
 		}
 
-		// Setup panic handler
-		defer common.RecoverPanic()
-
-		logger.Info("Starting MCPShell agent")
-
-		// Check if config file is provided
-		if configFile == "" {
-			logger.Error("Configuration file is required")
-			return fmt.Errorf("configuration file is required. Use --config or -c flag to specify the path")
+		// Build agent configuration
+		agentConfig, err := buildAgentConfig()
+		if err != nil {
+			return err
 		}
 
-		// Check if model is provided
-		if agentModel == "" {
-			logger.Error("LLM model is required")
-			return fmt.Errorf("LLM model is required. Use --model flag to specify the model")
-		}
-
-		// Check if API key is provided or in environment
-		if agentOpenAIApiKey == "" {
-			agentOpenAIApiKey = os.Getenv("OPENAI_API_KEY")
-			if agentOpenAIApiKey == "" {
-				logger.Error("OpenAI API key is required")
-				return fmt.Errorf("OpenAI API key is required. Use --api-key flag or set OPENAI_API_KEY environment variable")
-			}
+		// Validate agent configuration
+		agentInstance := agent.New(agentConfig, logger)
+		if err := agentInstance.Validate(); err != nil {
+			return err
 		}
 
 		return nil
 	},
 	RunE: func(cmd *cobra.Command, args []string) error {
-		logger := common.GetLogger()
-
-		agentConfig := agent.AgentConfig{
-			ConfigFile:   configFile,
-			Model:        agentModel,
-			SystemPrompt: agentSystemPrompt,
-			UserPrompt:   agentUserPrompt,
-			OpenAIApiKey: agentOpenAIApiKey,
-			OpenAIApiURL: agentOpenAIApiURL,
-			Once:         agentOnce,
-			Version:      version,
+		// Initialize logger
+		logger, err := initLogger()
+		if err != nil {
+			return err
 		}
 
-		a := agent.New(agentConfig, logger)
-
-		if err := a.Validate(); err != nil {
-			return fmt.Errorf("agent validation failed: %w", err)
+		// Build agent configuration
+		agentConfig, err := buildAgentConfig()
+		if err != nil {
+			return err
 		}
+
+		// Create agent instance
+		agentInstance := agent.New(agentConfig, logger)
+
+		// Create channels for user input and agent output
+		userInput := make(chan string)
+		agentOutput := make(chan string)
 
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
 
-		// Handle Ctrl+C (SIGINT) and SIGTERM to gracefully shut down
-		sigChan := make(chan os.Signal, 1)
-		signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
-		go func() {
-			<-sigChan
-			logger.Info("Received interrupt signal, cancelling agent context...")
-			cancel()
-		}()
-
-		userInputChan := make(chan string)
-		agentOutputChan := make(chan string)
+		// Setup signal handling for graceful shutdown
+		signalChan := make(chan os.Signal, 1)
+		signal.Notify(signalChan, os.Interrupt, syscall.SIGTERM)
 
 		var wg sync.WaitGroup
-
-		// Goroutine to read from stdin and send to userInputChan
-		if !agentOnce {
-			wg.Add(1)
-			go func() {
-				defer wg.Done()
-				defer close(userInputChan)
-				scanner := bufio.NewScanner(os.Stdin)
-				for scanner.Scan() {
-					select {
-					case userInputChan <- scanner.Text():
-					case <-ctx.Done():
-						logger.Info("Context cancelled, stopping stdin reader.")
-						return
-					}
-				}
-				if err := scanner.Err(); err != nil {
-					logger.Error("Error reading from stdin: %v", err)
-				}
-				logger.Info("Stdin scanner finished.")
-			}()
-		} else {
-			// In one-shot mode, we'll close the channel when Run completes
-			logger.Info("One-shot mode, skipping stdin reader.")
-		}
-
-		// Goroutine to read from agentOutputChan and print to stdout
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			for {
-				select {
-				case output, ok := <-agentOutputChan:
-					if !ok {
-						logger.Info("Agent output channel closed, stdout writer finishing.")
-						return
-					}
-					fmt.Print(output)
-				case <-ctx.Done():
-					logger.Info("Context cancelled, stopping stdout writer.")
-					for output := range agentOutputChan {
-						fmt.Print(output)
-					}
-					return
-				}
+			select {
+			case <-signalChan:
+				logger.Info("Received interrupt signal, shutting down...")
+				cancel()
+			case <-ctx.Done():
 			}
 		}()
 
-		err := a.Run(ctx, userInputChan, agentOutputChan)
-
-		cancel()
-
-		logger.Info("Waiting for I/O goroutines to finish...")
-		wg.Wait()
-		logger.Info("All goroutines finished.")
-
-		if err != nil {
-			if err == context.Canceled || err == context.DeadlineExceeded {
-				logger.Info("Agent run was cancelled: %v", err)
-				return nil
-			}
-			logger.Error("Agent execution failed: %v", err)
-			return fmt.Errorf("agent execution failed: %w", err)
+		// Start a goroutine to read user input only when not in --once mode
+		if !agentConfig.Once {
+			wg.Add(1)
+			go func() {
+				defer wg.Done()
+				scanner := bufio.NewScanner(os.Stdin)
+				for {
+					select {
+					case <-ctx.Done():
+						return
+					default:
+						if scanner.Scan() {
+							userInput <- scanner.Text()
+						} else {
+							close(userInput)
+							return
+						}
+					}
+				}
+			}()
 		}
 
-		logger.Info("Agent finished successfully.")
+		// Start the agent
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			if err := agentInstance.Run(ctx, userInput, agentOutput); err != nil {
+				logger.Error("Agent encountered an error: %v", err)
+			}
+		}()
+
+		// Print agent output
+		for output := range agentOutput {
+			fmt.Println(output)
+		}
+
+		wg.Wait()
 		return nil
 	},
 }
@@ -186,7 +225,6 @@ func init() {
 	agentCommand.Flags().StringVarP(&agentOpenAIApiURL, "openai-api-url", "b", "", "Base URL for the OpenAI API (optional)")
 	agentCommand.Flags().BoolVarP(&agentOnce, "once", "o", false, "Exit after receiving a final response from the LLM (one-shot mode)")
 
-	// Mark required flags
-	_ = agentCommand.MarkFlagRequired("config")
-	_ = agentCommand.MarkFlagRequired("model")
+	// Add config subcommand
+	agentCommand.AddCommand(agentConfigCommand)
 }

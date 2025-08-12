@@ -7,7 +7,7 @@ Some problems can arise when using this adapter:
 You should first check your configuration:
 
 ```bash
-mcpshell validate --config /path/to/config.yaml
+mcpshell validate --tools /path/to/config.yaml
 ```
 
 Successful validation will show each tool found and verified:
@@ -76,7 +76,7 @@ You should also try to execute the tool directly from the command line. In gener
 you can run something like:
 
 ```bash
-mcpshell exe --config /path/to/config.yaml "tool_name" "param1=value1" "param2=value2"
+mcpshell exe --tools /path/to/config.yaml "tool_name" "param1=value1" "param2=value2"
 ```
 
 This executes a specific tool directly from the command line without starting the server. It follows the
@@ -92,7 +92,7 @@ Use this command to:
 Example:
 
 ```bash
-$ mcpshell exe --config examples/config.yaml "hello_world" "name=Claude"
+$ mcpshell exe --tools examples/config.yaml "hello_world" "name=Claude"
 Hello Claude!
 ```
 

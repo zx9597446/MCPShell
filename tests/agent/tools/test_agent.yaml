@@ -1,5 +1,5 @@
 prompts:
-  - system:
+  system:
     - "You are a helpful assistant that can create files."
     - "Please respond directly to the task requested without unnecessary explanations."
 

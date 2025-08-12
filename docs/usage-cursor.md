@@ -48,7 +48,7 @@ The MCPShell uses the "stdio" transport type, which runs locally on your machine
             "command": "go",
             "args": [
                 "run", "github.com/inercia/MCPShell@v0.1.5",
-                "mcp", "--config", "/absolute/path/to/mcp-cli.yaml"
+                "mcp", "--tools", "/absolute/path/to/mcp-cli.yaml"
             ]
         }
     }
@@ -63,7 +63,7 @@ The MCPShell uses the "stdio" transport type, which runs locally on your machine
         "mcpshell": {
             "command": "/absolute/path/to/mcpshell",
             "args": [
-                "mcp", "--config", "/absolute/path/to/mcp-cli.yaml"
+                "mcp", "--tools", "/absolute/path/to/mcp-cli.yaml"
             ]
         }
     }
@@ -85,7 +85,7 @@ You can configure multiple instances of the MCPShell, each with different tool s
             "command": "/some/path/mcpshell/build/mcpshell",
             "args": [
                 "mcp",
-                "--config", "/some/path/mcpshell/examples/config.yaml",
+                "--tools", "/some/path/mcpshell/examples/config.yaml",
                 "--logfile", "/some/path/mcpshell/debug.log"
             ],
             "env": {
@@ -95,7 +95,7 @@ You can configure multiple instances of the MCPShell, each with different tool s
             "command": "/some/path/mcpshell/build/mcpshell",
             "args": [
                 "mcp",
-                "--config", "/some/path/mcpshell/examples/kubectl-ro.yaml",
+                "--tools", "/some/path/mcpshell/examples/kubectl-ro.yaml",
                 "--logfile", "/some/path/mcpshell/debug.kubernetes-ro.log"
             ],
             "env": {
@@ -120,7 +120,7 @@ You can provide authentication credentials and other sensitive information using
         "mcpshell": {
             "command": "/absolute/path/to/mcpshell",
             "args": [
-                "mcp", "--config", "/absolute/path/to/mcp-cli.yaml"
+                "mcp", "--tools", "/absolute/path/to/mcp-cli.yaml"
             ],
             "env": {
                 "API_KEY": "your-api-key-here",

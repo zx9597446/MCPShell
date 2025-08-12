@@ -10,9 +10,8 @@
 ```console
 .
 ├── cmd/           # Command definitions
-│   └── root/      # Root command
-│   └── run/       # Run command for MCP server
 ├── docs/          # Documentation
+├── pkg/           # Source code
 ├── main.go        # Entry point
 ├── Makefile       # Build scripts
 └── README.md      # This file
@@ -64,8 +63,8 @@ This project uses GitHub Actions to automatically build and release binaries. Wh
 To create a new release:
 
 ```bash
-# Tag the commit
-git tag v0.1.0
+# Create a new release, by tagging the code
+make release
 
 # Push the tag to trigger the release workflow
 git push origin v0.1.0

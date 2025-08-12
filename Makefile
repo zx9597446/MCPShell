@@ -33,6 +33,10 @@ test:
 # Run the exe command tests
 test-e2e:
 	@echo ">>> Running exe command tests..."
+	@if [ ! -x "$(GOBIN)/$(BINARY_NAME)" ]; then \
+		echo ">>> $(GOBIN)/$(BINARY_NAME) not found. Building..."; \
+		$(MAKE) build; \
+	fi
 	@chmod +x tests/*.sh
 	@tests/run_tests.sh
 	@echo ">>> ... exe command tests completed"
@@ -81,7 +85,7 @@ validate-examples: build
 	@find examples -name "*.yaml" -type f | while read file; do \
 		echo "--------------------------------------------------------------"; \
 		echo ">>> Validating $$file..."; \
-		$(GOBIN)/$(BINARY_NAME) validate --config $$file || exit 1; \
+		$(GOBIN)/$(BINARY_NAME) validate --tools $$file || exit 1; \
 	done
 	@echo ">>>"
 	@echo ">>> ... all example configurations validated SUCCESSFULLY !!!"

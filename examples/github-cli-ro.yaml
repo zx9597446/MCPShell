@@ -21,12 +21,12 @@ mcp:
           type: string
           description: "Optional JQ filter to extract specific fields from the JSON response"
       constraints:
-        - "repo.size() > 0 && repo.size() <= 100"                # Reasonable repo name length
-        - "repo.matches('^[a-zA-Z0-9_.-]+/[a-zA-Z0-9_.-]+$')"    # Valid repo format (owner/repo)
-        - "!repo.contains(';')"                                  # Prevent command injection
-        - "jq_filter == '' || jq_filter.size() <= 200"           # Reasonable JQ filter length
-        - "!jq_filter.contains(';')"                             # Prevent command injection
-        - "!jq_filter.matches('.*[&|><`$].*')"                   # Block shell special characters
+        - "repo.size() > 0 && repo.size() <= 100" # Reasonable repo name length
+        - "repo.matches('^[a-zA-Z0-9_.-]+/[a-zA-Z0-9_.-]+$')" # Valid repo format (owner/repo)
+        - "!repo.contains(';')" # Prevent command injection
+        - "jq_filter == '' || jq_filter.size() <= 200" # Reasonable JQ filter length
+        - "!jq_filter.contains(';')" # Prevent command injection
+        - "!jq_filter.matches('.*[&|><`$].*')" # Block shell special characters
       run:
         env:
           - GITHUB_TOKEN
@@ -38,7 +38,29 @@ mcp:
           {{ end }}
       output:
         prefix: "Repository information for {{ .repo }}:"
-
+      runners:
+        - name: sandbox-exec
+          options:
+            allow_networking: true
+            allow_user_folders: false
+            allow_read_folders:
+              - /usr/bin
+              - /usr/local/bin
+              - /bin
+              - /etc
+              - '{{ env "HOME" }}/.config/gh'
+        - name: firejail
+          options:
+            allow_networking: true
+            allow_user_folders: false
+            allow_read_folders:
+              - /usr/bin
+              - /usr/local/bin
+              - /bin
+              - /etc
+              - '{{ env "HOME" }}/.config/gh'
+        - name: exec
+          requirements: {}
     - name: "gh_issue_list"
       description: "List issues in a GitHub repository"
       params:
@@ -62,17 +84,17 @@ mcp:
           type: string
           description: "Filter issues by assignee"
       constraints:
-        - "repo.size() > 0 && repo.size() <= 100"                # Reasonable repo name length
-        - "repo.matches('^[a-zA-Z0-9_.-]+/[a-zA-Z0-9_.-]+$')"    # Valid repo format (owner/repo)
-        - "!repo.contains(';')"                                  # Prevent command injection
-        - "state == '' || ['open', 'closed', 'all'].exists(s, s == state)"  # Valid state values
-        - "int(limit) == 0 || (int(limit) > 0 && int(limit) <= 100)"  # Reasonable limit
-        - "label == '' || label.size() <= 50"                    # Reasonable label length
-        - "!label.contains(';')"                                 # Prevent command injection
-        - "author == '' || author.size() <= 50"                  # Reasonable author length
-        - "!author.contains(';')"                                # Prevent command injection
-        - "assignee == '' || assignee.size() <= 50"              # Reasonable assignee length
-        - "!assignee.contains(';')"                              # Prevent command injection
+        - "repo.size() > 0 && repo.size() <= 100" # Reasonable repo name length
+        - "repo.matches('^[a-zA-Z0-9_.-]+/[a-zA-Z0-9_.-]+$')" # Valid repo format (owner/repo)
+        - "!repo.contains(';')" # Prevent command injection
+        - "state == '' || ['open', 'closed', 'all'].exists(s, s == state)" # Valid state values
+        - "int(limit) == 0 || (int(limit) > 0 && int(limit) <= 100)" # Reasonable limit
+        - "label == '' || label.size() <= 50" # Reasonable label length
+        - "!label.contains(';')" # Prevent command injection
+        - "author == '' || author.size() <= 50" # Reasonable author length
+        - "!author.contains(';')" # Prevent command injection
+        - "assignee == '' || assignee.size() <= 50" # Reasonable assignee length
+        - "!assignee.contains(';')" # Prevent command injection
       run:
         env:
           - GITHUB_TOKEN
@@ -83,11 +105,33 @@ mcp:
           ARGS="$ARGS {{ if .label }}--label {{ .label }}{{ end }}"
           ARGS="$ARGS {{ if .author }}--author {{ .author }}{{ end }}"
           ARGS="$ARGS {{ if .assignee }}--assignee {{ .assignee }}{{ end }}"
-          
+
           gh issue list --repo "{{ .repo }}" $ARGS
       output:
         prefix: "Issues for {{ .repo }}:"
-
+      runners:
+        - name: sandbox-exec
+          options:
+            allow_networking: true
+            allow_user_folders: false
+            allow_read_folders:
+              - /usr/bin
+              - /usr/local/bin
+              - /bin
+              - /etc
+              - '{{ env "HOME" }}/.config/gh'
+        - name: firejail
+          options:
+            allow_networking: true
+            allow_user_folders: false
+            allow_read_folders:
+              - /usr/bin
+              - /usr/local/bin
+              - /bin
+              - /etc
+              - '{{ env "HOME" }}/.config/gh'
+        - name: exec
+          requirements: {}
     - name: "gh_issue_view"
       description: "View a specific issue in a GitHub repository"
       requirements:
@@ -106,21 +150,43 @@ mcp:
           type: boolean
           description: "Include comments in the output"
       constraints:
-        - "repo.size() > 0 && repo.size() <= 100"                # Reasonable repo name length
-        - "repo.matches('^[a-zA-Z0-9_.-]+/[a-zA-Z0-9_.-]+$')"    # Valid repo format (owner/repo)
-        - "!repo.contains(';')"                                  # Prevent command injection
-        - "int(issue_number) > 0"                                # Valid issue number
+        - "repo.size() > 0 && repo.size() <= 100" # Reasonable repo name length
+        - "repo.matches('^[a-zA-Z0-9_.-]+/[a-zA-Z0-9_.-]+$')" # Valid repo format (owner/repo)
+        - "!repo.contains(';')" # Prevent command injection
+        - "int(issue_number) > 0" # Valid issue number
       run:
         env:
           - GITHUB_TOKEN
         command: |
           ARGS=""
           ARGS="$ARGS {{ if .comments }}--comments{{ end }}"
-          
+
           gh issue view {{ .issue_number }} --repo "{{ .repo }}" $ARGS
       output:
         prefix: "Issue #{{ .issue_number }} in {{ .repo }}:"
-
+      runners:
+        - name: sandbox-exec
+          options:
+            allow_networking: true
+            allow_user_folders: false
+            allow_read_folders:
+              - /usr/bin
+              - /usr/local/bin
+              - /bin
+              - /etc
+              - '{{ env "HOME" }}/.config/gh'
+        - name: firejail
+          options:
+            allow_networking: true
+            allow_user_folders: false
+            allow_read_folders:
+              - /usr/bin
+              - /usr/local/bin
+              - /bin
+              - /etc
+              - '{{ env "HOME" }}/.config/gh'
+        - name: exec
+          requirements: {}
     - name: "gh_pr_list"
       description: "List pull requests in a GitHub repository"
       requirements:
@@ -150,19 +216,19 @@ mcp:
           type: string
           description: "Filter PRs by base branch"
       constraints:
-        - "repo.size() > 0 && repo.size() <= 100"                # Reasonable repo name length
-        - "repo.matches('^[a-zA-Z0-9_.-]+/[a-zA-Z0-9_.-]+$')"    # Valid repo format (owner/repo)
-        - "!repo.contains(';')"                                  # Prevent command injection
-        - "state == '' || ['open', 'closed', 'merged', 'all'].exists(s, s == state)"  # Valid state values
-        - "int(limit) == 0 || (int(limit) > 0 && int(limit) <= 100)"  # Reasonable limit
-        - "label == '' || label.size() <= 50"                    # Reasonable label length
-        - "!label.contains(';')"                                 # Prevent command injection
-        - "author == '' || author.size() <= 50"                  # Reasonable author length
-        - "!author.contains(';')"                                # Prevent command injection
-        - "assignee == '' || assignee.size() <= 50"              # Reasonable assignee length
-        - "!assignee.contains(';')"                              # Prevent command injection
-        - "base == '' || base.size() <= 50"                      # Reasonable base branch length
-        - "!base.contains(';')"                                  # Prevent command injection
+        - "repo.size() > 0 && repo.size() <= 100" # Reasonable repo name length
+        - "repo.matches('^[a-zA-Z0-9_.-]+/[a-zA-Z0-9_.-]+$')" # Valid repo format (owner/repo)
+        - "!repo.contains(';')" # Prevent command injection
+        - "state == '' || ['open', 'closed', 'merged', 'all'].exists(s, s == state)" # Valid state values
+        - "int(limit) == 0 || (int(limit) > 0 && int(limit) <= 100)" # Reasonable limit
+        - "label == '' || label.size() <= 50" # Reasonable label length
+        - "!label.contains(';')" # Prevent command injection
+        - "author == '' || author.size() <= 50" # Reasonable author length
+        - "!author.contains(';')" # Prevent command injection
+        - "assignee == '' || assignee.size() <= 50" # Reasonable assignee length
+        - "!assignee.contains(';')" # Prevent command injection
+        - "base == '' || base.size() <= 50" # Reasonable base branch length
+        - "!base.contains(';')" # Prevent command injection
       run:
         env:
           - GITHUB_TOKEN
@@ -174,11 +240,33 @@ mcp:
           ARGS="$ARGS {{ if .author }}--author {{ .author }}{{ end }}"
           ARGS="$ARGS {{ if .assignee }}--assignee {{ .assignee }}{{ end }}"
           ARGS="$ARGS {{ if .base }}--base {{ .base }}{{ end }}"
-          
+
           gh pr list --repo "{{ .repo }}" $ARGS
       output:
         prefix: "Pull requests for {{ .repo }}:"
-
+      runners:
+        - name: sandbox-exec
+          options:
+            allow_networking: true
+            allow_user_folders: false
+            allow_read_folders:
+              - /usr/bin
+              - /usr/local/bin
+              - /bin
+              - /etc
+              - '{{ env "HOME" }}/.config/gh'
+        - name: firejail
+          options:
+            allow_networking: true
+            allow_user_folders: false
+            allow_read_folders:
+              - /usr/bin
+              - /usr/local/bin
+              - /bin
+              - /etc
+              - '{{ env "HOME" }}/.config/gh'
+        - name: exec
+          requirements: {}
     - name: "gh_pr_view"
       description: "View a specific pull request in a GitHub repository"
       requirements:
@@ -197,21 +285,43 @@ mcp:
           type: boolean
           description: "Include comments in the output"
       constraints:
-        - "repo.size() > 0 && repo.size() <= 100"                # Reasonable repo name length
-        - "repo.matches('^[a-zA-Z0-9_.-]+/[a-zA-Z0-9_.-]+$')"    # Valid repo format (owner/repo)
-        - "!repo.contains(';')"                                  # Prevent command injection
-        - "int(pr_number) > 0"                                   # Valid PR number
+        - "repo.size() > 0 && repo.size() <= 100" # Reasonable repo name length
+        - "repo.matches('^[a-zA-Z0-9_.-]+/[a-zA-Z0-9_.-]+$')" # Valid repo format (owner/repo)
+        - "!repo.contains(';')" # Prevent command injection
+        - "int(pr_number) > 0" # Valid PR number
       run:
         env:
           - GITHUB_TOKEN
         command: |
           ARGS=""
           ARGS="$ARGS {{ if .comments }}--comments{{ end }}"
-          
+
           gh pr view {{ .pr_number }} --repo "{{ .repo }}" $ARGS
       output:
         prefix: "PR #{{ .pr_number }} in {{ .repo }}:"
-
+      runners:
+        - name: sandbox-exec
+          options:
+            allow_networking: true
+            allow_user_folders: false
+            allow_read_folders:
+              - /usr/bin
+              - /usr/local/bin
+              - /bin
+              - /etc
+              - '{{ env "HOME" }}/.config/gh'
+        - name: firejail
+          options:
+            allow_networking: true
+            allow_user_folders: false
+            allow_read_folders:
+              - /usr/bin
+              - /usr/local/bin
+              - /bin
+              - /etc
+              - '{{ env "HOME" }}/.config/gh'
+        - name: exec
+          requirements: {}
     - name: "gh_release_list"
       description: "List releases in a GitHub repository"
       requirements:
@@ -226,21 +336,43 @@ mcp:
           type: number
           description: "Maximum number of releases to display"
       constraints:
-        - "repo.size() > 0 && repo.size() <= 100"                # Reasonable repo name length
-        - "repo.matches('^[a-zA-Z0-9_.-]+/[a-zA-Z0-9_.-]+$')"    # Valid repo format (owner/repo)
-        - "!repo.contains(';')"                                  # Prevent command injection
-        - "int(limit) == 0 || (int(limit) > 0 && int(limit) <= 50)"  # Reasonable limit
+        - "repo.size() > 0 && repo.size() <= 100" # Reasonable repo name length
+        - "repo.matches('^[a-zA-Z0-9_.-]+/[a-zA-Z0-9_.-]+$')" # Valid repo format (owner/repo)
+        - "!repo.contains(';')" # Prevent command injection
+        - "int(limit) == 0 || (int(limit) > 0 && int(limit) <= 50)" # Reasonable limit
       run:
         env:
           - GITHUB_TOKEN
         command: |
           ARGS=""
           ARGS="$ARGS {{ if .limit }}--limit {{ .limit }}{{ end }}"
-          
+
           gh release list --repo "{{ .repo }}" $ARGS
       output:
         prefix: "Releases for {{ .repo }}:"
-
+      runners:
+        - name: sandbox-exec
+          options:
+            allow_networking: true
+            allow_user_folders: false
+            allow_read_folders:
+              - /usr/bin
+              - /usr/local/bin
+              - /bin
+              - /etc
+              - '{{ env "HOME" }}/.config/gh'
+        - name: firejail
+          options:
+            allow_networking: true
+            allow_user_folders: false
+            allow_read_folders:
+              - /usr/bin
+              - /usr/local/bin
+              - /bin
+              - /etc
+              - '{{ env "HOME" }}/.config/gh'
+        - name: exec
+          requirements: {}
     - name: "gh_release_view"
       description: "View a specific release in a GitHub repository"
       requirements:
@@ -256,12 +388,12 @@ mcp:
           description: "Release tag name"
           required: true
       constraints:
-        - "repo.size() > 0 && repo.size() <= 100"                # Reasonable repo name length
-        - "repo.matches('^[a-zA-Z0-9_.-]+/[a-zA-Z0-9_.-]+$')"    # Valid repo format (owner/repo)
-        - "!repo.contains(';')"                                  # Prevent command injection
-        - "tag.size() > 0 && tag.size() <= 50"                   # Reasonable tag length
-        - "!tag.contains(';')"                                   # Prevent command injection
-        - "tag.matches('^[a-zA-Z0-9_.-]+$')"                    # Valid tag characters
+        - "repo.size() > 0 && repo.size() <= 100" # Reasonable repo name length
+        - "repo.matches('^[a-zA-Z0-9_.-]+/[a-zA-Z0-9_.-]+$')" # Valid repo format (owner/repo)
+        - "!repo.contains(';')" # Prevent command injection
+        - "tag.size() > 0 && tag.size() <= 50" # Reasonable tag length
+        - "!tag.contains(';')" # Prevent command injection
+        - "tag.matches('^[a-zA-Z0-9_.-]+$')" # Valid tag characters
       run:
         env:
           - GITHUB_TOKEN
@@ -269,7 +401,29 @@ mcp:
           gh release view {{ .tag }} --repo "{{ .repo }}"
       output:
         prefix: "Release {{ .tag }} in {{ .repo }}:"
-
+      runners:
+        - name: sandbox-exec
+          options:
+            allow_networking: true
+            allow_user_folders: false
+            allow_read_folders:
+              - /usr/bin
+              - /usr/local/bin
+              - /bin
+              - /etc
+              - '{{ env "HOME" }}/.config/gh'
+        - name: firejail
+          options:
+            allow_networking: true
+            allow_user_folders: false
+            allow_read_folders:
+              - /usr/bin
+              - /usr/local/bin
+              - /bin
+              - /etc
+              - '{{ env "HOME" }}/.config/gh'
+        - name: exec
+          requirements: {}
     - name: "gh_repo_list"
       description: "List repositories for a user or organization"
       requirements:
@@ -290,13 +444,13 @@ mcp:
           type: string
           description: "Filter by primary language"
       constraints:
-        - "owner.size() > 0 && owner.size() <= 50"               # Reasonable owner length
-        - "owner.matches('^[a-zA-Z0-9_.-]+$')"                  # Valid GitHub username characters
-        - "!owner.contains(';')"                                 # Prevent command injection
-        - "int(limit) == 0 || (int(limit) > 0 && int(limit) <= 50)"  # Reasonable limit
-        - "visibility == '' || ['public', 'private', 'internal'].exists(v, v == visibility)"  # Valid visibility
-        - "language == '' || language.size() <= 30"              # Reasonable language length
-        - "!language.contains(';')"                              # Prevent command injection
+        - "owner.size() > 0 && owner.size() <= 50" # Reasonable owner length
+        - "owner.matches('^[a-zA-Z0-9_.-]+$')" # Valid GitHub username characters
+        - "!owner.contains(';')" # Prevent command injection
+        - "int(limit) == 0 || (int(limit) > 0 && int(limit) <= 50)" # Reasonable limit
+        - "visibility == '' || ['public', 'private', 'internal'].exists(v, v == visibility)" # Valid visibility
+        - "language == '' || language.size() <= 30" # Reasonable language length
+        - "!language.contains(';')" # Prevent command injection
       run:
         env:
           - GITHUB_TOKEN
@@ -305,11 +459,33 @@ mcp:
           ARGS="$ARGS {{ if .limit }}--limit {{ .limit }}{{ end }}"
           ARGS="$ARGS {{ if .visibility }}--visibility {{ .visibility }}{{ end }}"
           ARGS="$ARGS {{ if .language }}--language {{ .language }}{{ end }}"
-          
+
           gh repo list {{ .owner }} $ARGS
       output:
         prefix: "Repositories for {{ .owner }}:"
-
+      runners:
+        - name: sandbox-exec
+          options:
+            allow_networking: true
+            allow_user_folders: false
+            allow_read_folders:
+              - /usr/bin
+              - /usr/local/bin
+              - /bin
+              - /etc
+              - '{{ env "HOME" }}/.config/gh'
+        - name: firejail
+          options:
+            allow_networking: true
+            allow_user_folders: false
+            allow_read_folders:
+              - /usr/bin
+              - /usr/local/bin
+              - /bin
+              - /etc
+              - '{{ env "HOME" }}/.config/gh'
+        - name: exec
+          requirements: {}
     - name: "gh_search_repos"
       description: "Search for GitHub repositories"
       requirements:
@@ -330,22 +506,48 @@ mcp:
           type: string
           description: "Sort order (asc, desc)"
       constraints:
-        - "query.size() > 0 && query.size() <= 200"              # Reasonable query length
-        - "!query.contains(';')"                                 # Prevent command injection
-        - "int(limit) == 0 || (int(limit) > 0 && int(limit) <= 50)"  # Reasonable limit
-        - "sort == '' || ['stars', 'forks', 'updated'].exists(s, s == sort)"  # Valid sort options
-        - "order == '' || ['asc', 'desc'].exists(o, o == order)"  # Valid order options
+        - "query.size() > 0 && query.size() <= 200" # Reasonable query length
+        - "!query.contains(';')" # Prevent command injection
+        - "int(limit) == 0 || (int(limit) > 0 && int(limit) <= 50)" # Reasonable limit
+        - "sort == '' || ['stars', 'forks', 'updated'].exists(s, s == sort)" # Valid sort options
+        - "order == '' || ['asc', 'desc'].exists(o, o == order)" # Valid order options
       run:
         command: |
           ARGS=""
           ARGS="$ARGS {{ if .limit }}--limit {{ .limit }}{{ end }}"
           ARGS="$ARGS {{ if .sort }}--sort {{ .sort }}{{ end }}"
           ARGS="$ARGS {{ if .order }}--order {{ .order }}{{ end }}"
-          
+
           gh search repos "{{ .query }}" $ARGS
       output:
         prefix: "Repository search results for '{{ .query }}':"
-
+      runners:
+        - name: sandbox-exec
+          options:
+            allow_networking: true
+            allow_user_folders: false
+            allow_read_folders:
+              - /usr/bin
+              - /usr/local/bin
+              - /bin
+              - /etc
+              - '{{ env "HOME" }}/.config/gh'
+        - name: firejail
+          requirements:
+            os: linux
+            executables:
+              - firejail
+          options:
+            allow_networking: true
+            allow_user_folders: false
+            allow_read_folders:
+              - /usr/bin
+              - /usr/local/bin
+              - /bin
+              - /etc
+              - '{{ env "HOME" }}/.config/gh'
+        - name: exec
+          requirements: {}
     - name: "gh_search_issues"
       description: "Search for issues and pull requests"
       requirements:
@@ -369,11 +571,11 @@ mcp:
           type: boolean
           description: "Show search results on the web instead"
       constraints:
-        - "query.size() > 0 && query.size() <= 200"              # Reasonable query length
-        - "!query.contains(';')"                                 # Prevent command injection
-        - "int(limit) == 0 || (int(limit) > 0 && int(limit) <= 50)"  # Reasonable limit
-        - "sort == '' || ['comments', 'created', 'updated'].exists(s, s == sort)"  # Valid sort options
-        - "order == '' || ['asc', 'desc'].exists(o, o == order)"  # Valid order options
+        - "query.size() > 0 && query.size() <= 200" # Reasonable query length
+        - "!query.contains(';')" # Prevent command injection
+        - "int(limit) == 0 || (int(limit) > 0 && int(limit) <= 50)" # Reasonable limit
+        - "sort == '' || ['comments', 'created', 'updated'].exists(s, s == sort)" # Valid sort options
+        - "order == '' || ['asc', 'desc'].exists(o, o == order)" # Valid order options
       run:
         env:
           - GITHUB_TOKEN
@@ -383,11 +585,33 @@ mcp:
           ARGS="$ARGS {{ if .sort }}--sort {{ .sort }}{{ end }}"
           ARGS="$ARGS {{ if .order }}--order {{ .order }}{{ end }}"
           ARGS="$ARGS {{ if .web }}--web{{ end }}"
-          
+
           gh search issues "{{ .query }}" $ARGS
       output:
         prefix: "Issue search results for '{{ .query }}':"
-
+      runners:
+        - name: sandbox-exec
+          options:
+            allow_networking: true
+            allow_user_folders: false
+            allow_read_folders:
+              - /usr/bin
+              - /usr/local/bin
+              - /bin
+              - /etc
+              - '{{ env "HOME" }}/.config/gh'
+        - name: firejail
+          options:
+            allow_networking: true
+            allow_user_folders: false
+            allow_read_folders:
+              - /usr/bin
+              - /usr/local/bin
+              - /bin
+              - /etc
+              - '{{ env "HOME" }}/.config/gh'
+        - name: exec
+          requirements: {}
     - name: "gh_gist_list"
       description: "List gists for a user"
       requirements:
@@ -404,11 +628,11 @@ mcp:
           type: string
           description: "Filter by visibility (all, public, secret)"
       constraints:
-        - "username.size() <= 50"                               # Reasonable username length
-        - "username == '' || username.matches('^[a-zA-Z0-9_.-]+$')"  # Valid GitHub username characters
-        - "!username.contains(';')"                             # Prevent command injection
-        - "int(limit) == 0 || (int(limit) > 0 && int(limit) <= 50)"  # Reasonable limit
-        - "visibility == '' || ['all', 'public', 'secret'].exists(v, v == visibility)"  # Valid visibility
+        - "username.size() <= 50" # Reasonable username length
+        - "username == '' || username.matches('^[a-zA-Z0-9_.-]+$')" # Valid GitHub username characters
+        - "!username.contains(';')" # Prevent command injection
+        - "int(limit) == 0 || (int(limit) > 0 && int(limit) <= 50)" # Reasonable limit
+        - "visibility == '' || ['all', 'public', 'secret'].exists(v, v == visibility)" # Valid visibility
       run:
         env:
           - GITHUB_TOKEN
@@ -416,11 +640,37 @@ mcp:
           ARGS=""
           ARGS="$ARGS {{ if .limit }}--limit {{ .limit }}{{ end }}"
           ARGS="$ARGS {{ if .visibility }}--visibility {{ .visibility }}{{ end }}"
-          
+
           gh gist list {{ if .username }}--user {{ .username }}{{ end }} $ARGS
       output:
         prefix: "{{ if .username }}Gists for user {{ .username }}{{ else }}Your gists{{ end }}:"
-
+      runners:
+        - name: sandbox-exec
+          options:
+            allow_networking: true
+            allow_user_folders: false
+            allow_read_folders:
+              - /usr/bin
+              - /usr/local/bin
+              - /bin
+              - /etc
+              - '{{ env "HOME" }}/.config/gh'
+        - name: firejail
+          requirements:
+            os: linux
+            executables:
+              - firejail
+          options:
+            allow_networking: true
+            allow_user_folders: false
+            allow_read_folders:
+              - /usr/bin
+              - /usr/local/bin
+              - /bin
+              - /etc
+              - '{{ env "HOME" }}/.config/gh'
+        - name: exec
+          requirements: {}
     - name: "gh_workflow_list"
       description: "List workflows in a GitHub repository"
       requirements:
@@ -432,9 +682,9 @@ mcp:
           description: "Repository name in the format owner/repo"
           required: true
       constraints:
-        - "repo.size() > 0 && repo.size() <= 100"                # Reasonable repo name length
-        - "repo.matches('^[a-zA-Z0-9_.-]+/[a-zA-Z0-9_.-]+$')"    # Valid repo format (owner/repo)
-        - "!repo.contains(';')"                                  # Prevent command injection
+        - "repo.size() > 0 && repo.size() <= 100" # Reasonable repo name length
+        - "repo.matches('^[a-zA-Z0-9_.-]+/[a-zA-Z0-9_.-]+$')" # Valid repo format (owner/repo)
+        - "!repo.contains(';')" # Prevent command injection
       run:
         env:
           - GITHUB_TOKEN
@@ -442,7 +692,29 @@ mcp:
           gh workflow list --repo "{{ .repo }}"
       output:
         prefix: "Workflows for {{ .repo }}:"
-
+      runners:
+        - name: sandbox-exec
+          options:
+            allow_networking: true
+            allow_user_folders: false
+            allow_read_folders:
+              - /usr/bin
+              - /usr/local/bin
+              - /bin
+              - /etc
+              - '{{ env "HOME" }}/.config/gh'
+        - name: firejail
+          options:
+            allow_networking: true
+            allow_user_folders: false
+            allow_read_folders:
+              - /usr/bin
+              - /usr/local/bin
+              - /bin
+              - /etc
+              - '{{ env "HOME" }}/.config/gh'
+        - name: exec
+          requirements: {}
     - name: "gh_workflow_view"
       description: "View a specific workflow in a GitHub repository"
       requirements:
@@ -458,11 +730,11 @@ mcp:
           description: "Workflow name or ID"
           required: true
       constraints:
-        - "repo.size() > 0 && repo.size() <= 100"                # Reasonable repo name length
-        - "repo.matches('^[a-zA-Z0-9_.-]+/[a-zA-Z0-9_.-]+$')"    # Valid repo format (owner/repo)
-        - "!repo.contains(';')"                                  # Prevent command injection
-        - "workflow.size() > 0 && workflow.size() <= 100"        # Reasonable workflow name/ID length
-        - "!workflow.contains(';')"                              # Prevent command injection
+        - "repo.size() > 0 && repo.size() <= 100" # Reasonable repo name length
+        - "repo.matches('^[a-zA-Z0-9_.-]+/[a-zA-Z0-9_.-]+$')" # Valid repo format (owner/repo)
+        - "!repo.contains(';')" # Prevent command injection
+        - "workflow.size() > 0 && workflow.size() <= 100" # Reasonable workflow name/ID length
+        - "!workflow.contains(';')" # Prevent command injection
       run:
         env:
           - GITHUB_TOKEN
@@ -470,7 +742,29 @@ mcp:
           gh workflow view "{{ .workflow }}" --repo "{{ .repo }}"
       output:
         prefix: "Workflow {{ .workflow }} in {{ .repo }}:"
-
+      runners:
+        - name: sandbox-exec
+          options:
+            allow_networking: true
+            allow_user_folders: false
+            allow_read_folders:
+              - /usr/bin
+              - /usr/local/bin
+              - /bin
+              - /etc
+              - '{{ env "HOME" }}/.config/gh'
+        - name: firejail
+          options:
+            allow_networking: true
+            allow_user_folders: false
+            allow_read_folders:
+              - /usr/bin
+              - /usr/local/bin
+              - /bin
+              - /etc
+              - '{{ env "HOME" }}/.config/gh'
+        - name: exec
+          requirements: {}
     - name: "gh_run_list"
       description: "List workflow runs in a GitHub repository"
       requirements:
@@ -494,15 +788,15 @@ mcp:
           type: string
           description: "Filter by branch"
       constraints:
-        - "repo.size() > 0 && repo.size() <= 100"                # Reasonable repo name length
-        - "repo.matches('^[a-zA-Z0-9_.-]+/[a-zA-Z0-9_.-]+$')"    # Valid repo format (owner/repo)
-        - "!repo.contains(';')"                                  # Prevent command injection
-        - "workflow == '' || workflow.size() <= 100"             # Reasonable workflow name/ID length
-        - "!workflow.contains(';')"                              # Prevent command injection
-        - "status == '' || ['success', 'failure', 'cancelled', 'skipped', 'in_progress'].exists(s, s == status)"  # Valid status
-        - "int(limit) == 0 || (int(limit) > 0 && int(limit) <= 50)"  # Reasonable limit
-        - "branch == '' || branch.size() <= 50"                 # Reasonable branch length
-        - "!branch.contains(';')"                               # Prevent command injection
+        - "repo.size() > 0 && repo.size() <= 100" # Reasonable repo name length
+        - "repo.matches('^[a-zA-Z0-9_.-]+/[a-zA-Z0-9_.-]+$')" # Valid repo format (owner/repo)
+        - "!repo.contains(';')" # Prevent command injection
+        - "workflow == '' || workflow.size() <= 100" # Reasonable workflow name/ID length
+        - "!workflow.contains(';')" # Prevent command injection
+        - "status == '' || ['success', 'failure', 'cancelled', 'skipped', 'in_progress'].exists(s, s == status)" # Valid status
+        - "int(limit) == 0 || (int(limit) > 0 && int(limit) <= 50)" # Reasonable limit
+        - "branch == '' || branch.size() <= 50" # Reasonable branch length
+        - "!branch.contains(';')" # Prevent command injection
       run:
         env:
           - GITHUB_TOKEN
@@ -512,7 +806,30 @@ mcp:
           ARGS="$ARGS {{ if .status }}--status {{ .status }}{{ end }}"
           ARGS="$ARGS {{ if .limit }}--limit {{ .limit }}{{ end }}"
           ARGS="$ARGS {{ if .branch }}--branch {{ .branch }}{{ end }}"
-          
+
           gh run list --repo "{{ .repo }}" $ARGS
       output:
-        prefix: "Workflow runs for {{ .repo }}:" 
+        prefix: "Workflow runs for {{ .repo }}:"
+      runners:
+        - name: sandbox-exec
+          options:
+            allow_networking: true
+            allow_user_folders: false
+            allow_read_folders:
+              - /usr/bin
+              - /usr/local/bin
+              - /bin
+              - /etc
+              - '{{ env "HOME" }}/.config/gh'
+        - name: firejail
+          options:
+            allow_networking: true
+            allow_user_folders: false
+            allow_read_folders:
+              - /usr/bin
+              - /usr/local/bin
+              - /bin
+              - /etc
+              - '{{ env "HOME" }}/.config/gh'
+        - name: exec
+          requirements: {}

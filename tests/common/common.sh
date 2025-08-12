@@ -3,9 +3,9 @@
 
 #####################################################################################
 
-# Set script directory for relative paths
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-CLI_BIN="$SCRIPT_DIR/../MCPShell"
+# Set common script directory for relative paths
+COMMON_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+CLI_BIN="$COMMON_DIR/../../build/mcpshell"
 
 # ANSI color codes
 RED='\033[0;31m'

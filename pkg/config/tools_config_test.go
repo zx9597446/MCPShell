@@ -105,7 +105,7 @@ func TestCheckToolPrerequisites(t *testing.T) {
 
 func TestCreateTools_Prerequisites(t *testing.T) {
 	// Create a simple config with two tools, one with unmet prerequisites
-	cfg := &Config{
+	cfg := &ToolsConfig{
 		MCP: MCPConfig{
 			Tools: []MCPToolConfig{
 				{
