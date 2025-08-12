@@ -1,0 +1,20 @@
+agent:
+  models:
+    - model: "gpt-4o"
+      class: "openai"
+      name: "openai"
+      default: true
+      api-key: "your-openai-api-key"
+      api-url: "https://api.openai.com/v1"
+      prompts:
+        system:
+        - "You are a helpful assistant."
+        - "Use the available tools to help diagnose and solve problems."
+
+    - model: "gemma3n"
+      class: "ollama"
+      name: "ollama"
+      prompts:
+        system:
+        - "You are a helpful assistant."
+        - "Please provide detailed explanations."

@@ -18,9 +18,9 @@ const ApplicationName = "mcpshell"
 // Common command-line flags
 var (
 	// Common flags
-	configFile string
-	logFile    string
-	logLevel   string
+	toolsFile string
+	logFile   string
+	logLevel  string
 
 	// MCP server flags
 	description         []string
@@ -45,7 +45,15 @@ var rootCmd = &cobra.Command{
 	Short: "MCPShell",
 	Long: `MCPShell is a command line interface for the MCP platform.
 This CLI application enables AI systems to securely execute commands through
-the Model Context Protocol (MCP).`,
+the Model Context Protocol (MCP).
+
+Specify your tools configuration using the --tools flag:
+  mcpshell --tools /path/to/tools.yaml     (absolute path)
+  mcpshell --tools mytools                 (looks in tools directory, adds .yaml)
+  mcpshell --tools mytools.yaml            (looks in tools directory)
+  
+The tools directory defaults to ~/.mcpshell/tools but can be overridden 
+with the MCPSHELL_TOOLS_DIR environment variable.`,
 	Run: func(cmd *cobra.Command, args []string) {
 		// If no subcommand is specified, show the help
 		_ = cmd.Help()
@@ -67,7 +75,7 @@ func Execute() {
 // init registers all subcommands and sets up global flags
 func init() {
 	// Add common persistent flags
-	rootCmd.PersistentFlags().StringVarP(&configFile, "config", "c", "", "Path to the YAML configuration file, URL, or directory containing YAML files")
+	rootCmd.PersistentFlags().StringVar(&toolsFile, "tools", "", "Path to the tools configuration file (supports relative paths and auto .yaml extension)")
 	rootCmd.PersistentFlags().StringVarP(&logFile, "logfile", "l", "", "Path to the log file (optional)")
 	rootCmd.PersistentFlags().StringVarP(&logLevel, "log-level", "", "info", "Log level: none, error, info, debug")
 

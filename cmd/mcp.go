@@ -6,6 +6,7 @@ import (
 	"github.com/inercia/MCPShell/pkg/common"
 	"github.com/inercia/MCPShell/pkg/config"
 	"github.com/inercia/MCPShell/pkg/server"
+	"github.com/inercia/MCPShell/pkg/utils"
 	"github.com/spf13/cobra"
 )
 
@@ -39,9 +40,15 @@ available to AI applications via the MCP protocol.
 		logger.Info("Starting MCPShell")
 
 		// Check if config file is provided
-		if configFile == "" {
-			logger.Error("Configuration file is required")
-			return fmt.Errorf("configuration file is required. Use --config or -c flag to specify the path")
+		if toolsFile == "" {
+			logger.Error("Tools configuration file is required")
+			return fmt.Errorf("tools configuration file is required. Use --tools flag to specify the path")
+		}
+
+		// Ensure tools directory exists
+		if err := utils.EnsureToolsDir(); err != nil {
+			logger.Error("Failed to ensure tools directory: %v", err)
+			return fmt.Errorf("failed to ensure tools directory: %w", err)
 		}
 
 		return nil
@@ -51,7 +58,7 @@ available to AI applications via the MCP protocol.
 		defer common.RecoverPanic()
 
 		// Load the configuration file (local or remote)
-		localConfigPath, cleanup, err := config.ResolveConfigPath(configFile, logger)
+		localConfigPath, cleanup, err := config.ResolveConfigPath(toolsFile, logger)
 		if err != nil {
 			logger.Error("Failed to load configuration: %v", err)
 			return fmt.Errorf("failed to load configuration: %w", err)
@@ -91,5 +98,5 @@ func init() {
 	mcpCommand.Flags().IntVar(&httpPort, "port", 8080, "Port for HTTP server (default: 8080, only used with --http)")
 
 	// Mark required flags
-	_ = mcpCommand.MarkFlagRequired("config")
+	_ = mcpCommand.MarkFlagRequired("tools")
 }

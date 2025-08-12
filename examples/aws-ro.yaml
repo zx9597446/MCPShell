@@ -106,6 +106,35 @@ mcp:
           echo "To use a specific profile with AWS tools, add 'profile=PROFILE_NAME' to your command."
       output:
         prefix: "AWS Profiles:"
+      runners:
+        - name: sandbox-exec
+          requirements:
+            os: darwin
+            executables: [sandbox-exec]
+          options:
+            allow_networking: true
+            allow_user_folders: false
+            allow_read_folders:
+              - "/usr/bin"
+              - "/usr/local/bin"
+              - "/bin"
+              - "/etc"
+              - "{{ env \"HOME\" }}/.aws"
+        - name: firejail
+          requirements:
+            os: linux
+            executables: [firejail]
+          options:
+            allow_networking: true
+            allow_user_folders: false
+            allow_read_folders:
+              - "/usr/bin"
+              - "/usr/local/bin"
+              - "/bin"
+              - "/etc"
+              - "{{ env \"HOME\" }}/.aws"
+        - name: exec
+          requirements: {}
         
     - name: "aws_regions_list"
       description: "List all available AWS regions"
@@ -175,4 +204,33 @@ mcp:
             echo "$OUTPUT"
           fi
       output:
-        prefix: "AWS Regions:" 
+        prefix: "AWS Regions:"
+      runners:
+        - name: sandbox-exec
+          requirements:
+            os: darwin
+            executables: [sandbox-exec]
+          options:
+            allow_networking: true
+            allow_user_folders: false
+            allow_read_folders:
+              - "/usr/bin"
+              - "/usr/local/bin"
+              - "/bin"
+              - "/etc"
+              - "{{ env \"HOME\" }}/.aws"
+        - name: firejail
+          requirements:
+            os: linux
+            executables: [firejail]
+          options:
+            allow_networking: true
+            allow_user_folders: false
+            allow_read_folders:
+              - "/usr/bin"
+              - "/usr/local/bin"
+              - "/bin"
+              - "/etc"
+              - "{{ env \"HOME\" }}/.aws"
+        - name: exec
+          requirements: {} 

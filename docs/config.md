@@ -233,19 +233,12 @@ Here's a simple example with multiple runners:
 ```yaml
 runners:
   - name: sandbox-exec
-    requirements:
-      os: darwin
-      executables: [sandbox-exec]
     options:
       allow_networking: false
   - name: firejail
-    requirements: 
-      os: linux
-      executables: [firejail]
     options:
       allow_networking: false
-  - name: exec
-    requirements: {}  # Fallback runner
+  - name: exec     # Fallback runner
 ```
 
 For detailed information about runners, including options, selection process, and supported types, see [Runner Configuration](config-runners.md).

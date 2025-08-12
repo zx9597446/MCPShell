@@ -3,12 +3,14 @@
 
 # Source common utilities
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-source "$SCRIPT_DIR/common.sh"
+TESTS_ROOT="$(dirname "$SCRIPT_DIR")"
+source "$TESTS_ROOT/common/common.sh"
 
 #####################################################################################
 # Configuration for this test
-CONFIG_FILE="$SCRIPT_DIR/test_agent.yaml"
-LOG_FILE="$SCRIPT_DIR/../agent_test_output.log"
+export MCPSHELL_TOOLS_DIR="$SCRIPT_DIR/tools"
+CONFIG_FILE="test_agent"  # Will look for test_agent.yaml in MCPSHELL_TOOLS_DIR
+LOG_FILE="$TESTS_ROOT/agent_test_output.log"
 TEST_NAME="test_agent"
 
 # LLM configuration
@@ -22,7 +24,7 @@ MODEL="${MODEL:-qwen3:14b}"
 
 testcase "$TEST_NAME"
 
-info "Testing MCPShell agent with config: $CONFIG_FILE"
+info "Testing MCPShell agent with config: $CONFIG_FILE (using MCPSHELL_TOOLS_DIR=$MCPSHELL_TOOLS_DIR)"
 
 separator
 info "1. Checking the URL of the LLM"
@@ -49,7 +51,7 @@ TEST_FILENAME="agent_test_output-$(date +%s | cut -c6-10).txt"
 TEST_CONTENT="This is a test file created by the agent."
 
 # Direct tool execution
-OUTPUT=$("$CLI_BIN" --config "$CONFIG_FILE" exe create_test_file filename="$TEST_FILENAME" content="$TEST_CONTENT" 2>&1)]
+OUTPUT=$("$CLI_BIN" --tools "$CONFIG_FILE" exe create_test_file filename="$TEST_FILENAME" content="$TEST_CONTENT" 2>&1)]
 RESULT=$?
 [ -n "$E2E_LOG_FILE" ] && echo "$OUTPUT" >> "$E2E_LOG_FILE"
 
@@ -81,14 +83,22 @@ separator
 USER_PROMPT="Create a test file with content 'This is a test file created by the agent'"
 SYSTEM_PROMPT="You are an assistant that helps manage files."
 
-"$CLI_BIN" --config "$CONFIG_FILE" agent \
+info "Starting agent interaction..."
+info "System prompt: $SYSTEM_PROMPT"
+info "User prompt: $USER_PROMPT"
+info "Model: $MODEL"
+
+"$CLI_BIN" --tools "$CONFIG_FILE" agent \
     --system-prompt "$SYSTEM_PROMPT" \
     --user-prompt "$USER_PROMPT" \
     --model "$MODEL" \
     --once \
     --logfile "$LOG_FILE" \
     --openai-api-key "$OPENAI_API_KEY" \
-    --openai-api-url "$OPENAI_API_BASE" > /dev/null 2>&1
+    --openai-api-url "$OPENAI_API_BASE"
+
+AGENT_RESULT=$?
+info "Agent finished with exit code: $AGENT_RESULT"
 
 # Wait a moment for file operations to complete
 sleep 1
@@ -103,12 +113,20 @@ sleep 1
 
 [ -n "$E2E_LOG_FILE" ] && echo -e "\n$TEST_NAME:\n\n$LOG_FILE" >> "$E2E_LOG_FILE"
 
-# Get the name of the file created by the agent from the log
-AGENT_FILENAME=$(grep -o "agent_test_output-[0-9]*\.txt" "$LOG_FILE" | head -1)
+# Look for files created by the agent
+# First, try to find filename from the tool execution arguments in the log
+AGENT_FILENAME=$(grep -o "filename:[a-zA-Z0-9_.-]*" "$LOG_FILE" | sed 's/filename://' | head -1)
 
 [ -n "$AGENT_FILENAME" ] || {
     info "Agent test: looking for different filename pattern..."
-    AGENT_FILENAME=$(grep -o "File.*created" "$LOG_FILE" | grep -o "[a-zA-Z0-9_-]*\.txt" | head -1)
+    # Try to find filename from the SUCCESS message
+    AGENT_FILENAME=$(grep "SUCCESS: File .* created" "$LOG_FILE" | sed 's/.*SUCCESS: File \([^ ]*\) created.*/\1/' | head -1)
+}
+
+[ -n "$AGENT_FILENAME" ] || {
+    info "Agent test: trying to find .txt files from current directory..."
+    # Look for any .txt files created recently (within last minute)
+    AGENT_FILENAME=$(find . -name "*.txt" -newermt "1 minute ago" 2>/dev/null | head -1 | sed 's|^\./||')
 }
 
 [ -n "$AGENT_FILENAME" ] || {

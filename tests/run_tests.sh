@@ -2,15 +2,15 @@
 
 # Source common utilities
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-source "$SCRIPT_DIR/common.sh"
+source "$SCRIPT_DIR/common/common.sh"
 
-# Test files to run
+# Test files to run (now in subdirectories)
 TEST_FILES=(
-    "test_agent.sh"
-    "test_exe.sh"
-    "test_exe_empty_file.sh"
-    "test_exe_constraints.sh"
-    "test_runner_docker.sh"
+    "agent/test_agent.sh"
+    "exe/test_exe.sh"
+    "exe/test_exe_empty_file.sh"
+    "exe/test_exe_constraints.sh"
+    "runners/test_runner_docker.sh"
 )
 
 echo "==================================="
@@ -18,7 +18,7 @@ echo "MCPShell E2E Tests"
 echo "==================================="
 
 # Make test scripts executable
-chmod +x "$SCRIPT_DIR"/*.sh
+find "$SCRIPT_DIR" -name "*.sh" -exec chmod +x {} \;
 
 # Track overall test status
 PASSED=0

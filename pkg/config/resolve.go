@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	"github.com/inercia/MCPShell/pkg/common"
+	"github.com/inercia/MCPShell/pkg/utils"
 )
 
 // ResolveConfigPath tries to resolve the configuration file path.
@@ -32,31 +33,26 @@ func ResolveConfigPath(configPath string, logger *common.Logger) (string, func()
 		return "", noopCleanup, fmt.Errorf("invalid configuration path: %w", err)
 	}
 
-	// If it's not a URL, check if it's a local file or directory
+	// If it's not a URL, use our tools file resolution
 	if parsedURL.Scheme == "" || parsedURL.Scheme == "file" {
 		localPath := configPath
 		if parsedURL.Scheme == "file" {
 			localPath = parsedURL.Path
 		}
 
-		// Check if the path exists
-		fileInfo, err := os.Stat(localPath)
-		if os.IsNotExist(err) {
-			return "", noopCleanup, fmt.Errorf("configuration path does not exist: %s", localPath)
-		}
-
-		// If it's a directory, resolve all YAML files in it
-		if fileInfo.IsDir() {
+		// If localPath is a directory, merge all YAMLs inside
+		if info, statErr := os.Stat(localPath); statErr == nil && info.IsDir() {
 			return resolveConfigDirectory(localPath, logger)
 		}
 
-		// If it's a file, verify it's a YAML file
-		if !strings.HasSuffix(strings.ToLower(localPath), ".yaml") && !strings.HasSuffix(strings.ToLower(localPath), ".yml") {
-			return "", noopCleanup, fmt.Errorf("configuration file must have .yaml or .yml extension: %s", localPath)
+		// Use ResolveToolsFile for local file resolution with directory support
+		resolvedPath, err := utils.ResolveToolsFile(localPath)
+		if err != nil {
+			return "", noopCleanup, err
 		}
 
-		logger.Info("Using local configuration file: %s", localPath)
-		return localPath, noopCleanup, nil
+		logger.Info("Using local configuration file: %s", resolvedPath)
+		return resolvedPath, noopCleanup, nil
 	}
 
 	// If it's a remote URL, download it

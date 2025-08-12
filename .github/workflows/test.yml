@@ -44,7 +44,7 @@ jobs:
           echo "Validating example YAML configurations..."
           find examples -name "*.yaml" -type f | while read file; do
             echo "Validating $file..."
-            ./mcpshell validate --config "$file" || exit 1
+            ./mcpshell validate --tools "$file" || exit 1
           done
           echo "All example configurations validated successfully"
           

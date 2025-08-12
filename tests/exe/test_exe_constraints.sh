@@ -4,7 +4,8 @@
 
 # Source common utilities
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-source "$SCRIPT_DIR/common.sh"
+TESTS_ROOT="$(dirname "$SCRIPT_DIR")"
+source "$TESTS_ROOT/common/common.sh"
 
 # Test configuration
 CONFIG_FILE="$SCRIPT_DIR/test_exe_config.yaml"
@@ -26,7 +27,7 @@ info "Invalid path (expected to fail): $INVALID_PATH"
 separator
 
 # Command to test with invalid path
-CMD="$CLI_BIN exe -c $CONFIG_FILE create_file filepath=$INVALID_PATH"
+CMD="$CLI_BIN exe --tools $CONFIG_FILE create_file filepath=$INVALID_PATH"
 
 info "Executing: $CMD"
 OUTPUT=$(eval "$CMD" 2>&1)
@@ -40,7 +41,7 @@ success "Command failed as expected. Testing constraint violation for path conta
 
 # Test path with shell injection attempt
 INJECTION_PATH="/tmp/test;rm -rf /"
-CMD="$CLI_BIN exe -c $CONFIG_FILE create_file filepath=\"$INJECTION_PATH\""
+CMD="$CLI_BIN exe --tools $CONFIG_FILE create_file filepath=\"$INJECTION_PATH\""
 
 info "Executing: $CMD"
 OUTPUT=$(eval "$CMD" 2>&1)

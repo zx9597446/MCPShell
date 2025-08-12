@@ -1,0 +1,45 @@
+# Example configuration showing how to use prompts in ToolsConfig
+# This example demonstrates the new single prompts configuration format
+
+# Prompts configuration for the tools - this will be provided to clients
+prompts:
+  system:
+    - "You are a helpful assistant that can create and manage files safely."
+    - "Always double-check file paths before creating files."
+    - "Use the available tools to help users with their file management tasks."
+  user:
+    - "Please assist me with file operations."
+
+# MCP server configuration
+mcp:
+  description: |
+    Example configuration showing how to use prompts with MCPShell tools.
+    This server provides safe file creation capabilities with proper prompts.
+  
+  run:
+    shell: zsh
+  
+  tools:
+    - name: "create_safe_file"
+      description: "Create a file in a safe location with the given content"
+      params:
+        filename:
+          type: string
+          description: "Name of the file to create (must be in /tmp or current directory)"
+          required: true
+        content:
+          type: string
+          description: "Content to write to the file"
+          required: true
+      constraints:
+        - "filename.startsWith('/tmp/') || !filename.contains('/')"  # Only allow /tmp or current dir
+        - "!filename.contains('..')"  # Prevent directory traversal
+        - "filename.size() <= 100"    # Limit filename length
+        - "content.size() <= 1000"    # Limit content size
+      run:
+        command: |
+          echo "Creating file: {{ .filename }}"
+          echo "{{ .content }}" > "{{ .filename }}"
+          echo "File created successfully: {{ .filename }}"
+      output:
+        prefix: "File creation result:"

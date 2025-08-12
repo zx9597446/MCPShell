@@ -45,7 +45,7 @@ func TestGetDescription(t *testing.T) {
 	}
 
 	// Define a custom implementation for testing
-	testGetDescription := func(cfg Config, configLoader func(string) (*config.Config, error)) (string, error) {
+	testGetDescription := func(cfg Config, configLoader func(string) (*config.ToolsConfig, error)) (string, error) {
 		var finalDesc string
 
 		// First, check if we should load the description from the config file
@@ -107,7 +107,7 @@ func TestGetDescription(t *testing.T) {
 	tests := []struct {
 		name           string
 		config         Config
-		mockLoader     func(string) (*config.Config, error)
+		mockLoader     func(string) (*config.ToolsConfig, error)
 		expectedResult string
 		expectError    bool
 	}{
@@ -117,8 +117,8 @@ func TestGetDescription(t *testing.T) {
 				ConfigFile: configPath,
 				Logger:     logger,
 			},
-			mockLoader: func(path string) (*config.Config, error) {
-				return &config.Config{
+			mockLoader: func(path string) (*config.ToolsConfig, error) {
+				return &config.ToolsConfig{
 					MCP: config.MCPConfig{
 						Description: "description from config",
 					},
@@ -133,8 +133,8 @@ func TestGetDescription(t *testing.T) {
 				Logger:       logger,
 				Descriptions: []string{"description from cmd"},
 			},
-			mockLoader: func(path string) (*config.Config, error) {
-				return &config.Config{}, nil
+			mockLoader: func(path string) (*config.ToolsConfig, error) {
+				return &config.ToolsConfig{}, nil
 			},
 			expectedResult: "description from cmd",
 		},
@@ -145,8 +145,8 @@ func TestGetDescription(t *testing.T) {
 				Logger:       logger,
 				Descriptions: []string{"description 1", "description 2"},
 			},
-			mockLoader: func(path string) (*config.Config, error) {
-				return &config.Config{}, nil
+			mockLoader: func(path string) (*config.ToolsConfig, error) {
+				return &config.ToolsConfig{}, nil
 			},
 			expectedResult: "description 1\ndescription 2",
 		},
@@ -157,8 +157,8 @@ func TestGetDescription(t *testing.T) {
 				Logger:       logger,
 				Descriptions: []string{"description from cmd"},
 			},
-			mockLoader: func(path string) (*config.Config, error) {
-				return &config.Config{
+			mockLoader: func(path string) (*config.ToolsConfig, error) {
+				return &config.ToolsConfig{
 					MCP: config.MCPConfig{
 						Description: "description from config",
 					},
@@ -174,8 +174,8 @@ func TestGetDescription(t *testing.T) {
 				Descriptions:        []string{"description from cmd"},
 				DescriptionOverride: true,
 			},
-			mockLoader: func(path string) (*config.Config, error) {
-				return &config.Config{
+			mockLoader: func(path string) (*config.ToolsConfig, error) {
+				return &config.ToolsConfig{
 					MCP: config.MCPConfig{
 						Description: "description from config",
 					},
@@ -190,8 +190,8 @@ func TestGetDescription(t *testing.T) {
 				Logger:           logger,
 				DescriptionFiles: []string{file1Path, file2Path},
 			},
-			mockLoader: func(path string) (*config.Config, error) {
-				return &config.Config{}, nil
+			mockLoader: func(path string) (*config.ToolsConfig, error) {
+				return &config.ToolsConfig{}, nil
 			},
 			expectedResult: "description from file 1\ndescription from file 2",
 		},
@@ -202,8 +202,8 @@ func TestGetDescription(t *testing.T) {
 				Logger:           logger,
 				DescriptionFiles: []string{file1Path},
 			},
-			mockLoader: func(path string) (*config.Config, error) {
-				return &config.Config{
+			mockLoader: func(path string) (*config.ToolsConfig, error) {
+				return &config.ToolsConfig{
 					MCP: config.MCPConfig{
 						Description: "description from config",
 					},
@@ -219,8 +219,8 @@ func TestGetDescription(t *testing.T) {
 				DescriptionFiles:    []string{file1Path},
 				DescriptionOverride: true,
 			},
-			mockLoader: func(path string) (*config.Config, error) {
-				return &config.Config{
+			mockLoader: func(path string) (*config.ToolsConfig, error) {
+				return &config.ToolsConfig{
 					MCP: config.MCPConfig{
 						Description: "description from config",
 					},
@@ -235,8 +235,8 @@ func TestGetDescription(t *testing.T) {
 				Logger:           logger,
 				DescriptionFiles: []string{filepath.Join(tempDir, "nonexistent.txt")},
 			},
-			mockLoader: func(path string) (*config.Config, error) {
-				return &config.Config{}, nil
+			mockLoader: func(path string) (*config.ToolsConfig, error) {
+				return &config.ToolsConfig{}, nil
 			},
 			expectError: true,
 		},
@@ -248,8 +248,8 @@ func TestGetDescription(t *testing.T) {
 				Descriptions:     []string{"description from cmd"},
 				DescriptionFiles: []string{file1Path},
 			},
-			mockLoader: func(path string) (*config.Config, error) {
-				return &config.Config{
+			mockLoader: func(path string) (*config.ToolsConfig, error) {
+				return &config.ToolsConfig{
 					MCP: config.MCPConfig{
 						Description: "description from config",
 					},

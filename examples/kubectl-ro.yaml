@@ -1,5 +1,7 @@
 mcp:
   description: |
+    # Kubernetes Read-Only tools
+
     Kubernetes Read-Only tools for enabling secure access to Kubernetes
     cluster information, allowing users to list resources, view pod logs,
     check cluster contexts, monitor resource usage, and inspect cluster
@@ -8,7 +10,10 @@ mcp:
     shell: bash
   tools:
     - name: "kubectl_get"
-      description: "List Kubernetes resources (pods, deployments, services, etc.)"
+      description: |
+        List Kubernetes resources (pods, deployments, services, etc.)
+        Use the `kubectl_get_namespaces` command to list all namespaces.
+        Try to use some filtering for better performance and less noise.
       requirements:
         executables: ["kubectl"]
       params:
@@ -27,7 +32,24 @@ mcp:
           description: "Label selector to filter resources (e.g. 'app=nginx')"
         output_format:
           type: string
-          description: "Output format (wide, json, yaml)"
+          description: |
+            Output format (wide, json, yaml).
+            Try to use some formatting for better readability.
+            When looking for some specific resource, try to use the `wide` format.
+        filter_grep:
+          type: string
+          description: |
+            Filter logs with grep for the given string (literal text match).
+        filter_grep_regex:
+          type: string
+          description: |
+            Filter logs with grep using a regular expression pattern.
+            The pattern is an extended regular expression.
+        filter_jq:
+          type: string
+          description: |
+            Filter with jq for the given expression.
+            Make sure you use `output_format`` == 'json' to use this.
       constraints:
         - "resource.size() > 0"                                    # Resource must not be empty
         - "resource.size() <= 30"                                  # Reasonable length limit
@@ -44,14 +66,19 @@ mcp:
           LABEL_PARAM="{{ if .labels }}-l {{ .labels }}{{ end }}"
           FORMAT_PARAM="{{ if .output_format }}-o {{ .output_format }}{{ end }}"
           
+          {{ if .filter_grep }}
+          kubectl $CONTEXT_PARAM get {{ .resource }} $NAMESPACE_PARAM $LABEL_PARAM $FORMAT_PARAM | grep -F "{{ .filter_grep }}" || /bin/true
+          {{ else if .filter_grep_regex }}
+          kubectl $CONTEXT_PARAM get {{ .resource }} $NAMESPACE_PARAM $LABEL_PARAM $FORMAT_PARAM | grep -E "{{ .filter_grep_regex }}" || /bin/true
+          {{ else if .filter_jq }}
+          kubectl $CONTEXT_PARAM get {{ .resource }} $NAMESPACE_PARAM $LABEL_PARAM $FORMAT_PARAM | jq "{{ .filter_jq }}" || /bin/true
+          {{ else }}
           kubectl $CONTEXT_PARAM get {{ .resource }} $NAMESPACE_PARAM $LABEL_PARAM $FORMAT_PARAM
+          {{ end }}
         env:
           - KUBECONFIG
         runners:
           - name: sandbox-exec
-            requirements:
-              os: darwin
-              executables: [sandbox-exec]
             options:
               allow_networking: true
               allow_user_folders: false
@@ -62,9 +89,6 @@ mcp:
                 - "{{ env \"HOME\" }}/.kube"
                 - "{{ env \"KUBECONFIG\" }}"
           - name: firejail
-            requirements:
-              os: linux
-              executables: [firejail]
             options:
               allow_networking: true
               allow_user_folders: false
@@ -87,11 +111,11 @@ mcp:
       params:
         resource:
           type: string
-          description: "Resource type (pods, deployments, services, etc.)"
+          description: "Kubernetes resource type (pods, deployments, services, etc.)"
           required: true
         name:
           type: string
-          description: "Resource name (optional, describes all resources of the type if not specified)"
+          description: "Kubernetes resource name (optional, describes all resources of the type if not specified)"
         ns:
           type: string
           description: "Kubernetes namespace (optional, uses current context's namespace if not specified)"
@@ -118,9 +142,6 @@ mcp:
           - KUBECONFIG
         runners:
           - name: sandbox-exec
-            requirements:
-              os: darwin
-              executables: [sandbox-exec]
             options:
               allow_networking: true
               allow_user_folders: false
@@ -131,9 +152,6 @@ mcp:
                 - "{{ env \"HOME\" }}/.kube"
                 - "{{ env \"KUBECONFIG\" }}"
           - name: firejail
-            requirements:
-              os: linux
-              executables: [firejail]
             options:
               allow_networking: true
               allow_user_folders: false
@@ -150,7 +168,9 @@ mcp:
           Details for {{ .resource }}{{ if .name }} "{{ .name }}"{{ end }}:
 
     - name: "kubectl_logs"
-      description: "Get logs from a pod"
+      description: |
+        Get logs from a pod.
+        Try to use some filtering for better performance and less noise.
       requirements:
         executables: ["kubectl"]
       params:
@@ -176,9 +196,14 @@ mcp:
         since:
           type: string
           description: "Show logs since relative time (e.g. '5s', '2m', or '3h')"
-        grep:
+        filter_grep:
           type: string
-          description: "Filter logs with grep for the given string"
+          description: |
+            Filter logs with grep for the given string (literal text match).
+        filter_grep_regex:
+          type: string
+          description: |
+            Filter logs with grep using a regular expression pattern.
       constraints:
         - "pod.size() > 0"                                         # Pod name must not be empty
         - "pod.size() <= 253"                                      # Maximum DNS label length
@@ -189,33 +214,33 @@ mcp:
         - "context == '' || context.size() <= 253"                 # Valid context name
         - "tail >= 0.0 && tail <= 10000.0"                         # Reasonable tail lines limit
         - "since == '' || since.matches('^[0-9]+(s|m|h|d)$')"      # Valid duration format
-        - "grep == '' || (grep.size() <= 100 && !grep.contains(';'))"  # Safe grep pattern
+        - "filter_grep == '' || (filter_grep.size() <= 100 && !filter_grep.contains(';'))"  # Safe grep pattern
+        - "filter_grep_regex == '' || (filter_grep_regex.size() <= 100 && !filter_grep_regex.contains(';'))"  # Safe grep regex pattern
+        - "(filter_grep == '' || filter_grep_regex == '')"                       # Only one of filter_grep or filter_grep_regex can be used
       run:
         command: |
           CONTEXT_PARAM="{{ if .context }}--context={{ .context }}{{ end }}"
           NAMESPACE_PARAM="{{ if .ns }}-n {{ .ns }}{{ end }}"
           CONTAINER_PARAM="{{ if .container }}-c {{ .container }}{{ end }}"
-          TAIL_PARAM="{{ if .tail }}-t {{ .tail }}{{ end }}"
+          TAIL_PARAM=""
           PREVIOUS_PARAM="{{ if .previous }}-p {{ end }}"
-          SINCE_PARAM="{{ if .since }}-s {{ .since }}{{ end }}"
-          GREP_PARAM="{{ if .grep }}-g {{ .grep }}{{ end }}"
+          SINCE_PARAM="{{ if .since }}--since={{ .since }}{{ end }}"
           
           # Base kubectl logs command
           CMD="kubectl $CONTEXT_PARAM logs {{ .pod }} $NAMESPACE_PARAM $CONTAINER_PARAM $TAIL_PARAM $PREVIOUS_PARAM $SINCE_PARAM"
           
           # Add grep filtering if specified
-          if [ -n "{{ .grep }}" ]; then
-            $CMD | grep -F "{{ .grep }}"
-          else
-            $CMD
-          fi
+          {{ if .filter_grep }}
+          $CMD | grep -F "{{ .filter_grep }}" || /bin/true
+          {{ else if .filter_grep_regex }}
+          $CMD | grep -E "{{ .filter_grep_regex }}" || /bin/true
+          {{ else }}
+          $CMD || /bin/true
+          {{ end }}
         env:
           - KUBECONFIG
         runners:
           - name: sandbox-exec
-            requirements:
-              os: darwin
-              executables: [sandbox-exec]
             options:
               allow_networking: true
               allow_user_folders: false
@@ -226,9 +251,6 @@ mcp:
                 - "{{ env \"HOME\" }}/.kube"
                 - "{{ env \"KUBECONFIG\" }}"
           - name: firejail
-            requirements:
-              os: linux
-              executables: [firejail]
             options:
               allow_networking: true
               allow_user_folders: false
@@ -242,7 +264,7 @@ mcp:
             requirements: {}
       output:
         prefix: |
-          Logs for pod {{ .pod }}{{ if .container }} (container: {{ .container }}){{ end }}{{ if .grep }} (filtered for: '{{ .grep }}'){{ end }}:
+          Logs for pod {{ .pod }}{{ if .container }} (container: {{ .container }}){{ end }}{{ if .grep }} (filtered for literal: '{{ .grep }}'){{ end }}{{ if .grep_regex }} (filtered for regex: '{{ .grep_regex }}'){{ end }}:
 
     - name: "kubectl_get_contexts"
       description: "List available Kubernetes contexts"
@@ -261,9 +283,6 @@ mcp:
           - KUBECONFIG
         runners:
           - name: sandbox-exec
-            requirements:
-              os: darwin
-              executables: [sandbox-exec]
             options:
               allow_networking: true
               allow_user_folders: false
@@ -274,9 +293,6 @@ mcp:
                 - "{{ env \"HOME\" }}/.kube"
                 - "{{ env \"KUBECONFIG\" }}"
           - name: firejail
-            requirements:
-              os: linux
-              executables: [firejail]
             options:
               allow_networking: true
               allow_user_folders: false
@@ -309,9 +325,6 @@ mcp:
           - KUBECONFIG
         runners:
           - name: sandbox-exec
-            requirements:
-              os: darwin
-              executables: [sandbox-exec]
             options:
               allow_networking: true
               allow_user_folders: false
@@ -322,9 +335,6 @@ mcp:
                 - "{{ env \"HOME\" }}/.kube"
                 - "{{ env \"KUBECONFIG\" }}"
           - name: firejail
-            requirements:
-              os: linux
-              executables: [firejail]
             options:
               allow_networking: true
               allow_user_folders: false
@@ -349,17 +359,12 @@ mcp:
           type: string
           description: "Kubernetes context to use (optional, uses current context if not specified)"
       run:
-        command: |
-          CONTEXT_PARAM="{{ if .context }}--context={{ .context }}{{ end }}"
-          
-          kubectl $CONTEXT_PARAM get namespaces
+        command: |          
+          kubectl {{ if .context }}--context={{ .context }}{{ end }} get namespaces
         env:
           - KUBECONFIG
         runners:
           - name: sandbox-exec
-            requirements:
-              os: darwin
-              executables: [sandbox-exec]
             options:
               allow_networking: true
               allow_user_folders: false
@@ -370,9 +375,6 @@ mcp:
                 - "{{ env \"HOME\" }}/.kube"
                 - "{{ env \"KUBECONFIG\" }}"
           - name: firejail
-            requirements:
-              os: linux
-              executables: [firejail]
             options:
               allow_networking: true
               allow_user_folders: false
@@ -426,14 +428,19 @@ mcp:
           description: "jq expression to apply to the response (optional)"
         filter_grep:
           type: string
-          description: "grep expression to apply to the response (optional)"
+          description: "grep expression to apply to the response (optional, literal text match)"
+        filter_grep_regex:
+          type: string
+          description: "grep regex pattern to apply to the response (optional)"
       constraints:
         - "ns == '' || (ns.size() <= 63 && ns.matches('^[a-z0-9]([-a-z0-9]*[a-z0-9])?$'))"  # Valid k8s namespace
         - "context == '' || context.size() <= 253"                 # Valid context name
-        - "pod_port.size() > 0"                                        # Port must not be empty
-        - "pod_port.matches('^[0-9]+$')"                               # Port must be a number
+        - "pod_port.size() > 0"                                    # Port must not be empty
+        - "pod_port.matches('^[0-9]+$')"                           # Port must be a number
         - "path.size() > 0"                                        # Path must not be empty
         - "path.matches('^/[^ ]+$')"                               # Path must start with a '/' and contain no spaces
+        - "filter_grep == '' || filter_grep_regex == ''"           # Only one of filter_grep or filter_grep_regex can be used
+        - "filter_jq == '' || (filter_grep == '' && filter_grep_regex == '')"  # Can't use both jq and grep filters
       run:
         command: |
 
@@ -461,7 +468,9 @@ mcp:
           {{ if .filter_jq }}
           curl $CURL_ARGS "http://localhost:$localport{{ .path }}" | jq '{{ .filter_jq }}'
           {{ else if .filter_grep }}
-          curl $CURL_ARGS "http://localhost:$localport{{ .path }}" | grep '{{ .filter_grep }}'
+          curl $CURL_ARGS "http://localhost:$localport{{ .path }}" | grep -F "{{ .filter_grep }}" || /bin/true
+          {{ else if .filter_grep_regex }}
+          curl $CURL_ARGS "http://localhost:$localport{{ .path }}" | grep -E "{{ .filter_grep_regex }}" || /bin/true
           {{ else }}
           curl $CURL_ARGS "http://localhost:$localport{{ .path }}"
           {{ end }}
@@ -471,9 +480,6 @@ mcp:
           - KUBECONFIG
         runners:
           - name: sandbox-exec
-            requirements:
-              os: darwin
-              executables: [sandbox-exec]
             options:
               allow_networking: true
               allow_user_folders: false
@@ -484,9 +490,6 @@ mcp:
                 - "{{ env \"HOME\" }}/.kube"
                 - "{{ env \"KUBECONFIG\" }}"
           - name: firejail
-            requirements:
-              os: linux
-              executables: [firejail]
             options:
               allow_networking: true
               allow_user_folders: false
@@ -500,7 +503,7 @@ mcp:
             requirements: {}
       output:
         prefix: |
-          Port forwarding to pod {{ .pod }}:{{ .pod_port }}:
+          Port forwarding to pod {{ .pod }}:{{ .pod_port }}{{ if .filter_grep }} (filtered for literal: '{{ .filter_grep }}'){{ end }}{{ if .filter_grep_regex }} (filtered for regex: '{{ .filter_grep_regex }}'){{ end }}:
 
     - name: "kubectl_envoy"
       description: |
@@ -569,7 +572,10 @@ mcp:
           description: "jq expression to apply to the response (optional)"
         filter_grep:
           type: string
-          description: "grep expression to apply to the response (optional)"
+          description: "grep expression to apply to the response (optional, literal text match)"
+        filter_grep_regex:
+          type: string
+          description: "grep regex pattern to apply to the response (optional)"
       constraints:
         - "ns == '' || (ns.size() <= 63 && ns.matches('^[a-z0-9]([-a-z0-9]*[a-z0-9])?$'))"  # Valid k8s namespace
         - "context == '' || context.size() <= 253"                 # Valid context name
@@ -577,6 +583,8 @@ mcp:
         - "pod_port.matches('^[0-9]+$')"                               # Port must be a number
         - "path.size() > 0"                                        # Path must not be empty
         - "path.matches('^/[^ ]+$')"                               # Path must start with a '/' and contain no spaces
+        - "filter_grep == '' || filter_grep_regex == ''"           # Only one of filter_grep or filter_grep_regex can be used
+        - "filter_jq == '' || (filter_grep == '' && filter_grep_regex == '')"  # Can't use both jq and grep filters
       run:
         command: |
 
@@ -602,9 +610,11 @@ mcp:
           # nmap -sT -p $localport localhost    # This would show that the port is open
 
           {{ if .filter_jq }}
-          curl $CURL_ARGS "http://localhost:$localport{{ .path }}" | jq '{{ .filter_jq }}'
+          curl $CURL_ARGS "http://localhost:$localport{{ .path }}" | jq '{{ .filter_jq }}' || /bin/true
           {{ else if .filter_grep }}
-          curl $CURL_ARGS "http://localhost:$localport{{ .path }}" | grep '{{ .filter_grep }}'
+          curl $CURL_ARGS "http://localhost:$localport{{ .path }}" | grep -F '{{ .filter_grep }}' || /bin/true
+          {{ else if .filter_grep_regex }}
+          curl $CURL_ARGS "http://localhost:$localport{{ .path }}" | grep -E '{{ .filter_grep_regex }}' || /bin/true
           {{ else }}
           curl $CURL_ARGS "http://localhost:$localport{{ .path }}"
           {{ end }}
@@ -627,9 +637,6 @@ mcp:
                 - "{{ env \"HOME\" }}/.kube"
                 - "{{ env \"KUBECONFIG\" }}"
           - name: firejail
-            requirements:
-              os: linux
-              executables: [firejail]
             options:
               allow_networking: true
               allow_user_folders: false
@@ -643,4 +650,4 @@ mcp:
             requirements: {}
       output:
         prefix: |
-          Envoy configuration from pod {{ .pod }}:{{ .pod_port }}{{ .path }}:
+          Envoy configuration from pod {{ .pod }}:{{ .pod_port }}{{ .path }}{{ if .filter_grep }} (filtered for literal: '{{ .filter_grep }}'){{ end }}{{ if .filter_grep_regex }} (filtered for regex: '{{ .filter_grep_regex }}'){{ end }}:

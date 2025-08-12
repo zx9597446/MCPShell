@@ -2,7 +2,8 @@
 
 # Source common utilities
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-source "$SCRIPT_DIR/common.sh"
+TESTS_ROOT="$(dirname "$SCRIPT_DIR")"
+source "$TESTS_ROOT/common/common.sh"
 
 # Configuration file for this test
 CONFIG_FILE="$SCRIPT_DIR/test_runner_docker.yaml"
@@ -33,7 +34,7 @@ separator
 info "2. Simple hello world in Docker container"
 separator
 
-CMD="$CLI_BIN --config $CONFIG_FILE exe docker_hello"
+CMD="$CLI_BIN --tools $CONFIG_FILE exe docker_hello"
 info "Executing: $CMD"
 OUTPUT=$(eval "$CMD" 2>&1)
 RESULT=$?
@@ -47,7 +48,7 @@ separator
 info "3. Environment variable passing"
 separator
 
-CMD="$CLI_BIN --config $CONFIG_FILE exe docker_with_env message=\"Hello from Docker container\""
+CMD="$CLI_BIN --tools $CONFIG_FILE exe docker_with_env message=\"Hello from Docker container\""
 info "Executing: $CMD"
 OUTPUT=$(eval "$CMD" 2>&1)
 RESULT=$?
@@ -62,7 +63,7 @@ separator
 info "4. Prepare command functionality"
 separator
 
-CMD="$CLI_BIN --config $CONFIG_FILE exe docker_with_prepare"
+CMD="$CLI_BIN --tools $CONFIG_FILE exe docker_with_prepare"
 info "Executing: $CMD"
 OUTPUT=$(eval "$CMD" 2>&1)
 RESULT=$?

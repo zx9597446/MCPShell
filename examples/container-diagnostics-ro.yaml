@@ -17,32 +17,62 @@ mcp:
             echo "Error: Docker is not installed or not in the PATH."
             exit 1
           fi
-          
+
           # Check if Docker daemon is running
           if ! docker info &> /dev/null; then
             echo "Error: Docker daemon is not running or you don't have permission to connect."
             echo "Try running 'sudo systemctl start docker' or check Docker Desktop on macOS/Windows."
             exit 1
           fi
-          
+
           echo "Docker Version:"
           docker version
-          
+
           echo -e "\nDocker Info:"
           docker info | grep -v "WARNING"
-          
+
           echo -e "\nRunning Containers:"
           docker ps --format "table {{.ID}}\t{{.Image}}\t{{.Status}}\t{{.Names}}\t{{.Ports}}"
-          
+
           echo -e "\nContainer Count:"
           echo "Running: $(docker ps -q | wc -l)"
           echo "All: $(docker ps -a -q | wc -l)"
-          
+
           echo -e "\nImages:"
           docker images --format "table {{.Repository}}:{{.Tag}}\t{{.ID}}\t{{.Size}}" | head -15
       output:
         prefix: "Docker Environment Overview:"
-
+      runners:
+        - name: sandbox-exec
+          requirements:
+            os: darwin
+            executables:
+              - sandbox-exec
+          options:
+            allow_networking: true
+            allow_user_folders: false
+            allow_read_folders:
+              - /usr/bin
+              - /usr/local/bin
+              - /bin
+              - /etc
+              - /var/run/docker.sock
+        - name: firejail
+          requirements:
+            os: linux
+            executables:
+              - firejail
+          options:
+            allow_networking: true
+            allow_user_folders: false
+            allow_read_folders:
+              - /usr/bin
+              - /usr/local/bin
+              - /bin
+              - /etc
+              - /var/run/docker.sock
+        - name: exec
+          requirements: {}
     - name: "container_stats"
       description: "Show resource usage statistics for running containers"
       params:
@@ -53,72 +83,44 @@ mcp:
           type: number
           description: "Number of stats snapshots to collect (1-5)"
       constraints:
-        - "container == '' || container.matches('^[a-zA-Z0-9_.-]+$')"   # Safe container name/ID chars
-        - "container.size() <= 64"                                      # Max container ID length
-        - "int(stats_count) == 0 || (int(stats_count) >= 1 && int(stats_count) <= 5)"  # Reasonable stats count
+        - "container == '' || container.matches('^[a-zA-Z0-9_.-]+$')" # Safe container name/ID chars
+        - "container.size() <= 64" # Max container ID length
+        - "int(stats_count) == 0 || (int(stats_count) >= 1 && int(stats_count) <= 5)" # Reasonable stats count
       run:
-        command: |
-          # Check if Docker is installed
-          if ! command -v docker &> /dev/null; then
-            echo "Error: Docker is not installed or not in the PATH."
-            exit 1
-          fi
-          
-          # Set defaults
-          STATS_COUNT=1
-          CONTAINER_FILTER=""
-          
-          if [ -n "{{ .container }}" ]; then
-            CONTAINER_FILTER="{{ .container }}"
-            
-            # Verify container exists
-            if ! docker ps -a --format "{{.Names}}:{{.ID}}" | grep -q "$CONTAINER_FILTER"; then
-              echo "Error: Container '$CONTAINER_FILTER' not found."
-              echo "Available containers:"
-              docker ps -a --format "table {{.Names}}\t{{.ID}}\t{{.Status}}"
-              exit 1
-            fi
-          fi
-          
-          if [ {{ .stats_count }} -gt 0 ]; then
-            STATS_COUNT={{ .stats_count }}
-          fi
-          
-          if [ -n "$CONTAINER_FILTER" ]; then
-            echo "Stats for container: $CONTAINER_FILTER (taking $STATS_COUNT samples)"
-            # Collect stats for specific container
-            docker stats --no-stream "$CONTAINER_FILTER"
-            
-            # If multiple stats samples requested
-            if [ $STATS_COUNT -gt 1 ]; then
-              for i in $(seq 2 $STATS_COUNT); do
-                echo -e "\nSample $i:"
-                sleep 2
-                docker stats --no-stream "$CONTAINER_FILTER"
-              done
-            fi
-            
-            echo -e "\nContainer details:"
-            docker inspect --format "{{.State.Status}}: {{.Config.Image}} (Created: {{.Created}})" "$CONTAINER_FILTER"
-            echo "Network mode: $(docker inspect --format '{{.HostConfig.NetworkMode}}' "$CONTAINER_FILTER")"
-            echo "Restart policy: $(docker inspect --format '{{.HostConfig.RestartPolicy.Name}}' "$CONTAINER_FILTER")"
-          else
-            echo "Stats for all running containers (taking $STATS_COUNT samples)"
-            # Collect stats for all containers
-            docker stats --no-stream
-            
-            # If multiple stats samples requested
-            if [ $STATS_COUNT -gt 1 ]; then
-              for i in $(seq 2 $STATS_COUNT); do
-                echo -e "\nSample $i:"
-                sleep 2
-                docker stats --no-stream
-              done
-            fi
-          fi
+        command: "# Check if Docker is installed\nif ! command -v docker &> /dev/null; then\n  echo \"Error: Docker is not installed or not in the PATH.\"\n  exit 1\nfi\n\n# Set defaults\nSTATS_COUNT=1\nCONTAINER_FILTER=\"\"\n\nif [ -n \"{{ .container }}\" ]; then\n  CONTAINER_FILTER=\"{{ .container }}\"\n  \n  # Verify container exists\n  if ! docker ps -a --format \"{{.Names}}:{{.ID}}\" | grep -q \"$CONTAINER_FILTER\"; then\n    echo \"Error: Container '$CONTAINER_FILTER' not found.\"\n    echo \"Available containers:\"\n    docker ps -a --format \"table {{.Names}}\\t{{.ID}}\\t{{.Status}}\"\n    exit 1\n  fi\nfi\n\nif [ {{ .stats_count }} -gt 0 ]; then\n  STATS_COUNT={{ .stats_count }}\nfi\n\nif [ -n \"$CONTAINER_FILTER\" ]; then\n  echo \"Stats for container: $CONTAINER_FILTER (taking $STATS_COUNT samples)\"\n  # Collect stats for specific container\n  docker stats --no-stream \"$CONTAINER_FILTER\"\n  \n  # If multiple stats samples requested\n  if [ $STATS_COUNT -gt 1 ]; then\n    for i in $(seq 2 $STATS_COUNT); do\n      echo -e \"\\nSample $i:\"\n      sleep 2\n      docker stats --no-stream \"$CONTAINER_FILTER\"\n    done\n  fi\n  \n  echo -e \"\\nContainer details:\"\n  docker inspect --format \"{{.State.Status}}: {{.Config.Image}} (Created: {{.Created}})\" \"$CONTAINER_FILTER\"\n  echo \"Network mode: $(docker inspect --format '{{.HostConfig.NetworkMode}}' \"$CONTAINER_FILTER\")\"\n  echo \"Restart policy: $(docker inspect --format '{{.HostConfig.RestartPolicy.Name}}' \"$CONTAINER_FILTER\")\"\nelse\n  echo \"Stats for all running containers (taking $STATS_COUNT samples)\"\n  # Collect stats for all containers\n  docker stats --no-stream\n  \n  # If multiple stats samples requested\n  if [ $STATS_COUNT -gt 1 ]; then\n    for i in $(seq 2 $STATS_COUNT); do\n      echo -e \"\\nSample $i:\"\n      sleep 2\n      docker stats --no-stream\n    done\n  fi\nfi\n"
       output:
         prefix: "Container Resource Usage:"
-
+      runners:
+        - name: sandbox-exec
+          requirements:
+            os: darwin
+            executables:
+              - sandbox-exec
+          options:
+            allow_networking: true
+            allow_user_folders: false
+            allow_read_folders:
+              - /usr/bin
+              - /usr/local/bin
+              - /bin
+              - /etc
+              - /var/run/docker.sock
+        - name: firejail
+          requirements:
+            os: linux
+            executables:
+              - firejail
+          options:
+            allow_networking: true
+            allow_user_folders: false
+            allow_read_folders:
+              - /usr/bin
+              - /usr/local/bin
+              - /bin
+              - /etc
+              - /var/run/docker.sock
+        - name: exec
+          requirements: {}
     - name: "container_logs"
       description: "Show logs from a container"
       params:
@@ -136,10 +138,10 @@ mcp:
           type: string
           description: "Show logs since timestamp (e.g., '10m', '1h', '2h30m')"
       constraints:
-        - "container.matches('^[a-zA-Z0-9_.-]+$')"                      # Safe container name/ID chars
-        - "container.size() <= 64"                                       # Max container ID length
-        - "int(lines) == 0 || (int(lines) >= 1 && int(lines) <= 1000)"                  # Reasonable line count
-        - "since == '' || since.matches('^[0-9]+[smhd]$|^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}$')"  # Valid time format
+        - "container.matches('^[a-zA-Z0-9_.-]+$')" # Safe container name/ID chars
+        - "container.size() <= 64" # Max container ID length
+        - "int(lines) == 0 || (int(lines) >= 1 && int(lines) <= 1000)" # Reasonable line count
+        - "since == '' || since.matches('^[0-9]+[smhd]$|^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}$')" # Valid time format
       run:
         command: |
           # Check if Docker is installed
@@ -147,16 +149,16 @@ mcp:
             echo "Error: Docker is not installed or not in the PATH."
             exit 1
           fi
-          
+
           # Set defaults
           LINES_PARAM="--tail=50"
           FOLLOW_PARAM=""
           SINCE_PARAM=""
-          
+
           if [ {{ .lines }} -gt 0 ]; then
             LINES_PARAM="--tail={{ .lines }}"
           fi
-          
+
           if [ "{{ .follow }}" = "true" ]; then
             # Limit follow to 30 seconds max to prevent hanging
             FOLLOW_PARAM="--follow"
@@ -172,11 +174,11 @@ mcp:
               fi
             fi
           fi
-          
+
           if [ -n "{{ .since }}" ]; then
             SINCE_PARAM="--since={{ .since }}"
           fi
-          
+
           # Verify container exists
           if ! docker ps -a --format "{{.Names}}:{{.ID}}" | grep -q "{{ .container }}"; then
             echo "Error: Container '{{ .container }}' not found."
@@ -184,22 +186,51 @@ mcp:
             docker ps -a --format "table {{.Names}}\t{{.ID}}\t{{.Status}}"
             exit 1
           fi
-          
+
           echo "Container: {{ .container }}"
           echo "Status: $(docker inspect --format '{{.State.Status}}' {{ .container }})"
           echo "Created: $(docker inspect --format '{{.Created}}' {{ .container }})"
           echo "Image: $(docker inspect --format '{{.Config.Image}}' {{ .container }})"
           echo -e "Displaying logs with params: $LINES_PARAM $FOLLOW_PARAM $SINCE_PARAM\n"
-          
+
           if [ -n "$FOLLOW_PARAM" ] && [ -n "$timeout_cmd" ]; then
             $timeout_cmd docker logs $LINES_PARAM $FOLLOW_PARAM $SINCE_PARAM {{ .container }}
           else
             docker logs $LINES_PARAM $FOLLOW_PARAM $SINCE_PARAM {{ .container }}
           fi
-          
       output:
         prefix: "Container Logs for {{ .container }}:"
-
+      runners:
+        - name: sandbox-exec
+          requirements:
+            os: darwin
+            executables:
+              - sandbox-exec
+          options:
+            allow_networking: true
+            allow_user_folders: false
+            allow_read_folders:
+              - /usr/bin
+              - /usr/local/bin
+              - /bin
+              - /etc
+              - /var/run/docker.sock
+        - name: firejail
+          requirements:
+            os: linux
+            executables:
+              - firejail
+          options:
+            allow_networking: true
+            allow_user_folders: false
+            allow_read_folders:
+              - /usr/bin
+              - /usr/local/bin
+              - /bin
+              - /etc
+              - /var/run/docker.sock
+        - name: exec
+          requirements: {}
     - name: "container_inspect"
       description: "Show detailed information about a container"
       params:
@@ -214,71 +245,44 @@ mcp:
           type: string
           description: "JQ filter to apply to the output"
       constraints:
-        - "container.matches('^[a-zA-Z0-9_.-]+$')"                      # Safe container name/ID chars
-        - "container.size() <= 64"                                       # Max container ID length
-        - "format == '' || ['full', 'network', 'mounts', 'env', 'config'].exists(f, f == format)"  # Valid formats
+        - "container.matches('^[a-zA-Z0-9_.-]+$')" # Safe container name/ID chars
+        - "container.size() <= 64" # Max container ID length
+        - "format == '' || ['full', 'network', 'mounts', 'env', 'config'].exists(f, f == format)" # Valid formats
       run:
-        command: |
-          # Check if Docker is installed
-          if ! command -v docker &> /dev/null; then
-            echo "Error: Docker is not installed or not in the PATH."
-            exit 1
-          fi
-          
-          # Set default format
-          FORMAT="{{ .format }}"
-          if [ -z "$FORMAT" ]; then
-            FORMAT="full"
-          fi
-          
-          # Verify container exists
-          if ! docker ps -a --format "{{.Names}}:{{.ID}}" | grep -q "{{ .container }}"; then
-            echo "Error: Container '{{ .container }}' not found."
-            echo "Available containers:"
-            docker ps -a --format "table {{.Names}}\t{{.ID}}\t{{.Status}}"
-            exit 1
-          fi
-          
-          echo "Container: {{ .container }}"
-          
-          case "$FORMAT" in
-            "network")
-              echo -e "\nNetwork Configuration:"
-              docker inspect --format '{{json .NetworkSettings}}' {{ .container }} | jq '{{ .jq_filter }}'
-              
-              echo -e "\nNetwork Mode:"
-              docker inspect --format '{{.HostConfig.NetworkMode}}' {{ .container }}
-              
-              echo -e "\nPorts:"
-              docker inspect --format '{{json .NetworkSettings.Ports}}' {{ .container }} | jq '{{ .jq_filter }}'
-              ;;
-              
-            "mounts")
-              echo -e "\nVolumes and Mounts:"
-              docker inspect --format '{{json .Mounts}}' {{ .container }} | jq '{{ .jq_filter }}'
-              
-              echo -e "\nVolume Configuration:"
-              docker inspect --format '{{json .Config.Volumes}}' {{ .container }} | jq '{{ .jq_filter }}'
-              ;;
-              
-            "env")
-              echo -e "\nEnvironment Variables:"
-              docker inspect --format '{{range .Config.Env}}{{println .}}{{end}}' {{ .container }}
-              ;;
-              
-            "config")
-              echo -e "\nContainer Configuration:"
-              docker inspect --format '{{json .Config}}' {{ .container }} | jq '{{ .jq_filter }}'
-              ;;
-              
-            "full"|*)
-              echo -e "\nFull Container Inspection (may be lengthy):"
-              docker inspect {{ .container }} | jq '{{ .jq_filter }}'
-              ;;
-          esac
+        command: "# Check if Docker is installed\nif ! command -v docker &> /dev/null; then\n  echo \"Error: Docker is not installed or not in the PATH.\"\n  exit 1\nfi\n\n# Set default format\nFORMAT=\"{{ .format }}\"\nif [ -z \"$FORMAT\" ]; then\n  FORMAT=\"full\"\nfi\n\n# Verify container exists\nif ! docker ps -a --format \"{{.Names}}:{{.ID}}\" | grep -q \"{{ .container }}\"; then\n  echo \"Error: Container '{{ .container }}' not found.\"\n  echo \"Available containers:\"\n  docker ps -a --format \"table {{.Names}}\\t{{.ID}}\\t{{.Status}}\"\n  exit 1\nfi\n\necho \"Container: {{ .container }}\"\n\ncase \"$FORMAT\" in\n  \"network\")\n    echo -e \"\\nNetwork Configuration:\"\n    docker inspect --format '{{json .NetworkSettings}}' {{ .container }} | jq '{{ .jq_filter }}'\n    \n    echo -e \"\\nNetwork Mode:\"\n    docker inspect --format '{{.HostConfig.NetworkMode}}' {{ .container }}\n    \n    echo -e \"\\nPorts:\"\n    docker inspect --format '{{json .NetworkSettings.Ports}}' {{ .container }} | jq '{{ .jq_filter }}'\n    ;;\n    \n  \"mounts\")\n    echo -e \"\\nVolumes and Mounts:\"\n    docker inspect --format '{{json .Mounts}}' {{ .container }} | jq '{{ .jq_filter }}'\n    \n    echo -e \"\\nVolume Configuration:\"\n    docker inspect --format '{{json .Config.Volumes}}' {{ .container }} | jq '{{ .jq_filter }}'\n    ;;\n    \n  \"env\")\n    echo -e \"\\nEnvironment Variables:\"\n    docker inspect --format '{{range .Config.Env}}{{println .}}{{end}}' {{ .container }}\n    ;;\n    \n  \"config\")\n    echo -e \"\\nContainer Configuration:\"\n    docker inspect --format '{{json .Config}}' {{ .container }} | jq '{{ .jq_filter }}'\n    ;;\n    \n  \"full\"|*)\n    echo -e \"\\nFull Container Inspection (may be lengthy):\"\n    docker inspect {{ .container }} | jq '{{ .jq_filter }}'\n    ;;\nesac\n"
       output:
         prefix: "Container Inspection for {{ .container }}:"
-
+      runners:
+        - name: sandbox-exec
+          requirements:
+            os: darwin
+            executables:
+              - sandbox-exec
+          options:
+            allow_networking: true
+            allow_user_folders: false
+            allow_read_folders:
+              - /usr/bin
+              - /usr/local/bin
+              - /bin
+              - /etc
+              - /var/run/docker.sock
+        - name: firejail
+          requirements:
+            os: linux
+            executables:
+              - firejail
+          options:
+            allow_networking: true
+            allow_user_folders: false
+            allow_read_folders:
+              - /usr/bin
+              - /usr/local/bin
+              - /bin
+              - /etc
+              - /var/run/docker.sock
+        - name: exec
+          requirements: {}
     - name: "docker_networks"
       description: "Show Docker network configuration and connected containers"
       params:
@@ -286,43 +290,43 @@ mcp:
           type: string
           description: "Network name or ID (optional, shows all if not specified)"
       constraints:
-        - "network == '' || network.matches('^[a-zA-Z0-9_.-]+$')"       # Safe network name/ID chars
-        - "network.size() <= 64"                                         # Reasonable network name length
+        - "network == '' || network.matches('^[a-zA-Z0-9_.-]+$')" # Safe network name/ID chars
+        - "network.size() <= 64" # Reasonable network name length
       run:
-        command: |
-          # Check if Docker is installed
-          if ! command -v docker &> /dev/null; then
-            echo "Error: Docker is not installed or not in the PATH."
-            exit 1
-          fi
-          
-          if [ -n "{{ .network }}" ]; then
-            # Verify network exists
-            if ! docker network ls --format "{{.Name}}:{{.ID}}" | grep -q "{{ .network }}"; then
-              echo "Error: Network '{{ .network }}' not found."
-              echo "Available networks:"
-              docker network ls
-              exit 1
-            fi
-            
-            echo "Network details for: {{ .network }}"
-            docker network inspect {{ .network }}
-          else
-            echo "Available Docker networks:"
-            docker network ls
-            
-            echo -e "\nNetworks with connected containers:"
-            for net in $(docker network ls --format "{{.Name}}"); do
-              container_count=$(docker network inspect $net --format '{{len .Containers}}')
-              if [ "$container_count" -gt 0 ]; then
-                echo -e "\nNetwork: $net (Containers: $container_count)"
-                docker network inspect $net --format '{{range $id, $container := .Containers}}{{printf "- %s (%s)\n" $container.Name $id}}{{end}}'
-              fi
-            done
-          fi
+        command: "# Check if Docker is installed\nif ! command -v docker &> /dev/null; then\n  echo \"Error: Docker is not installed or not in the PATH.\"\n  exit 1\nfi\n\nif [ -n \"{{ .network }}\" ]; then\n  # Verify network exists\n  if ! docker network ls --format \"{{.Name}}:{{.ID}}\" | grep -q \"{{ .network }}\"; then\n    echo \"Error: Network '{{ .network }}' not found.\"\n    echo \"Available networks:\"\n    docker network ls\n    exit 1\n  fi\n  \n  echo \"Network details for: {{ .network }}\"\n  docker network inspect {{ .network }}\nelse\n  echo \"Available Docker networks:\"\n  docker network ls\n  \n  echo -e \"\\nNetworks with connected containers:\"\n  for net in $(docker network ls --format \"{{.Name}}\"); do\n    container_count=$(docker network inspect $net --format '{{len .Containers}}')\n    if [ \"$container_count\" -gt 0 ]; then\n      echo -e \"\\nNetwork: $net (Containers: $container_count)\"\n      docker network inspect $net --format '{{range $id, $container := .Containers}}{{printf \"- %s (%s)\\n\" $container.Name $id}}{{end}}'\n    fi\n  done\nfi\n"
       output:
         prefix: "Docker Network Configuration:"
-
+      runners:
+        - name: sandbox-exec
+          requirements:
+            os: darwin
+            executables:
+              - sandbox-exec
+          options:
+            allow_networking: true
+            allow_user_folders: false
+            allow_read_folders:
+              - /usr/bin
+              - /usr/local/bin
+              - /bin
+              - /etc
+              - /var/run/docker.sock
+        - name: firejail
+          requirements:
+            os: linux
+            executables:
+              - firejail
+          options:
+            allow_networking: true
+            allow_user_folders: false
+            allow_read_folders:
+              - /usr/bin
+              - /usr/local/bin
+              - /bin
+              - /etc
+              - /var/run/docker.sock
+        - name: exec
+          requirements: {}
     - name: "docker_volumes"
       description: "Show Docker volume information and usage"
       params:
@@ -330,54 +334,40 @@ mcp:
           type: string
           description: "Volume name or ID (optional, shows all if not specified)"
       constraints:
-        - "volume == '' || volume.matches('^[a-zA-Z0-9_.-]+$')"       # Safe volume name/ID chars
-        - "volume.size() <= 64"                                        # Reasonable volume name length
+        - "volume == '' || volume.matches('^[a-zA-Z0-9_.-]+$')" # Safe volume name/ID chars
+        - "volume.size() <= 64" # Reasonable volume name length
       run:
-        command: |
-          # Check if Docker is installed
-          if ! command -v docker &> /dev/null; then
-            echo "Error: Docker is not installed or not in the PATH."
-            exit 1
-          fi
-          
-          if [ -n "{{ .volume }}" ]; then
-            # Verify volume exists
-            if ! docker volume ls --format "{{.Name}}:{{.Driver}}" | grep -q "{{ .volume }}"; then
-              echo "Error: Volume '{{ .volume }}' not found."
-              echo "Available volumes:"
-              docker volume ls
-              exit 1
-            fi
-            
-            echo "Volume details for: {{ .volume }}"
-            docker volume inspect {{ .volume }}
-            
-            # Find containers using this volume
-            echo -e "\nContainers using this volume:"
-            found=false
-            for container in $(docker ps -a --format "{{.Names}}"); do
-              if docker inspect --format '{{range .Mounts}}{{if and (eq .Type "volume") (eq .Name "{{ .volume }}")}}{{$.Name}}{{end}}{{end}}' "$container" | grep -q .; then
-                echo "- $container"
-                found=true
-              fi
-            done
-            
-            if ! $found; then
-              echo "No containers currently using this volume."
-            fi
-          else
-            echo "Available Docker volumes:"
-            docker volume ls
-            
-            echo -e "\nVolume details:"
-            for vol in $(docker volume ls --format "{{.Name}}" | head -5); do
-              echo -e "\nVolume: $vol"
-              docker volume inspect $vol
-            done
-            
-            if [ "$(docker volume ls -q | wc -l)" -gt 5 ]; then
-              echo -e "\n(Only showing first 5 volumes. Specify a volume name for details on a specific volume.)"
-            fi
-          fi
+        command: "# Check if Docker is installed\nif ! command -v docker &> /dev/null; then\n  echo \"Error: Docker is not installed or not in the PATH.\"\n  exit 1\nfi\n\nif [ -n \"{{ .volume }}\" ]; then\n  # Verify volume exists\n  if ! docker volume ls --format \"{{.Name}}:{{.Driver}}\" | grep -q \"{{ .volume }}\"; then\n    echo \"Error: Volume '{{ .volume }}' not found.\"\n    echo \"Available volumes:\"\n    docker volume ls\n    exit 1\n  fi\n  \n  echo \"Volume details for: {{ .volume }}\"\n  docker volume inspect {{ .volume }}\n  \n  # Find containers using this volume\n  echo -e \"\\nContainers using this volume:\"\n  found=false\n  for container in $(docker ps -a --format \"{{.Names}}\"); do\n    if docker inspect --format '{{range .Mounts}}{{if and (eq .Type \"volume\") (eq .Name \"{{ .volume }}\")}}{{$.Name}}{{end}}{{end}}' \"$container\" | grep -q .; then\n      echo \"- $container\"\n      found=true\n    fi\n  done\n  \n  if ! $found; then\n    echo \"No containers currently using this volume.\"\n  fi\nelse\n  echo \"Available Docker volumes:\"\n  docker volume ls\n  \n  echo -e \"\\nVolume details:\"\n  for vol in $(docker volume ls --format \"{{.Name}}\" | head -5); do\n    echo -e \"\\nVolume: $vol\"\n    docker volume inspect $vol\n  done\n  \n  if [ \"$(docker volume ls -q | wc -l)\" -gt 5 ]; then\n    echo -e \"\\n(Only showing first 5 volumes. Specify a volume name for details on a specific volume.)\"\n  fi\nfi\n"
       output:
-        prefix: "Docker Volume Information:" 
+        prefix: "Docker Volume Information:"
+      runners:
+        - name: sandbox-exec
+          requirements:
+            os: darwin
+            executables:
+              - sandbox-exec
+          options:
+            allow_networking: true
+            allow_user_folders: false
+            allow_read_folders:
+              - /usr/bin
+              - /usr/local/bin
+              - /bin
+              - /etc
+              - /var/run/docker.sock
+        - name: firejail
+          requirements:
+            os: linux
+            executables:
+              - firejail
+          options:
+            allow_networking: true
+            allow_user_folders: false
+            allow_read_folders:
+              - /usr/bin
+              - /usr/local/bin
+              - /bin
+              - /etc
+              - /var/run/docker.sock
+        - name: exec
+          requirements: {}

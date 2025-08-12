@@ -73,13 +73,18 @@ Example constraint approach:
 }
 ```
 
-### 4. Run with Minimal Privileges
+### 4. Use the Restricted _runners_
+
+- Use one of the restricted [runners](config-runners.md)
+- Limit the directories and files the runner can access.
+
+### 5. Run with Minimal Privileges
 
 - Run the adapter with the least privileges necessary
 - Create a dedicated user account with limited permissions
 - Use containerization when possible to isolate execution
 
-### 5. Audit and Monitor
+### 6. Audit and Monitor
 
 - Log all commands executed by the LLM
 - Regularly review logs for suspicious activity

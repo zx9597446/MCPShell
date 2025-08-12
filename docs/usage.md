@@ -21,7 +21,11 @@ MCPShell provides the following commands:
 
 This is the list of argument that are common to all the commands:
 
-- `--config`, `-c` (required): Path to the YAML configuration file, URL, or directory containing YAML files
+- `--tools` (required): Path to the tools configuration input. It can be:
+  - an absolute or relative filename to a YAML config
+  - a directory (all `.yaml`/`.yml` files will be merged)
+  - an `http(s)://` URL to a YAML config
+  - a bare name found under the tools directory (auto-appends `.yaml`)
 - `--logfile`, `-l`: Path to the log file (optional)
 - `--log-level`: Log level: none, error, info, debug (default: "info")
 - `--description-override`: override the description found in the config file.
@@ -34,20 +38,26 @@ This is the list of argument that are common to all the commands:
   `--description-file https://example.com/description.txt`). It follows the same behaviour of
   `--description`, where the final description is the result of the concatenation of all of them
 
-**Configuration Loading**:
+### Tools Directory
 
-The `--config` flag supports three types of inputs:
+MCPShell looks for tools files in a dedicated directory:
+- Default: `~/.mcpshell/tools/`
+- Override with: `MCPSHELL_TOOLS_DIR` environment variable
 
-1. **Single YAML file**: `--config=examples/config.yaml`
-2. **URL**: `--config=https://example.com/config.yaml`
-3. **Directory**: `--config=./configs/` - loads all `.yaml` and `.yml` files in the directory
+When using relative paths with `--tools`, the file is searched in this directory.
+If no extension is provided, `.yaml` is automatically appended.
 
-When loading from a directory, MCPShell will:
-- Scan the directory recursively for YAML files
-- Merge all found configurations into a single configuration
-- Use the description and run settings from the first file
-- Combine all tools from all files
-- Concatenate all prompts from all files
+Examples:
+```console
+# Using a file in the tools directory (adds .yaml automatically)
+mcpshell mcp --tools mytools
+
+# Using a file in the tools directory with extension  
+mcpshell mcp --tools mytools.yaml
+
+# Using an absolute path
+mcpshell mcp --tools /path/to/your/tools.yaml
+```
   
 For example, imagine you want to use the [kubectl](../examples/kubectl-ro.yaml) toolkit,
 but you want to add some additional instructions specific to your infrastructure,
@@ -55,7 +65,7 @@ you could do:
 
 ```console
 mcpshell mcp \
-    --configfile example/kubectl-ro.yaml \
+    --tools example/kubectl-ro.yaml \
     --description "Monitoring namespace is called 'monitoring'"
     --description "Envoy is running in namespace 'envoy'"
 ```
@@ -65,7 +75,7 @@ like:
 
 ```console
 # Combine multiple descriptions from different sources
-mcpshell mcp --config=examples/config.yaml \
+mcpshell mcp --tools=examples/config.yaml \
   --description "Primary server description" \
   --description "Additional information" \
   --description-file docs/intro.txt \
@@ -97,7 +107,7 @@ Runs an MCP server that communicates using the Model Context Protocol and expose
 **Example**:
 
 ```console
-mcpshell mcp --config=examples/config.yaml --http --port=9090 --log-level=debug
+mcpshell mcp --tools=examples/config.yaml --log-level=debug
 ```
 
 ### EXE Command
@@ -116,7 +126,7 @@ Directly executes a MCP tool with the specified parameters. This command is usef
 **Example**:
 
 ```console
-mcpshell exe --config=examples/config.yaml "hello_world" "name=John"
+mcpshell exe --tools=examples/config.yaml "hello_world" "name=John"
 ```
 
 ### Validate Command
@@ -136,7 +146,7 @@ Validates an MCP configuration file without starting the server. It checks for e
 **Example**:
 
 ```console
-mcpshell validate --config=examples/config.yaml
+mcpshell validate --tools=examples/config.yaml
 ```
 
 ### Agent Command

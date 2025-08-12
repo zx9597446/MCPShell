@@ -16,7 +16,7 @@ mcp:
           echo "Kernel: $(uname -r)"
           echo "Uptime: $(uptime)"
           echo ""
-          
+
           echo "CPU Information:"
           if [[ "$(uname)" == "Darwin" ]]; then
             # MacOS
@@ -30,7 +30,7 @@ mcp:
             top -bn1 | grep "Cpu(s)" | sed "s/.,%//"
           fi
           echo ""
-          
+
           echo "Memory Information:"
           if [[ "$(uname)" == "Darwin" ]]; then
             # MacOS
@@ -40,12 +40,36 @@ mcp:
             free -h
           fi
           echo ""
-          
+
           echo "Disk Usage:"
           df -h | grep -v "tmp"
       output:
         prefix: "System Performance Overview:"
-
+      runners:
+        - name: sandbox-exec
+          options:
+            allow_networking: true
+            allow_user_folders: false
+            allow_read_folders:
+              - /usr/bin
+              - /usr/local/bin
+              - /bin
+              - /etc
+              - /proc
+              - /sys
+        - name: firejail
+          options:
+            allow_networking: true
+            allow_user_folders: false
+            allow_read_folders:
+              - /usr/bin
+              - /usr/local/bin
+              - /bin
+              - /etc
+              - /proc
+              - /sys
+        - name: exec
+          requirements: {}
     - name: "cpu_load"
       description: "Show detailed CPU load and utilization statistics"
       params:
@@ -53,28 +77,28 @@ mcp:
           type: number
           description: "Number of samples to take (1-10)"
         delay:
-          type: number 
+          type: number
           description: "Delay between samples in seconds (1-5)"
       constraints:
-        - "int(samples) == 0 || (int(samples) >= 1 && int(samples) <= 10)"   # 1-10 samples
-        - "int(delay) == 0 || (int(delay) >= 1 && int(delay) <= 5)"          # 1-5 second delay
+        - "int(samples) == 0 || (int(samples) >= 1 && int(samples) <= 10)" # 1-10 samples
+        - "int(delay) == 0 || (int(delay) >= 1 && int(delay) <= 5)" # 1-5 second delay
       run:
         command: |
           # Set default values if not specified
           SAMPLES=3
           DELAY=2
-          
+
           if [ {{ .samples }} -gt 0 ]; then
             SAMPLES={{ .samples }}
           fi
-          
+
           if [ {{ .delay }} -gt 0 ]; then
             DELAY={{ .delay }}
           fi
-          
+
           echo "Taking $SAMPLES CPU samples with ${DELAY}s delay..."
           echo ""
-          
+
           if [[ "$(uname)" == "Darwin" ]]; then
             # MacOS
             for i in $(seq 1 $SAMPLES); do
@@ -85,13 +109,13 @@ mcp:
                 echo ""
               fi
             done
-            
+
             echo ""
             echo "CPU Info:"
             sysctl -n machdep.cpu.brand_string
             sysctl -n hw.physicalcpu
             sysctl -n hw.logicalcpu
-            
+
           else
             # Linux
             for i in $(seq 1 $SAMPLES); do
@@ -102,11 +126,11 @@ mcp:
                 echo ""
               fi
             done
-            
+
             echo ""
             echo "Load averages (1, 5, 15 min):"
             cat /proc/loadavg
-            
+
             echo ""
             echo "CPU Info:"
             grep "model name" /proc/cpuinfo | head -1
@@ -114,47 +138,62 @@ mcp:
           fi
       output:
         prefix: "CPU Load Analysis:"
-
+      runners:
+        - name: sandbox-exec
+          options:
+            allow_networking: true
+            allow_user_folders: false
+            allow_read_folders:
+              - /usr/bin
+              - /usr/local/bin
+              - /bin
+              - /etc
+              - /proc
+              - /sys
+        - name: firejail
+          options:
+            allow_networking: true
+            allow_user_folders: false
+            allow_read_folders:
+              - /usr/bin
+              - /usr/local/bin
+              - /bin
+              - /etc
+              - /proc
+              - /sys
+        - name: exec
+          requirements: {}
     - name: "memory_stats"
       description: "Show detailed memory usage statistics"
       run:
-        command: |
-          if [[ "$(uname)" == "Darwin" ]]; then
-            # MacOS
-            echo "Memory Usage Summary:"
-            vm_stat | perl -ne '/page size of (\d+)/ and $size=$1; /Pages free: (\d+)/ and print "Free Memory: " . $1 * $size / 1048576 . " MB\n"; /Pages active: (\d+)/ and print "Active Memory: " . $1 * $size / 1048576 . " MB\n"; /Pages inactive: (\d+)/ and print "Inactive Memory: " . $1 * $size / 1048576 . " MB\n"; /Pages speculative: (\d+)/ and print "Speculative Memory: " . $1 * $size / 1048576 . " MB\n"; /Pages wired down: (\d+)/ and print "Wired Memory: " . $1 * $size / 1048576 . " MB\n";'
-            
-            echo ""
-            echo "Memory Pressure:"
-            memory_pressure
-            
-            echo ""
-            echo "Top Memory Processes:"
-            top -l 1 -o MEM -n 5 | head -n 12
-          else
-            # Linux
-            echo "Memory Usage Summary:"
-            free -h
-            
-            echo ""
-            echo "Memory Details:"
-            cat /proc/meminfo | head -15
-            
-            echo ""
-            echo "Swap Usage:"
-            swapon --show
-            
-            echo ""
-            echo "Top Memory Processes:"
-            ps aux --sort=-%mem | head -6
-            
-            echo ""
-            echo "Memory Caches:"
-            echo "Buffer/Cache usage: $(free | grep Mem | awk '{print $6}') bytes"
-          fi
+        command: "if [[ \"$(uname)\" == \"Darwin\" ]]; then\n  # MacOS\n  echo \"Memory Usage Summary:\"\n  vm_stat | perl -ne '/page size of (\\d+)/ and $size=$1; /Pages free: (\\d+)/ and print \"Free Memory: \" . $1 * $size / 1048576 . \" MB\\n\"; /Pages active: (\\d+)/ and print \"Active Memory: \" . $1 * $size / 1048576 . \" MB\\n\"; /Pages inactive: (\\d+)/ and print \"Inactive Memory: \" . $1 * $size / 1048576 . \" MB\\n\"; /Pages speculative: (\\d+)/ and print \"Speculative Memory: \" . $1 * $size / 1048576 . \" MB\\n\"; /Pages wired down: (\\d+)/ and print \"Wired Memory: \" . $1 * $size / 1048576 . \" MB\\n\";'\n  \n  echo \"\"\n  echo \"Memory Pressure:\"\n  memory_pressure\n  \n  echo \"\"\n  echo \"Top Memory Processes:\"\n  top -l 1 -o MEM -n 5 | head -n 12\nelse\n  # Linux\n  echo \"Memory Usage Summary:\"\n  free -h\n  \n  echo \"\"\n  echo \"Memory Details:\"\n  cat /proc/meminfo | head -15\n  \n  echo \"\"\n  echo \"Swap Usage:\"\n  swapon --show\n  \n  echo \"\"\n  echo \"Top Memory Processes:\"\n  ps aux --sort=-%mem | head -6\n  \n  echo \"\"\n  echo \"Memory Caches:\"\n  echo \"Buffer/Cache usage: $(free | grep Mem | awk '{print $6}') bytes\"\nfi\n"
       output:
         prefix: "Memory Usage Analysis:"
-
+      runners:
+        - name: sandbox-exec
+          options:
+            allow_networking: true
+            allow_user_folders: false
+            allow_read_folders:
+              - /usr/bin
+              - /usr/local/bin
+              - /bin
+              - /etc
+              - /proc
+              - /sys
+        - name: firejail
+          options:
+            allow_networking: true
+            allow_user_folders: false
+            allow_read_folders:
+              - /usr/bin
+              - /usr/local/bin
+              - /bin
+              - /etc
+              - /proc
+              - /sys
+        - name: exec
+          requirements: {}
     - name: "disk_io_stats"
       description: "Show detailed disk I/O statistics"
       params:
@@ -162,28 +201,28 @@ mcp:
           type: number
           description: "Number of samples to take (1-5)"
         delay:
-          type: number 
+          type: number
           description: "Delay between samples in seconds (1-5)"
       constraints:
-        - "int(samples) == 0 || (int(samples) >= 1 && int(samples) <= 5)"    # 1-5 samples
-        - "int(delay) == 0 || (int(delay) >= 1 && int(delay) <= 5)"          # 1-5 second delay
+        - "int(samples) == 0 || (int(samples) >= 1 && int(samples) <= 5)" # 1-5 samples
+        - "int(delay) == 0 || (int(delay) >= 1 && int(delay) <= 5)" # 1-5 second delay
       run:
         command: |
           # Set default values if not specified
           SAMPLES=2
           DELAY=3
-          
+
           if [ {{ .samples }} -gt 0 ]; then
             SAMPLES={{ .samples }}
           fi
-          
+
           if [ {{ .delay }} -gt 0 ]; then
             DELAY={{ .delay }}
           fi
-          
+
           echo "Taking $SAMPLES disk I/O samples with ${DELAY}s delay..."
           echo ""
-          
+
           if [[ "$(uname)" == "Darwin" ]]; then
             # MacOS
             echo "Disk I/O Statistics:"
@@ -195,7 +234,7 @@ mcp:
                 echo ""
               fi
             done
-            
+
             echo ""
             echo "Filesystem Status:"
             df -h
@@ -210,21 +249,45 @@ mcp:
                 echo ""
               fi
             done
-            
+
             echo ""
             echo "Current I/O Operations:"
             for disk in $(lsblk -d -o NAME | grep -v NAME); do
               echo "Disk: $disk"
               cat /proc/diskstats | grep $disk
             done
-            
+
             echo ""
             echo "Filesystem Status:"
             df -h
           fi
       output:
         prefix: "Disk I/O Performance Analysis:"
-      
+      runners:
+        - name: sandbox-exec
+          options:
+            allow_networking: true
+            allow_user_folders: false
+            allow_read_folders:
+              - /usr/bin
+              - /usr/local/bin
+              - /bin
+              - /etc
+              - /proc
+              - /sys
+        - name: firejail
+          options:
+            allow_networking: true
+            allow_user_folders: false
+            allow_read_folders:
+              - /usr/bin
+              - /usr/local/bin
+              - /bin
+              - /etc
+              - /proc
+              - /sys
+        - name: exec
+          requirements: {}
     - name: "network_stats"
       description: "Show detailed network usage statistics"
       params:
@@ -235,18 +298,18 @@ mcp:
           type: number
           description: "Number of samples to take (1-5)"
       constraints:
-        - "interface.matches(\"^[a-zA-Z0-9_:.\\\\-]+$\")"                # Valid interface name
-        - "interface.size() <= 15"                                   # Reasonable length
-        - "int(samples) == 0 || (int(samples) >= 1 && int(samples) <= 5)"           # 1-5 samples
+        - "interface.matches(\"^[a-zA-Z0-9_:.\\\\-]+$\")" # Valid interface name
+        - "interface.size() <= 15" # Reasonable length
+        - "int(samples) == 0 || (int(samples) >= 1 && int(samples) <= 5)" # 1-5 samples
       run:
         command: |
           # Set default values if not specified
           SAMPLES=2
-          
+
           if [ {{ .samples }} -gt 0 ]; then
             SAMPLES={{ .samples }}
           fi
-          
+
           # Get default interface if none specified
           INTERFACE=""
           if [ -n "{{ .interface }}" ]; then
@@ -260,20 +323,20 @@ mcp:
               INTERFACE=$(ip route show default | grep -o "dev [^ ]*" | awk '{print $2}')
             fi
           fi
-          
+
           echo "Network interface: $INTERFACE"
           echo ""
-          
+
           if [[ "$(uname)" == "Darwin" ]]; then
             # MacOS
             echo "Interface details:"
             ifconfig $INTERFACE
-            
+
             echo ""
             echo "Network statistics:"
             netstat -i | head -2
             netstat -i | grep $INTERFACE
-            
+
             echo ""
             echo "Connection statistics:"
             netstat -na | grep "tcp4\\|tcp6" | awk '{print $6}' | sort | uniq -c | sort -rn
@@ -281,7 +344,7 @@ mcp:
             # Linux
             echo "Interface details:"
             ip addr show $INTERFACE
-            
+
             echo ""
             echo "Network statistics:"
             for i in $(seq 1 $SAMPLES); do
@@ -292,12 +355,12 @@ mcp:
                 echo ""
               fi
             done
-            
+
             echo ""
             echo "Connection statistics:"
             ss -tan | awk '{print $1}' | sort | uniq -c | sort -rn
           fi
-          
+
           echo ""
           echo "Active connections:"
           if [[ "$(uname)" == "Darwin" ]]; then
@@ -309,7 +372,31 @@ mcp:
           fi
       output:
         prefix: "Network Performance Analysis:"
-
+      runners:
+        - name: sandbox-exec
+          options:
+            allow_networking: true
+            allow_user_folders: false
+            allow_read_folders:
+              - /usr/bin
+              - /usr/local/bin
+              - /bin
+              - /etc
+              - /proc
+              - /sys
+        - name: firejail
+          options:
+            allow_networking: true
+            allow_user_folders: false
+            allow_read_folders:
+              - /usr/bin
+              - /usr/local/bin
+              - /bin
+              - /etc
+              - /proc
+              - /sys
+        - name: exec
+          requirements: {}
     - name: "process_stats"
       description: "Show stats for top processes by CPU, memory, or both"
       params:
@@ -327,28 +414,28 @@ mcp:
           # Set default values if not specified
           SORT="cpu"
           COUNT=10
-          
+
           if [ -n "{{ .sort_by }}" ]; then
             SORT="{{ .sort_by }}"
           fi
-          
+
           if [ {{ .count }} -gt 0 ]; then
             COUNT={{ .count }}
           fi
-          
+
           if [[ "$(uname)" == "Darwin" ]]; then
             # MacOS
             if [ "$SORT" == "cpu" ] || [ "$SORT" == "both" ]; then
               echo "Top $COUNT processes by CPU usage:"
               ps -Ao pid,user,comm,%cpu,%mem -r | head -n $(($COUNT + 1))
             fi
-            
+
             if [ "$SORT" == "memory" ] || [ "$SORT" == "both" ]; then
               echo ""
               echo "Top $COUNT processes by memory usage:"
               ps -Ao pid,user,comm,%cpu,%mem -m | head -n $(($COUNT + 1))
             fi
-            
+
             echo ""
             echo "Process counts by user:"
             ps -Ao user | sort | uniq -c | sort -r
@@ -358,16 +445,41 @@ mcp:
               echo "Top $COUNT processes by CPU usage:"
               ps -Ao pid,user,comm,%cpu,%mem --sort=-%cpu | head -n $(($COUNT + 1))
             fi
-            
+
             if [ "$SORT" == "memory" ] || [ "$SORT" == "both" ]; then
               echo ""
               echo "Top $COUNT processes by memory usage:"
               ps -Ao pid,user,comm,%cpu,%mem --sort=-%mem | head -n $(($COUNT + 1))
             fi
-            
+
             echo ""
             echo "Process counts by user:"
             ps -Ao user | sort | uniq -c | sort -r
           fi
       output:
-        prefix: "Process Statistics:" 
+        prefix: "Process Statistics:"
+      runners:
+        - name: sandbox-exec
+          options:
+            allow_networking: true
+            allow_user_folders: false
+            allow_read_folders:
+              - /usr/bin
+              - /usr/local/bin
+              - /bin
+              - /etc
+              - /proc
+              - /sys
+        - name: firejail
+          options:
+            allow_networking: true
+            allow_user_folders: false
+            allow_read_folders:
+              - /usr/bin
+              - /usr/local/bin
+              - /bin
+              - /etc
+              - /proc
+              - /sys
+        - name: exec
+          requirements: {}

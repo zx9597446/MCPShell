@@ -15,10 +15,10 @@ import (
 	"github.com/inercia/MCPShell/pkg/common"
 )
 
-// Config represents the top-level configuration structure for the application.
-type Config struct {
-	// Prompts is a list of prompts that will be provided to clients
-	Prompts []Prompts `yaml:"prompts,omitempty"`
+// ToolsConfig represents the top-level configuration structure for the application.
+type ToolsConfig struct {
+	// Prompts is a prompt configuration that will be provided to clients
+	Prompts common.PromptsConfig `yaml:"prompts,omitempty"`
 
 	// MCP contains the configuration specific to the MCP server and tools
 	MCP MCPConfig `yaml:"mcp"`
@@ -34,15 +34,6 @@ type MCPConfig struct {
 
 	// Tools is a list of tool definitions that will be provided to clients
 	Tools []MCPToolConfig `yaml:"tools"`
-}
-
-// Prompts is a list of prompts that could be provided to clients
-type Prompts struct {
-	// System is a list of system prompts
-	System []string `yaml:"system,omitempty"`
-
-	// User is a list of user prompts
-	User []string `yaml:"user,omitempty"`
 }
 
 // MCPRunConfig represents run-specific configuration options.
@@ -111,18 +102,19 @@ type MCPToolRunConfig struct {
 ////////////////////////////////////////////////////////////////////////////////////
 
 // NewConfigFromFile loads the configuration from a YAML file at the specified path.
+// The file path should already be resolved (use ResolveConfigPath for URL/directory resolution).
 //
 // Parameters:
-//   - filepath: Path to the YAML configuration file
+//   - filepath: Path to the YAML configuration file (should be absolute and resolved)
 //
 // Returns:
 //   - A pointer to the loaded Config structure
 //   - An error if loading or parsing fails
-func NewConfigFromFile(filepath string) (*Config, error) {
+func NewConfigFromFile(filepath string) (*ToolsConfig, error) {
 	// Open the configuration file
 	file, err := os.Open(filepath)
 	if err != nil {
-		return nil, fmt.Errorf("failed to open config file: %w", err)
+		return nil, fmt.Errorf("failed to open config file %s: %w", filepath, err)
 	}
 	defer func() {
 		_ = file.Close()
@@ -131,14 +123,14 @@ func NewConfigFromFile(filepath string) (*Config, error) {
 	// Read the file content
 	data, err := io.ReadAll(file)
 	if err != nil {
-		return nil, fmt.Errorf("failed to read config file: %w", err)
+		return nil, fmt.Errorf("failed to read config file %s: %w", filepath, err)
 	}
 
 	// Parse the YAML content
-	var config Config
+	var config ToolsConfig
 	err = yaml.Unmarshal(data, &config)
 	if err != nil {
-		return nil, fmt.Errorf("failed to parse config file: %w", err)
+		return nil, fmt.Errorf("failed to parse config file %s: %w", filepath, err)
 	}
 
 	return &config, nil
@@ -149,7 +141,7 @@ func NewConfigFromFile(filepath string) (*Config, error) {
 //
 // Returns:
 //   - A slice of ToolDefinition objects
-func (c *Config) GetTools() []Tool {
+func (c *ToolsConfig) GetTools() []Tool {
 	var tools []Tool
 
 	for _, toolConfig := range c.MCP.Tools {
@@ -175,7 +167,7 @@ func (c *Config) GetTools() []Tool {
 // Returns:
 //   - YAML data as bytes
 //   - An error if serialization fails
-func (c *Config) ToYAML() ([]byte, error) {
+func (c *ToolsConfig) ToYAML() ([]byte, error) {
 	return yaml.Marshal(c)
 }
 
@@ -192,12 +184,12 @@ func (c *Config) ToYAML() ([]byte, error) {
 // Returns:
 //   - A pointer to the merged Config structure
 //   - An error if loading or merging fails
-func LoadAndMergeConfigs(filepaths []string) (*Config, error) {
+func LoadAndMergeConfigs(filepaths []string) (*ToolsConfig, error) {
 	if len(filepaths) == 0 {
 		return nil, fmt.Errorf("no configuration files provided")
 	}
 
-	var mergedConfig Config
+	var mergedConfig ToolsConfig
 	var isFirstFile = true
 
 	for _, filepath := range filepaths {
@@ -206,8 +198,9 @@ func LoadAndMergeConfigs(filepaths []string) (*Config, error) {
 			return nil, fmt.Errorf("failed to load config file %s: %w", filepath, err)
 		}
 
-		// Merge prompts (concatenate from all files)
-		mergedConfig.Prompts = append(mergedConfig.Prompts, config.Prompts...)
+		// Merge prompts (concatenate system and user prompts)
+		mergedConfig.Prompts.System = append(mergedConfig.Prompts.System, config.Prompts.System...)
+		mergedConfig.Prompts.User = append(mergedConfig.Prompts.User, config.Prompts.User...)
 
 		// For MCP config, use the first file's description and run config
 		if isFirstFile {

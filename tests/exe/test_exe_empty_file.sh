@@ -4,7 +4,8 @@
 
 # Source common utilities
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-source "$SCRIPT_DIR/common.sh"
+TESTS_ROOT="$(dirname "$SCRIPT_DIR")"
+source "$TESTS_ROOT/common/common.sh"
 
 # Test configuration
 CONFIG_FILE="$SCRIPT_DIR/test_exe_config.yaml"
@@ -26,7 +27,7 @@ separator
 check_cli_exists
 
 # Command to test
-CMD="$CLI_BIN exe -c $CONFIG_FILE create_file filepath=$TEST_FILE"
+CMD="$CLI_BIN exe --tools $CONFIG_FILE create_file filepath=$TEST_FILE"
 OUTPUT=$(eval "$CMD" 2>&1)
 RESULT=$?
 [ -n "$E2E_LOG_FILE" ] && echo -e "\n$TEST_NAME:\n\n$OUTPUT" >> "$E2E_LOG_FILE"
