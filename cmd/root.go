@@ -18,9 +18,10 @@ const ApplicationName = "mcpshell"
 // Common command-line flags
 var (
 	// Common flags
-	toolsFile string
-	logFile   string
-	logLevel  string
+	toolsFiles []string
+	logFile    string
+	logLevel   string
+	verbose    bool
 
 	// MCP server flags
 	description         []string
@@ -43,17 +44,29 @@ var (
 var rootCmd = &cobra.Command{
 	Use:   ApplicationName,
 	Short: "MCPShell",
-	Long: `MCPShell is a command line interface for the MCP platform.
+	Long: `
+MCPShell is a MCP bridge for LLMs and shell commands.
+
 This CLI application enables AI systems to securely execute commands through
 the Model Context Protocol (MCP).
 
-Specify your tools configuration using the --tools flag:
-  mcpshell --tools /path/to/tools.yaml     (absolute path)
-  mcpshell --tools mytools                 (looks in tools directory, adds .yaml)
-  mcpshell --tools mytools.yaml            (looks in tools directory)
+Specify your tools configuration using the --tools flag (supports multiple files):
+  mcpshell --tools /path/to/tools.yaml              (single file, absolute path)
+  mcpshell --tools mytools                          (single file in global tools directory, adds .yaml)
+  mcpshell --tools mytools.yaml                     (single file in tools directory)
+  mcpshell --tools /some/dir                        (load all tools in the directory)
+  mcpshell --tools file1.yaml --tools file2.yaml    (multiple files)
+  mcpshell --tools file1.yaml,file2.yaml            (multiple files, comma-separated)
   
 The tools directory defaults to ~/.mcpshell/tools but can be overridden 
-with the MCPSHELL_TOOLS_DIR environment variable.`,
+with the MCPSHELL_TOOLS_DIR environment variable.
+
+When multiple configuration files are provided, they are merged with:
+
+- Prompts concatenated from all files
+- Tools combined from all files  
+- MCP description and run config taken from the first file
+`,
 	Run: func(cmd *cobra.Command, args []string) {
 		// If no subcommand is specified, show the help
 		_ = cmd.Help()
@@ -75,17 +88,25 @@ func Execute() {
 // init registers all subcommands and sets up global flags
 func init() {
 	// Add common persistent flags
-	rootCmd.PersistentFlags().StringVar(&toolsFile, "tools", "", "Path to the tools configuration file (supports relative paths and auto .yaml extension)")
+	rootCmd.PersistentFlags().StringSliceVar(&toolsFiles, "tools", []string{}, "Path(s) to the tools configuration file(s).\nSupports multiple files via --tools=file1 --tools=file2 or --tools=file1,file2.\nEach path supports relative paths and auto .yaml extension.\nDefault look path from MCPSHELL_TOOLS_DIR")
 	rootCmd.PersistentFlags().StringVarP(&logFile, "logfile", "l", "", "Path to the log file (optional)")
 	rootCmd.PersistentFlags().StringVarP(&logLevel, "log-level", "", "info", "Log level: none, error, info, debug")
+	rootCmd.PersistentFlags().BoolVarP(&verbose, "verbose", "v", false, "Enable verbose logging (sets log level to debug)")
 
 	// Add version flag to all commands
-	rootCmd.PersistentFlags().BoolP("version", "v", false, "Print version information")
+	rootCmd.PersistentFlags().Bool("version", false, "Print version information")
 }
 
 // initLogger initializes the logger with the specified configuration
 func initLogger() (*common.Logger, error) {
-	level := common.LogLevelFromString(logLevel)
+	// If verbose flag is set, use debug level; otherwise use the configured log level
+	var level common.LogLevel
+	if verbose {
+		level = common.LogLevelDebug
+	} else {
+		level = common.LogLevelFromString(logLevel)
+	}
+
 	logger, err := common.NewLogger("[mcpshell] ", logFile, level, true)
 	if err != nil {
 		return nil, fmt.Errorf("failed to set up logger: %w", err)

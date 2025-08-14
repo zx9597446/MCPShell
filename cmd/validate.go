@@ -12,9 +12,11 @@ import (
 // validateCommand represents the validate command which checks a configuration file
 var validateCommand = &cobra.Command{
 	Use:   "validate",
-	Short: "Validate an MCP configuration file",
-	Long: `Validate an MCP configuration file without starting the server.
+	Short: "Validate an MCPShell tools configuration file",
+	Long: `Validate an MCPShell tools configuration file.
+
 This command checks the configuration file for errors including:
+
 - File format and schema validation
 - Tool parameter definitions
 - Constraint expression syntax
@@ -36,9 +38,9 @@ This command checks the configuration file for errors including:
 		logger.Info("Validating MCP configuration")
 
 		// Check if config file is provided
-		if toolsFile == "" {
-			logger.Error("Tools configuration file is required")
-			return fmt.Errorf("tools configuration file is required. Use --tools flag to specify the path")
+		if len(toolsFiles) == 0 {
+			logger.Error("Tools configuration file(s) are required")
+			return fmt.Errorf("tools configuration file(s) are required. Use --tools flag to specify the path(s)")
 		}
 
 		return nil
@@ -54,8 +56,8 @@ This command checks the configuration file for errors including:
 			}
 		}()
 
-		// Load the configuration file (local or remote)
-		localConfigPath, cleanup, err := config.ResolveConfigPath(toolsFile, logger)
+		// Load the configuration file(s) (local or remote)
+		localConfigPath, cleanup, err := config.ResolveMultipleConfigPaths(toolsFiles, logger)
 		if err != nil {
 			logger.Error("Failed to load configuration: %v", err)
 			return fmt.Errorf("failed to load configuration: %w", err)

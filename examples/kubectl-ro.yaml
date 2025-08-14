@@ -67,11 +67,11 @@ mcp:
           FORMAT_PARAM="{{ if .output_format }}-o {{ .output_format }}{{ end }}"
           
           {{ if .filter_grep }}
-          kubectl $CONTEXT_PARAM get {{ .resource }} $NAMESPACE_PARAM $LABEL_PARAM $FORMAT_PARAM | grep -F "{{ .filter_grep }}" || /bin/true
+          kubectl $CONTEXT_PARAM get {{ .resource }} $NAMESPACE_PARAM $LABEL_PARAM $FORMAT_PARAM | grep -F "{{ .filter_grep }}" || true
           {{ else if .filter_grep_regex }}
-          kubectl $CONTEXT_PARAM get {{ .resource }} $NAMESPACE_PARAM $LABEL_PARAM $FORMAT_PARAM | grep -E "{{ .filter_grep_regex }}" || /bin/true
+          kubectl $CONTEXT_PARAM get {{ .resource }} $NAMESPACE_PARAM $LABEL_PARAM $FORMAT_PARAM | grep -E "{{ .filter_grep_regex }}" || true
           {{ else if .filter_jq }}
-          kubectl $CONTEXT_PARAM get {{ .resource }} $NAMESPACE_PARAM $LABEL_PARAM $FORMAT_PARAM | jq "{{ .filter_jq }}" || /bin/true
+          kubectl $CONTEXT_PARAM get {{ .resource }} $NAMESPACE_PARAM $LABEL_PARAM $FORMAT_PARAM | jq "{{ .filter_jq }}" || true
           {{ else }}
           kubectl $CONTEXT_PARAM get {{ .resource }} $NAMESPACE_PARAM $LABEL_PARAM $FORMAT_PARAM
           {{ end }}
@@ -231,11 +231,11 @@ mcp:
           
           # Add grep filtering if specified
           {{ if .filter_grep }}
-          $CMD | grep -F "{{ .filter_grep }}" || /bin/true
+          $CMD | grep -F "{{ .filter_grep }}" || true
           {{ else if .filter_grep_regex }}
-          $CMD | grep -E "{{ .filter_grep_regex }}" || /bin/true
+          $CMD | grep -E "{{ .filter_grep_regex }}" || true
           {{ else }}
-          $CMD || /bin/true
+          $CMD || true
           {{ end }}
         env:
           - KUBECONFIG
@@ -466,11 +466,11 @@ mcp:
           # nmap -sT -p $localport localhost    # This would show that the port is open
 
           {{ if .filter_jq }}
-          curl $CURL_ARGS "http://localhost:$localport{{ .path }}" | jq '{{ .filter_jq }}'
+          curl $CURL_ARGS "http://localhost:$localport{{ .path }}" | jq '{{ .filter_jq }}' 2>/dev/null || true
           {{ else if .filter_grep }}
-          curl $CURL_ARGS "http://localhost:$localport{{ .path }}" | grep -F "{{ .filter_grep }}" || /bin/true
+          curl $CURL_ARGS "http://localhost:$localport{{ .path }}" | grep -F "{{ .filter_grep }}" || true
           {{ else if .filter_grep_regex }}
-          curl $CURL_ARGS "http://localhost:$localport{{ .path }}" | grep -E "{{ .filter_grep_regex }}" || /bin/true
+          curl $CURL_ARGS "http://localhost:$localport{{ .path }}" | grep -E "{{ .filter_grep_regex }}" || true
           {{ else }}
           curl $CURL_ARGS "http://localhost:$localport{{ .path }}"
           {{ end }}
@@ -487,6 +487,8 @@ mcp:
                 - "/usr/bin"
                 - "/bin"
                 - "/etc"
+                - "/usr/local/bin"
+                - "/opt/homebrew/bin"
                 - "{{ env \"HOME\" }}/.kube"
                 - "{{ env \"KUBECONFIG\" }}"
           - name: firejail
@@ -497,6 +499,8 @@ mcp:
                 - "/usr/bin"
                 - "/bin"
                 - "/etc"
+                - "/usr/local/bin"
+                - "/opt/homebrew/bin"
                 - "{{ env \"HOME\" }}/.kube"
                 - "{{ env \"KUBECONFIG\" }}"
           - name: exec
@@ -610,11 +614,11 @@ mcp:
           # nmap -sT -p $localport localhost    # This would show that the port is open
 
           {{ if .filter_jq }}
-          curl $CURL_ARGS "http://localhost:$localport{{ .path }}" | jq '{{ .filter_jq }}' || /bin/true
+          curl $CURL_ARGS "http://localhost:$localport{{ .path }}" | jq '{{ .filter_jq }}' || true
           {{ else if .filter_grep }}
-          curl $CURL_ARGS "http://localhost:$localport{{ .path }}" | grep -F '{{ .filter_grep }}' || /bin/true
+          curl $CURL_ARGS "http://localhost:$localport{{ .path }}" | grep -F '{{ .filter_grep }}' || true
           {{ else if .filter_grep_regex }}
-          curl $CURL_ARGS "http://localhost:$localport{{ .path }}" | grep -E '{{ .filter_grep_regex }}' || /bin/true
+          curl $CURL_ARGS "http://localhost:$localport{{ .path }}" | grep -E '{{ .filter_grep_regex }}' || true
           {{ else }}
           curl $CURL_ARGS "http://localhost:$localport{{ .path }}"
           {{ end }}
@@ -634,6 +638,8 @@ mcp:
                 - "/usr/bin"
                 - "/bin"
                 - "/etc"
+                - "/usr/local/bin"
+                - "/opt/homebrew/bin"
                 - "{{ env \"HOME\" }}/.kube"
                 - "{{ env \"KUBECONFIG\" }}"
           - name: firejail
@@ -644,6 +650,8 @@ mcp:
                 - "/usr/bin"
                 - "/bin"
                 - "/etc"
+                - "/usr/local/bin"
+                - "/opt/homebrew/bin"
                 - "{{ env \"HOME\" }}/.kube"
                 - "{{ env \"KUBECONFIG\" }}"
           - name: exec

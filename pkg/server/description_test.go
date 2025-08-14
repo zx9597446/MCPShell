@@ -57,7 +57,7 @@ func TestGetDescription(t *testing.T) {
 				configDesc = loadedCfg.MCP.Description
 				cfg.Logger.Debug("Found description in config file: %s", configDesc)
 				finalDesc = configDesc
-				cfg.Logger.Info("Using description from config file: %s", configDesc)
+				cfg.Logger.Debug("Using description from config file: %s", configDesc)
 			}
 		}
 

@@ -14,7 +14,6 @@ import (
 	"github.com/sashabaranov/go-openai"
 
 	"github.com/inercia/MCPShell/pkg/common"
-	"github.com/inercia/MCPShell/pkg/config"
 	"github.com/inercia/MCPShell/pkg/server"
 )
 
@@ -50,16 +49,10 @@ func (a *Agent) Validate() error {
 		return fmt.Errorf("tools configuration file is required")
 	}
 
-	// Check if model is provided
-	if a.config.Model == "" {
-		a.logger.Error("LLM model is required")
-		return fmt.Errorf("LLM model is required")
-	}
-
-	// Check if API key is provided or in environment
-	if a.config.APIKey == "" {
-		a.logger.Error("API key is required")
-		return fmt.Errorf("API key is required (set API key environment variable or pass via config/flags)")
+	// Validate model configuration using the model manager
+	if err := ValidateModelConfig(a.config.ModelConfig, a.logger); err != nil {
+		a.logger.Error("Model configuration validation failed: %v", err)
+		return fmt.Errorf("model configuration validation failed: %w", err)
 	}
 
 	return nil
@@ -79,8 +72,12 @@ func (a *Agent) Run(ctx context.Context, userInput chan string, agentOutput chan
 	}
 	defer cleanup() // Ensure cleanup is called
 
-	// Initialize OpenAI client
-	client := a.initializeOpenAIClient()
+	// Initialize model client
+	client, err := a.initializeModelClient()
+	if err != nil {
+		agentOutput <- fmt.Sprintf("Error: %v", err)
+		return err
+	}
 
 	// Convert MCP tools to OpenAI tools
 	openaiTools, err := srv.GetOpenAITools()
@@ -179,12 +176,9 @@ func (a *Agent) Run(ctx context.Context, userInput chan string, agentOutput chan
 
 // setupServer initializes and creates the MCP server
 func (a *Agent) setupServer(ctx context.Context) (*server.Server, func(), error) {
-	// Load the configuration file (local or remote)
-	localConfigPath, cleanup, err := config.ResolveConfigPath(a.config.ToolsFile, a.logger)
-	if err != nil {
-		a.logger.Error("Failed to load configuration: %v", err)
-		return nil, cleanup, fmt.Errorf("failed to load configuration: %w", err)
-	}
+	// Use the already resolved configuration file path (no need to resolve again)
+	localConfigPath := a.config.ToolsFile
+	cleanup := func() {} // No cleanup needed since path was already resolved
 
 	// Initialize MCP server to get tools
 	a.logger.Info("Initializing MCP server")
@@ -203,15 +197,14 @@ func (a *Agent) setupServer(ctx context.Context) (*server.Server, func(), error)
 	return srv, cleanup, nil
 }
 
-// initializeOpenAIClient creates and configures the OpenAI client
-func (a *Agent) initializeOpenAIClient() *openai.Client {
-	openaiConfig := openai.DefaultConfig(a.config.APIKey)
-	if a.config.APIURL != "" {
-		openaiConfig.BaseURL = a.config.APIURL
+// initializeModelClient creates and configures the appropriate model client using the model manager
+func (a *Agent) initializeModelClient() (*openai.Client, error) {
+	client, err := InitializeModelClient(a.config.ModelConfig, a.logger)
+	if err != nil {
+		a.logger.Error("Failed to initialize model client: %v", err)
+		return nil, fmt.Errorf("failed to initialize model client: %w", err)
 	}
-	client := openai.NewClientWithConfig(openaiConfig)
-	a.logger.Info("Initialized OpenAI client with model: %s", a.config.Model)
-	return client
+	return client, nil
 }
 
 // setupConversation prepares the initial conversation messages and system prompt

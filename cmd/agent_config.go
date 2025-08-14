@@ -85,6 +85,13 @@ $ mcpshell agent config show
 			return err
 		}
 
+		// Get the config file path
+		mcpShellHome, err := utils.GetMCPShellHome()
+		if err != nil {
+			return fmt.Errorf("failed to get MCPShell home directory: %w", err)
+		}
+		configPath := filepath.Join(mcpShellHome, "agent.yaml")
+
 		// Load the current configuration
 		config, err := agent.GetConfig()
 		if err != nil {
@@ -94,12 +101,16 @@ $ mcpshell agent config show
 
 		// Check if config is empty
 		if len(config.Agent.Models) == 0 {
+			fmt.Printf("Configuration file: %s\n", configPath)
+			fmt.Println()
 			fmt.Println("No agent configuration found.")
 			fmt.Println("Run 'mcpshell agent config create' to create a default configuration.")
 			return nil
 		}
 
 		// Pretty print the configuration
+		fmt.Printf("Configuration file: %s\n", configPath)
+		fmt.Println()
 		fmt.Println("Agent Configuration:")
 		fmt.Println("===================")
 		fmt.Println()

@@ -25,9 +25,14 @@ evaluation, tool selection and tool execution.
 
 For example, you can run:
 
-$ mcpshell exe --tools=examples/config.yaml "hello_world" "name=John"
+$ mcpshell exe --tools examples/config.yaml "hello_world" "name=John"
 
 and it will run the "hello_world" tool with the parameter "name" set to "John".
+You can also specify multiple tools files:
+
+$ mcpshell exe --tools file1.yaml --tools file2.yaml "hello_world" "name=John"
+$ mcpshell exe --tools file1.yaml,file2.yaml "hello_world" "name=John"
+
 Any error in the constraint evaluation, tool selection or tool execution
 will be reported.
 
@@ -46,9 +51,9 @@ will be reported.
 		logger.Info("Executing MCP tool directly")
 
 		// Check if config file is provided
-		if toolsFile == "" {
-			logger.Error("Tools configuration file is required")
-			return fmt.Errorf("tools configuration file is required. Use --tools flag to specify the path")
+		if len(toolsFiles) == 0 {
+			logger.Error("Tools configuration file(s) are required")
+			return fmt.Errorf("tools configuration file(s) are required. Use --tools flag to specify the path(s)")
 		}
 
 		return nil
@@ -64,8 +69,8 @@ will be reported.
 		toolName := args[0]
 		logger.Info("Executing tool: %s", toolName)
 
-		// Load the configuration file (local or remote)
-		localConfigPath, cleanup, err := config.ResolveConfigPath(toolsFile, logger)
+		// Load the configuration file(s) (local or remote)
+		localConfigPath, cleanup, err := config.ResolveMultipleConfigPaths(toolsFiles, logger)
 		if err != nil {
 			logger.Error("Failed to load configuration: %v", err)
 			return fmt.Errorf("failed to load configuration: %w", err)
@@ -151,7 +156,7 @@ will be reported.
 		handler, err := command.NewCommandHandler(config.Tool{
 			MCPTool: config.CreateMCPTool(*targetTool),
 			Config:  *targetTool,
-		}, targetTool.Params, shell, logger.Logger)
+		}, targetTool.Params, shell, logger)
 		if err != nil {
 			logger.Error("Failed to create command handler: %v", err)
 			return fmt.Errorf("failed to create command handler: %w", err)

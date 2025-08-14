@@ -58,9 +58,9 @@ func New(cfg Config) *Server {
 	if err != nil {
 		cfg.Logger.Error("Failed to process description flags: %v", err)
 	} else if finalDescription != "" {
-		cfg.Logger.Info("Using MCP server description: %s", finalDescription)
+		cfg.Logger.Debug("Using MCP server description: %s", finalDescription)
 	} else {
-		cfg.Logger.Info("No MCP server description provided")
+		cfg.Logger.Debug("No MCP server description provided")
 	}
 
 	return &Server{
@@ -109,7 +109,6 @@ func (s *Server) Validate() error {
 	if len(toolDefs) < len(cfg.MCP.Tools) {
 		skippedCount := len(cfg.MCP.Tools) - len(toolDefs)
 		s.logger.Info("%d tool(s) would be skipped due to unmet prerequisites", skippedCount)
-		fmt.Printf("%d tool(s) would be skipped due to unmet prerequisites\n", skippedCount)
 
 		// Log which tools were skipped
 		for _, toolConfig := range cfg.MCP.Tools {
@@ -123,7 +122,6 @@ func (s *Server) Validate() error {
 
 			if !found {
 				s.logger.Info("Tool '%s' would be skipped due to unmet prerequisites", toolConfig.Name)
-				fmt.Printf("- Tool '%s' would be skipped due to unmet prerequisites\n", toolConfig.Name)
 			}
 		}
 	}
@@ -168,12 +166,10 @@ func (s *Server) Validate() error {
 			constraintInfo = ""
 		}
 
-		fmt.Printf("Validated tool: '%s'%s\n", toolDef.MCPTool.Name, constraintInfo)
 		s.logger.Info("Validated tool: '%s'%s", toolDef.MCPTool.Name, constraintInfo)
 	}
 
 	s.logger.Info("Configuration validation successful")
-	fmt.Println("Configuration validation successful")
 	return nil
 }
 
@@ -191,7 +187,6 @@ func (s *Server) Start() error {
 	}
 
 	s.logger.Info("Starting MCP server with stdio handler")
-	fmt.Println("Starting MCP server...")
 
 	// Start the stdio server
 	if err := mcpserver.ServeStdio(s.mcpServer); err != nil {
@@ -218,12 +213,12 @@ func (s *Server) CreateServer() error {
 	// Use shell from config if present and no shell is explicitly set
 	if s.shell == "" && cfg.MCP.Run.Shell != "" {
 		s.shell = cfg.MCP.Run.Shell
-		s.logger.Info("Using shell from config: %s", s.shell)
+		s.logger.Debug("Using shell from config: %s", s.shell)
 	}
 
 	// Add description if provided
 	if s.description != "" {
-		s.logger.Info("Using description for MCP server: %s", s.description)
+		s.logger.Debug("Using description for MCP server: %s", s.description)
 		options = append(options, mcpserver.WithInstructions(s.description))
 	}
 
@@ -241,8 +236,6 @@ func (s *Server) CreateServer() error {
 
 // loadTools loads tools from the configuration and registers them with the server
 func (s *Server) loadTools(cfg *config.ToolsConfig) error {
-	s.logger.Info("Loading configuration from file: %s", s.configFile)
-
 	// Check if there are any tools defined
 	if len(cfg.MCP.Tools) == 0 {
 		s.logger.Error("No tools defined in the configuration file")
@@ -284,7 +277,7 @@ func (s *Server) loadTools(cfg *config.ToolsConfig) error {
 		params := cfg.MCP.Tools[s.findToolByName(cfg.MCP.Tools, toolDef.MCPTool.Name)].Params
 
 		// Create a new command handler instance
-		cmdHandler, err := command.NewCommandHandler(toolDef, params, s.shell, s.logger.Logger)
+		cmdHandler, err := command.NewCommandHandler(toolDef, params, s.shell, s.logger)
 		if err != nil {
 			s.logger.Error("Failed to create handler for tool '%s': %v", toolDef.MCPTool.Name, err)
 			return fmt.Errorf("failed to create handler for tool '%s': %w", toolDef.MCPTool.Name, err)
@@ -299,11 +292,9 @@ func (s *Server) loadTools(cfg *config.ToolsConfig) error {
 		// Print whether constraints are enabled
 		if len(toolDef.Config.Constraints) > 0 {
 			msg := fmt.Sprintf("Registered tool: '%s' (with %d constraints)", toolDef.MCPTool.Name, len(toolDef.Config.Constraints))
-			fmt.Println(msg)
 			s.logger.Info(msg)
 		} else {
 			msg := fmt.Sprintf("Registered tool: '%s'", toolDef.MCPTool.Name)
-			fmt.Println(msg)
 			s.logger.Info(msg)
 		}
 	}
@@ -613,8 +604,7 @@ func (s *Server) StartHTTP(port int) error {
 	}
 	http.HandleFunc("/sse", s.handleMCPHTTP)
 	addr := fmt.Sprintf(":%d", port)
-	s.logger.Info("Listening on http://localhost%s/sse", addr)
-	fmt.Printf("MCP HTTP server listening on http://localhost%s/sse\n", addr)
+	s.logger.Info("MCP HTTP server listening on http://localhost%s/sse", addr)
 	return http.ListenAndServe(addr, nil)
 }
 

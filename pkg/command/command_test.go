@@ -2,9 +2,6 @@ package command
 
 import (
 	"context"
-	"io"
-	"log"
-	"os"
 	"strings"
 	"testing"
 
@@ -15,7 +12,7 @@ import (
 )
 
 // Create a test logger that discards output to keep test output clean
-var testLogger = log.New(io.Discard, "", 0)
+var testLogger, _ = common.NewLogger("", "", common.LogLevelNone, false)
 
 func TestCommandHandler(t *testing.T) {
 	tests := []struct {
@@ -258,7 +255,7 @@ func TestCommandHandler(t *testing.T) {
 
 // TestCommandHandlerDefaults tests that default values are applied correctly
 func TestCommandHandlerDefaults(t *testing.T) {
-	logger := log.New(os.Stdout, "", log.LstdFlags)
+	logger, _ := common.NewLogger("", "", common.LogLevelInfo, false)
 
 	// Create a command handler with parameters that have default values
 	params := map[string]common.ParamConfig{

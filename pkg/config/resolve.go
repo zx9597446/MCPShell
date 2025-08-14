@@ -214,3 +214,73 @@ func createMergedConfigFile(yamlFiles []string, logger *common.Logger) (string, 
 	logger.Info("Created merged configuration file: %s (from %d source files)", tmpFilePath, len(yamlFiles))
 	return tmpFilePath, cleanup, nil
 }
+
+// ResolveMultipleConfigPaths tries to resolve multiple configuration file paths.
+// It handles each path individually (URLs, directories, local files) and then merges
+// all configurations into a single temporary file.
+// Returns the local path to the merged configuration file and a cleanup function.
+func ResolveMultipleConfigPaths(configPaths []string, logger *common.Logger) (string, func(), error) {
+	// Default no-op cleanup function
+	noopCleanup := func() {}
+
+	// Return early if no config paths provided
+	if len(configPaths) == 0 {
+		return "", noopCleanup, fmt.Errorf("no configuration file paths provided")
+	}
+
+	// If only one path, use the existing single path resolution
+	if len(configPaths) == 1 {
+		return ResolveConfigPath(configPaths[0], logger)
+	}
+
+	logger.Info("Resolving %d configuration paths", len(configPaths))
+
+	// Keep track of all temporary files and cleanup functions
+	var allCleanupFuncs []func()
+	var resolvedPaths []string
+
+	// Combined cleanup function for all temporary files
+	combinedCleanup := func() {
+		for _, cleanup := range allCleanupFuncs {
+			cleanup()
+		}
+	}
+
+	// Resolve each config path
+	for i, configPath := range configPaths {
+		logger.Debug("Resolving config path %d: %s", i+1, configPath)
+
+		resolvedPath, cleanup, err := ResolveConfigPath(configPath, logger)
+		if err != nil {
+			combinedCleanup() // Clean up any already resolved paths
+			return "", noopCleanup, fmt.Errorf("failed to resolve config path %s: %w", configPath, err)
+		}
+
+		resolvedPaths = append(resolvedPaths, resolvedPath)
+		if cleanup != nil {
+			allCleanupFuncs = append(allCleanupFuncs, cleanup)
+		}
+	}
+
+	// If we only have one resolved path after processing, return it directly
+	if len(resolvedPaths) == 1 {
+		logger.Info("Single configuration file resolved: %s", resolvedPaths[0])
+		return resolvedPaths[0], combinedCleanup, nil
+	}
+
+	// Create merged configuration file from all resolved paths
+	mergedPath, mergeCleanup, err := createMergedConfigFile(resolvedPaths, logger)
+	if err != nil {
+		combinedCleanup()
+		return "", noopCleanup, fmt.Errorf("failed to create merged configuration: %w", err)
+	}
+
+	// Add the merge cleanup to our combined cleanup
+	finalCleanup := func() {
+		combinedCleanup()
+		mergeCleanup()
+	}
+
+	logger.Info("Successfully resolved and merged %d configuration paths", len(configPaths))
+	return mergedPath, finalCleanup, nil
+}
