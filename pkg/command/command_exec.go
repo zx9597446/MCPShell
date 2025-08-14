@@ -23,13 +23,13 @@ import (
 //   - An error if command execution fails
 func (h *CommandHandler) executeToolCommand(ctx context.Context, params map[string]interface{}, extraRunnerOpts map[string]interface{}) (string, []string, error) {
 	// Log the tool execution
-	h.logger.Printf("Tool execution requested for '%s'", h.toolName)
-	h.logger.Printf("Arguments: %v", params)
+	h.logger.Info("Tool execution requested for '%s'", h.toolName)
+	h.logger.Info("Arguments: %v", params)
 
 	// Apply default values for parameters that aren't provided but have defaults
 	for paramName, paramConfig := range h.params {
 		if _, exists := params[paramName]; !exists && paramConfig.Default != nil {
-			h.logger.Printf("Using default value for parameter '%s': %v", paramName, paramConfig.Default)
+			h.logger.Debug("Using default value for parameter '%s': %v", paramName, paramConfig.Default)
 			params[paramName] = paramConfig.Default
 		}
 	}
@@ -38,7 +38,7 @@ func (h *CommandHandler) executeToolCommand(ctx context.Context, params map[stri
 	for paramName, paramConfig := range h.params {
 		if paramConfig.Required {
 			if _, exists := params[paramName]; !exists {
-				h.logger.Printf("Required parameter missing: %s", paramName)
+				h.logger.Error("Required parameter missing: %s", paramName)
 				return "", nil, fmt.Errorf("required parameter missing: %s", paramName)
 			}
 		}
@@ -47,14 +47,14 @@ func (h *CommandHandler) executeToolCommand(ctx context.Context, params map[stri
 	// Validate constraints before executing command
 	var failedConstraints []string
 	if h.constraintsCompiled != nil {
-		h.logger.Printf("Checking %d constraints", len(h.constraints))
+		h.logger.Debug("Checking %d constraints", len(h.constraints))
 		satisfied, failed, err := h.constraintsCompiled.Evaluate(params, h.params)
 		if err != nil {
-			h.logger.Printf("Error evaluating constraints: %v", err)
+			h.logger.Error("Error evaluating constraints: %v", err)
 			return "", nil, fmt.Errorf("error evaluating constraints: %v", err)
 		}
 		if !satisfied {
-			h.logger.Printf("Constraints not satisfied, blocking execution")
+			h.logger.Info("Constraints not satisfied, blocking execution")
 			failedConstraints = failed
 			errorMsg := "command execution blocked by constraints"
 
@@ -71,30 +71,30 @@ func (h *CommandHandler) executeToolCommand(ctx context.Context, params map[stri
 
 			return "", failedConstraints, fmt.Errorf("%s", errorMsg)
 		}
-		h.logger.Printf("All constraints satisfied")
+		h.logger.Debug("All constraints satisfied")
 	}
 
 	// Process the command template with the tool arguments
-	// h.logger.Printf("Processing command template:\n%s", h.cmd)
+	// h.logger.Debug("Processing command template:\n%s", h.cmd)
 
 	cmd, err := common.ProcessTemplate(h.cmd, params)
 	if err != nil {
-		h.logger.Printf("Error processing command template: %v", err)
+		h.logger.Error("Error processing command template: %v", err)
 		return "", nil, fmt.Errorf("error processing command template: %v", err)
 	}
 
-	// h.logger.Printf("Processed command: %s", cmd)
+	// h.logger.Debug("Processed command: %s", cmd)
 
 	// Prepare environment variables
 	env := h.getEnvironmentVariables(params)
 
-	h.logger.Printf("Executing command:")
-	h.logger.Printf("\n------------------------------------------------------\n%s\n------------------------------------------------------\n", cmd)
+	h.logger.Info("Executing command:")
+	h.logger.Info("\n------------------------------------------------------\n%s\n------------------------------------------------------\n", cmd)
 
 	// Determine which runner to use based on the configuration
 	runnerType := RunnerTypeExec // default runner
 	if h.runnerType != "" {
-		h.logger.Printf("Using configured runner type: %s", h.runnerType)
+		h.logger.Debug("Using configured runner type: %s", h.runnerType)
 		switch h.runnerType {
 		case string(RunnerTypeExec):
 			runnerType = RunnerTypeExec
@@ -103,7 +103,7 @@ func (h *CommandHandler) executeToolCommand(ctx context.Context, params map[stri
 		case string(RunnerTypeFirejail):
 			runnerType = RunnerTypeFirejail
 		default:
-			h.logger.Printf("Unknown runner type '%s', falling back to default runner", h.runnerType)
+			h.logger.Error("Unknown runner type '%s', falling back to default runner", h.runnerType)
 		}
 	}
 
@@ -115,24 +115,24 @@ func (h *CommandHandler) executeToolCommand(ctx context.Context, params map[stri
 
 	// Add or override with any options from the parameters if present
 	if extraRunnerOpts != nil {
-		h.logger.Printf("Found runner options in parameters: %v", extraRunnerOpts)
+		h.logger.Debug("Found runner options in parameters: %v", extraRunnerOpts)
 		for k, v := range extraRunnerOpts {
 			runnerOptions[k] = v
 		}
 	}
 
 	// Create the appropriate runner with options
-	h.logger.Printf("Creating runner of type %s and checking implicit requirements", runnerType)
-	runner, err := NewRunner(runnerType, runnerOptions, h.logger)
+	h.logger.Debug("Creating runner of type %s and checking implicit requirements", runnerType)
+	runner, err := NewRunner(runnerType, runnerOptions, h.logger.Logger)
 	if err != nil {
-		h.logger.Printf("Error creating runner: %v", err)
+		h.logger.Error("Error creating runner: %v", err)
 		return "", nil, fmt.Errorf("error creating runner: %v", err)
 	}
 
 	// Execute the command
 	commandOutput, err := runner.Run(ctx, h.shell, cmd, env, params, true)
 	if err != nil {
-		h.logger.Printf("Error executing command: %v", err)
+		h.logger.Error("Error executing command: %v", err)
 		return "", nil, err
 	}
 
@@ -141,21 +141,21 @@ func (h *CommandHandler) executeToolCommand(ctx context.Context, params map[stri
 
 	// Apply prefix if provided
 	if h.output.Prefix != "" {
-		h.logger.Printf("Applying output prefix template: %s", h.output.Prefix)
+		h.logger.Debug("Applying output prefix template: %s", h.output.Prefix)
 
 		// Process the prefix template with the tool arguments
 		prefix, err := common.ProcessTemplate(h.output.Prefix, params)
 		if err != nil {
-			h.logger.Printf("Error processing output prefix template: %v", err)
+			h.logger.Error("Error processing output prefix template: %v", err)
 			return "", nil, fmt.Errorf("error processing output prefix template: %v", err)
 		}
 
 		// Combine prefix and command output
 		finalOutput = strings.TrimSpace(prefix) + "\n\n" + finalOutput
-		h.logger.Printf("Final output with prefix:\n--------------------------------\n%s\n--------------------------------", finalOutput)
+		h.logger.Debug("Final output with prefix:\n--------------------------------\n%s\n--------------------------------", finalOutput)
 	}
 
-	h.logger.Printf("Tool execution completed successfully")
+	h.logger.Info("Tool execution completed successfully")
 	return finalOutput, nil, nil
 }
 

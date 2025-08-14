@@ -39,10 +39,10 @@ available to AI applications via the MCP protocol.
 
 		logger.Info("Starting MCPShell")
 
-		// Check if config file is provided
-		if toolsFile == "" {
-			logger.Error("Tools configuration file is required")
-			return fmt.Errorf("tools configuration file is required. Use --tools flag to specify the path")
+		// Check if config files are provided
+		if len(toolsFiles) == 0 {
+			logger.Error("Tools configuration file(s) are required")
+			return fmt.Errorf("tools configuration file(s) are required. Use --tools flag to specify the path(s)")
 		}
 
 		// Ensure tools directory exists
@@ -57,8 +57,8 @@ available to AI applications via the MCP protocol.
 		logger := common.GetLogger()
 		defer common.RecoverPanic()
 
-		// Load the configuration file (local or remote)
-		localConfigPath, cleanup, err := config.ResolveConfigPath(toolsFile, logger)
+		// Load the configuration file(s) (local or remote)
+		localConfigPath, cleanup, err := config.ResolveMultipleConfigPaths(toolsFiles, logger)
 		if err != nil {
 			logger.Error("Failed to load configuration: %v", err)
 			return fmt.Errorf("failed to load configuration: %w", err)

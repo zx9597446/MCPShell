@@ -27,6 +27,7 @@ func TestNew(t *testing.T) {
 		Version:    "1.0.0",
 		ModelConfig: ModelConfig{
 			Model:  "gpt-4",
+			Class:  "openai",
 			APIKey: "test-key",
 		},
 	}
@@ -71,12 +72,24 @@ func TestValidate(t *testing.T) {
 		errMsg  string
 	}{
 		{
-			name: "valid config",
+			name: "valid OpenAI config",
 			config: AgentConfig{
 				ToolsFile: "test.yaml",
 				ModelConfig: ModelConfig{
 					Model:  "gpt-4",
+					Class:  "openai",
 					APIKey: "test-key",
+				},
+			},
+			wantErr: false,
+		},
+		{
+			name: "valid Ollama config",
+			config: AgentConfig{
+				ToolsFile: "test.yaml",
+				ModelConfig: ModelConfig{
+					Model: "llama2",
+					Class: "ollama",
 				},
 			},
 			wantErr: false,
@@ -87,6 +100,7 @@ func TestValidate(t *testing.T) {
 				ToolsFile: "",
 				ModelConfig: ModelConfig{
 					Model:  "gpt-4",
+					Class:  "openai",
 					APIKey: "test-key",
 				},
 			},
@@ -94,28 +108,30 @@ func TestValidate(t *testing.T) {
 			errMsg:  "tools configuration file is required",
 		},
 		{
-			name: "missing model",
+			name: "missing model for OpenAI",
 			config: AgentConfig{
 				ToolsFile: "test.yaml",
 				ModelConfig: ModelConfig{
 					Model:  "",
+					Class:  "openai",
 					APIKey: "test-key",
 				},
 			},
 			wantErr: true,
-			errMsg:  "LLM model is required",
+			errMsg:  "model configuration validation failed: model name is required for OpenAI models",
 		},
 		{
-			name: "missing API key",
+			name: "missing API key for OpenAI model",
 			config: AgentConfig{
 				ToolsFile: "test.yaml",
 				ModelConfig: ModelConfig{
 					Model:  "gpt-4",
+					Class:  "openai",
 					APIKey: "",
 				},
 			},
 			wantErr: true,
-			errMsg:  "API key is required (set API key environment variable or pass via config/flags)",
+			errMsg:  "model configuration validation failed: API key is required for OpenAI models (set API key environment variable or pass via config/flags)",
 		},
 	}
 
@@ -221,7 +237,7 @@ func TestSetupConversation(t *testing.T) {
 	}
 }
 
-func TestInitializeOpenAIClient(t *testing.T) {
+func TestInitializeModelClient(t *testing.T) {
 	logger, err := common.NewLogger("", "", common.LogLevelError, false)
 	if err != nil {
 		t.Fatalf("Failed to create logger: %v", err)
@@ -232,21 +248,32 @@ func TestInitializeOpenAIClient(t *testing.T) {
 		config AgentConfig
 	}{
 		{
-			name: "basic client initialization",
+			name: "basic OpenAI client initialization",
 			config: AgentConfig{
 				ModelConfig: ModelConfig{
 					Model:  "gpt-4",
+					Class:  "openai",
 					APIKey: "test-key",
 				},
 			},
 		},
 		{
-			name: "client with custom API URL",
+			name: "OpenAI client with custom API URL",
 			config: AgentConfig{
 				ModelConfig: ModelConfig{
 					Model:  "gpt-4",
+					Class:  "openai",
 					APIKey: "test-key",
 					APIURL: "https://custom.api.url",
+				},
+			},
+		},
+		{
+			name: "Ollama client initialization",
+			config: AgentConfig{
+				ModelConfig: ModelConfig{
+					Model: "llama2",
+					Class: "ollama",
 				},
 			},
 		},
@@ -255,10 +282,13 @@ func TestInitializeOpenAIClient(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			agent := New(tt.config, logger)
-			client := agent.initializeOpenAIClient()
+			client, err := agent.initializeModelClient()
 
+			if err != nil {
+				t.Errorf("Unexpected error initializing model client: %v", err)
+			}
 			if client == nil {
-				t.Error("Expected OpenAI client to be initialized")
+				t.Error("Expected model client to be initialized")
 			}
 		})
 	}
@@ -294,6 +324,7 @@ func TestAgentWithOllama(t *testing.T) {
 		Version:    "test",
 		ModelConfig: ModelConfig{
 			Model:  modelName,
+			Class:  "ollama",
 			APIURL: "http://localhost:11434/v1", // Ollama's OpenAI-compatible endpoint
 			APIKey: "ollama",                    // Ollama doesn't require a real API key
 			Prompts: common.PromptsConfig{
@@ -318,10 +349,13 @@ func TestAgentWithOllama(t *testing.T) {
 		t.Errorf("Model %s should be tool-capable according to our test utilities", modelName)
 	}
 
-	// Test OpenAI client initialization
-	client := agent.initializeOpenAIClient()
+	// Test model client initialization
+	client, err := agent.initializeModelClient()
+	if err != nil {
+		t.Fatalf("Failed to initialize model client: %v", err)
+	}
 	if client == nil {
-		t.Fatal("Failed to initialize OpenAI client")
+		t.Fatal("Failed to initialize model client")
 	}
 
 	// Test conversation setup

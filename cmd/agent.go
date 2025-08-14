@@ -9,11 +9,18 @@ import (
 	"strings"
 	"sync"
 	"syscall"
+	"time"
 
+	"github.com/fatih/color"
 	"github.com/spf13/cobra"
 
 	"github.com/inercia/MCPShell/pkg/agent"
+	"github.com/inercia/MCPShell/pkg/common"
+	toolsConfig "github.com/inercia/MCPShell/pkg/config"
 )
+
+// Cache the agent configuration to avoid duplicate resolution
+var cachedAgentConfig agent.AgentConfig
 
 // buildAgentConfig creates an AgentConfig by merging command-line flags with configuration file
 func buildAgentConfig() (agent.AgentConfig, error) {
@@ -53,14 +60,11 @@ func buildAgentConfig() (agent.AgentConfig, error) {
 		// Add command-line system prompt
 		allSystemPrompts = append(allSystemPrompts, agentSystemPrompt)
 
-		// Update the prompts config with merged system prompts
+		// Update the model config with merged prompts
 		modelConfig.Prompts.System = allSystemPrompts
-		// Clear user prompts as they should be ignored from config
-		modelConfig.Prompts.User = nil
-	} else {
-		// No command-line system prompt provided, but still clear user prompts from config
-		modelConfig.Prompts.User = nil
 	}
+
+	// Override API key and URL if provided
 	if agentOpenAIApiKey != "" {
 		modelConfig.APIKey = agentOpenAIApiKey
 	}
@@ -68,17 +72,26 @@ func buildAgentConfig() (agent.AgentConfig, error) {
 		modelConfig.APIURL = agentOpenAIApiURL
 	}
 
-	// If no API key is set, try environment variable or handle template value
+	// Handle environment variable substitution for API key
 	switch modelConfig.APIKey {
-	case "":
-		modelConfig.APIKey = os.Getenv("OPENAI_API_KEY")
 	case "${OPENAI_API_KEY}":
 		// Handle environment variable substitution
 		modelConfig.APIKey = os.Getenv("OPENAI_API_KEY")
 	}
 
+	// Resolve multiple config files into a single merged config file
+	logger := common.GetLogger()
+	if len(toolsFiles) == 0 {
+		return agent.AgentConfig{}, fmt.Errorf("tools configuration file(s) are required")
+	}
+
+	localConfigPath, _, err := toolsConfig.ResolveMultipleConfigPaths(toolsFiles, logger)
+	if err != nil {
+		return agent.AgentConfig{}, fmt.Errorf("failed to resolve config paths: %w", err)
+	}
+
 	return agent.AgentConfig{
-		ToolsFile:   toolsFile,
+		ToolsFile:   localConfigPath,
 		UserPrompt:  agentUserPrompt,
 		Once:        agentOnce,
 		Version:     version,
@@ -128,14 +141,14 @@ The agent will try to debug the issue with the given tools.
 			return err
 		}
 
-		// Build agent configuration
-		agentConfig, err := buildAgentConfig()
+		// Build agent configuration (this will be cached for RunE)
+		cachedAgentConfig, err = buildAgentConfig()
 		if err != nil {
 			return err
 		}
 
 		// Validate agent configuration
-		agentInstance := agent.New(agentConfig, logger)
+		agentInstance := agent.New(cachedAgentConfig, logger)
 		if err := agentInstance.Validate(); err != nil {
 			return err
 		}
@@ -154,11 +167,8 @@ The agent will try to debug the issue with the given tools.
 			return err
 		}
 
-		// Build agent configuration
-		agentConfig, err := buildAgentConfig()
-		if err != nil {
-			return err
-		}
+		// Use cached agent configuration (built in PreRunE)
+		agentConfig := cachedAgentConfig
 
 		// Create agent instance
 		agentInstance := agent.New(agentConfig, logger)
@@ -191,16 +201,30 @@ The agent will try to debug the issue with the given tools.
 			wg.Add(1)
 			go func() {
 				defer wg.Done()
+				defer close(userInput) // Always close userInput when this goroutine exits
+
 				scanner := bufio.NewScanner(os.Stdin)
+				inputChan := make(chan string)
+
+				// Start a separate goroutine to read from stdin
+				go func() {
+					for scanner.Scan() {
+						inputChan <- scanner.Text()
+					}
+					close(inputChan)
+				}()
+
 				for {
 					select {
 					case <-ctx.Done():
 						return
-					default:
-						if scanner.Scan() {
-							userInput <- scanner.Text()
-						} else {
-							close(userInput)
+					case input, ok := <-inputChan:
+						if !ok {
+							return
+						}
+						select {
+						case userInput <- input:
+						case <-ctx.Done():
 							return
 						}
 					}
@@ -213,7 +237,9 @@ The agent will try to debug the issue with the given tools.
 		go func() {
 			defer wg.Done()
 			if err := agentInstance.Run(ctx, userInput, agentOutput); err != nil {
-				logger.Error("Agent encountered an error: %v", err)
+				logger.Error(color.HiRedString("Agent encountered an error: %v", err))
+				// Cancel context to abort all goroutines on fatal errors
+				cancel()
 			}
 		}()
 
@@ -222,7 +248,21 @@ The agent will try to debug the issue with the given tools.
 			fmt.Println(output)
 		}
 
-		wg.Wait()
+		// Wait for all goroutines with a timeout to prevent hanging
+		done := make(chan struct{})
+		go func() {
+			wg.Wait()
+			close(done)
+		}()
+
+		select {
+		case <-done:
+			// All goroutines finished normally
+		case <-time.After(5 * time.Second):
+			// Force exit after timeout
+			logger.Info("Forcing shutdown after timeout")
+		}
+
 		return nil
 	},
 }

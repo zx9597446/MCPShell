@@ -152,7 +152,6 @@ func (c *ToolsConfig) GetTools() []Tool {
 
 		// Check prerequisites before creating the tool
 		if !tool.checkToolRequirements() {
-			fmt.Printf("Skipping tool %s because prerequisites are not met\n", toolConfig.Name)
 			continue // Skip this tool if prerequisites are not met
 		}
 
