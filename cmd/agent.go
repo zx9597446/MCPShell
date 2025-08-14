@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"os/signal"
+	"strings"
 	"sync"
 	"syscall"
 
@@ -108,10 +109,19 @@ If a model is configured as default in the agent configuration file, you can omi
 $ mcpshell agent --tools=examples/config.yaml \
      --user-prompt "I am having trouble with my computer. It is slow and I think it is due to the CPU usage."
 
+You can also provide the initial user prompt as positional arguments:
+
+$ mcpshell agent I am having trouble with my computer. It is slow and I think it is due to the CPU usage.
+
 The agent will try to debug the issue with the given tools.
 `,
-	Args: cobra.NoArgs,
+	Args: cobra.ArbitraryArgs,
 	PreRunE: func(cmd *cobra.Command, args []string) error {
+		// If --user-prompt is not provided but positional args exist, join them as the user prompt
+		if agentUserPrompt == "" && len(args) > 0 {
+			agentUserPrompt = strings.Join(args, " ")
+		}
+
 		// Initialize logger
 		logger, err := initLogger()
 		if err != nil {
@@ -133,6 +143,11 @@ The agent will try to debug the issue with the given tools.
 		return nil
 	},
 	RunE: func(cmd *cobra.Command, args []string) error {
+		// If --user-prompt is not provided but positional args exist, join them as the user prompt
+		if agentUserPrompt == "" && len(args) > 0 {
+			agentUserPrompt = strings.Join(args, " ")
+		}
+
 		// Initialize logger
 		logger, err := initLogger()
 		if err != nil {
