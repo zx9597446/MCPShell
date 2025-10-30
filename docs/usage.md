@@ -174,6 +174,7 @@ For information about configuring MCPShell, including defining tools, parameters
 
 - [Configuration Guide](config.md): General configuration information
 - [Runner Configuration](config-runners.md): Configuration for command runners
+- [Container Deployment](mcp-containers.md): Building and deploying MCPShell in containers and Kubernetes
 
 ## Troubleshooting
 

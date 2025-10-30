@@ -121,6 +121,8 @@ Take a look at all the command in [this document](docs/usage.md).
 Configuration files use a YAML format defined [here](docs/config.md).
 See the [this directory](examples) for some examples.
 
+For deploying MCPShell in containers and Kubernetes, see the [Container Deployment Guide](docs/mcp-containers.md).
+
 ## Agent Mode
 
 MCPShell can also be run in agent mode, providing direct connectivity between Large Language Models
