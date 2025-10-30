@@ -160,7 +160,8 @@ func (a *Agent) Run(ctx context.Context, userInput chan string, agentOutput chan
 				return nil
 			}
 			if nextInput == "" {
-				continue // Skip empty input
+				a.logger.Info("Empty input received, exiting")
+				return nil
 			}
 
 			// Add the new user message to the session to continue the conversation
